@@ -1,81 +1,154 @@
-"use client";
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import SubmitWorkForm from '../../../components/SubmitWorkForm';
 
-import { useState } from "react";
-import MarkdownRenderer from "@/app/components/MarkdownRenderer";
+interface Bounty {
+  id: string;
+  title: string;
+  description: string;
+  reward: string;
+  deadline: string;
+  status: 'open' | 'closed' | 'in_progress';
+  ownerAddress: string;
+  tags?: string[];
+}
 
-/**
- * Bounty detail page with markdown-rendered description.
- * Uses mock data since backend is not yet connected.
- */
-export default function BountyDetailPage({ params }: { params: { id: string } }) {
-  const [activeTab, setActiveTab] = useState<"write" | "preview">("preview");
+async function getBounty(id: string): Promise<Bounty | null> {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/bounties/${id}`,
+      { next: { revalidate: 60 } }
+    );
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
 
-  // Mock bounty data — replace with API call when backend is ready
-  const bounty = {
-    id: params.id,
-    title: "Build a bounty listing page",
-    description: `## Summary\n\nThe home page is a static placeholder. Build a real bounty listing page that fetches from the backend.\n\n## Acceptance Criteria\n\n- [ ] \`GET /bounties\` fetched server-side with Next.js \`fetch\`\n- [ ] Display bounty cards with title, reward, deadline\n- [ ] Filter by status (open, in-progress, completed)\n- [ ] Sort by reward amount or deadline\n- [ ] Loading skeleton while fetching\n- [ ] Empty state when no bounties match filters\n\n## Tech Notes\n\n- Use \`fetch(\`\${process.env.NEXT_PUBLIC_API_URL}/bounties\`)\`\n- Tailwind for styling\n- \`@/app/components/BountyCard.tsx\` for individual cards`,
-    reward: "500 XLM",
-    status: "open",
-    deadline: "2026-06-18",
+function formatAddress(address: string): string {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    open: { label: 'Open', className: 'bg-green-900/50 text-green-400 border-green-700' },
+    closed: { label: 'Closed', className: 'bg-red-900/50 text-red-400 border-red-700' },
+    in_progress: { label: 'In Progress', className: 'bg-yellow-900/50 text-yellow-400 border-yellow-700' },
   };
+  const info = config[status] || { label: status, className: 'bg-slate-700 text-slate-400 border-slate-600' };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              {bounty.status}
-            </span>
-            <span className="text-sm text-slate-400">Reward: {bounty.reward}</span>
-            <span className="text-sm text-slate-400">Deadline: {bounty.deadline}</span>
-          </div>
-          <h1 className="text-2xl font-bold">{bounty.title}</h1>
-        </div>
+    <span className={`text-sm font-medium px-3 py-1 rounded-full border ${info.className}`}>
+      {info.label}
+    </span>
+  );
+}
 
-        {/* Tabs */}
-        <div className="flex border-b border-slate-700 mb-6">
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "preview"
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
+export default async function BountyDetailPage({ params }: { params: { id: string } }) {
+  const bounty = await getBounty(params.id);
+
+  if (!bounty) {
+    notFound();
+  }
+
+  const daysLeft = Math.ceil((new Date(bounty.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Back Link */}
+      <div className="border-b border-slate-800">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <Link
+            href="/bounties"
+            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
           >
-            Preview
-          </button>
-          <button
-            onClick={() => setActiveTab("write")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "write"
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Write
-          </button>
-        </div>
-
-        {/* Content */}
-        {activeTab === "preview" ? (
-          <MarkdownRenderer content={bounty.description} className="p-4 bg-slate-900 rounded-lg" />
-        ) : (
-          <textarea
-            className="w-full h-96 bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm resize-y border border-slate-700 focus:outline-none focus:border-blue-500"
-            defaultValue={bounty.description}
-          />
-        )}
-
-        {/* Submit button */}
-        <div className="mt-6 flex justify-end">
-          <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-            Claim Bounty
-          </button>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to bounties
+          </Link>
         </div>
       </div>
-    </main>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Title & Status */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <StatusBadge status={bounty.status} />
+                {daysLeft > 0 && daysLeft <= 7 && (
+                  <span className="text-sm text-orange-400 font-medium">• {daysLeft} days left</span>
+                )}
+              </div>
+              <h1 className="text-3xl font-bold text-white">{bounty.title}</h1>
+            </div>
+
+            {/* Tags */}
+            {bounty.tags && bounty.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {bounty.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-sm text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Description */}
+            <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-3">Description</h2>
+              <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{bounty.description}</p>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Reward Card */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-sm font-medium text-slate-400 mb-2">Reward</h3>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-yellow-400">{bounty.reward}</span>
+                <span className="text-slate-500">XLM</span>
+              </div>
+            </div>
+
+            {/* Details Card */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 space-y-4">
+              <h3 className="text-sm font-medium text-slate-400">Details</h3>
+              <div>
+                <p className="text-xs text-slate-500 mb-0.5">Owner</p>
+                <p className="text-sm text-slate-300 font-mono" title={bounty.ownerAddress}>
+                  {formatAddress(bounty.ownerAddress)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-0.5">Deadline</p>
+                <p className="text-sm text-slate-300">
+                  {new Date(bounty.deadline).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {/* Submit Work Form */}
+            <SubmitWorkForm
+              bountyId={bounty.id}
+              isAuthenticated={false}
+              bountyStatus={bounty.status}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
