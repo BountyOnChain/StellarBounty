@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { WalletProvider } from "../components/WalletContext";
+import { ToastProvider } from "../components/ToastContext";
 import Navbar from "./components/Navbar";
 import "./globals.css"
 
@@ -12,12 +13,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <WalletProvider>
-          <div className="min-h-screen bg-slate-950 text-slate-100">
-            <Navbar />
-            {children}
-          </div>
-        </WalletProvider>
+        <ToastProvider>
+          <WalletProvider>
+            <div className="min-h-screen bg-slate-950 text-slate-100">
+              <Navbar />
+              {children}
+            </div>
+          </WalletProvider>
+        </ToastProvider>
       </body>
     </html>
   );

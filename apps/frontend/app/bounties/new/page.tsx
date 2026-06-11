@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import { useWallet } from "@/components/WalletContext";
 import { useAuth } from "@/lib/api";
+import { useToast } from "@/components/ToastContext";
 
 const MAX_REWARD_AMOUNT = 1_000_000_000;
 
@@ -42,8 +43,8 @@ export default function CreateBountyPage() {
   const router = useRouter();
   const { publicKey } = useWallet();
   const { getToken, clearToken, apiUrl } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -76,8 +77,6 @@ export default function CreateBountyPage() {
       router.replace("/");
       return;
     }
-
-    setSubmitError(null);
 
     try {
       const accessToken = await getToken(publicKey);
@@ -127,9 +126,10 @@ export default function CreateBountyPage() {
       }
 
       const created = (await response.json()) as CreateBountyResponse;
+      showToast("success", "Bounty created successfully!");
       router.push(`/bounties/${created.id}`);
     } catch (error) {
-      setSubmitError(formatErrorMessage(error));
+      showToast("error", formatErrorMessage(error));
     }
   });
 
@@ -234,12 +234,6 @@ export default function CreateBountyPage() {
               <p className={fieldErrorClass}>{errors.description.message}</p>
             )}
           </div>
-
-          {submitError && (
-            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {submitError}
-            </div>
-          )}
 
           <div className="flex justify-end">
             <button
