@@ -1,5 +1,7 @@
 import Link from "next/link";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 
 export const revalidate = 60;
 
@@ -35,7 +37,64 @@ async function getBounties(): Promise<BountyCardData[]> {
 }
 
 export default async function Home() {
-  const bounties = await getBounties();
+  const [bounties, setBounties] = useState<BountyCardData[]>([]);
+  const [sort, setSort] = useState("newest");
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchBounties = async () => {
+      const data = await getBounties();
+      setBounties(data);
+    };
+    fetchBounties();
+  }, []);
+
+  useEffect(() => {
+    const query = {};
+    if (sort !== "newest") query.sort = sort;
+    if (filter !== "all") query.filter = filter;
+    if (search) query.search = search;
+    router.push(
+      {
+        pathname: "/",
+        query,
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [sort, filter, search]);
+
+  useEffect(() => {
+    const query = router.query;
+    if (query.sort) setSort(query.sort as string);
+    if (query.filter) setFilter(query.filter as string);
+    if (query.search) setSearch(query.search as string);
+  }, [router.query]);
+
+  const sortedBounties = () => {
+    switch (sort) {
+      case "newest":
+        return bounties.sort((a, b) => b.id - a.id);
+      case "highest":
+        return bounties.sort((a, b) => (b.reward ?? 0) - (a.reward ?? 0));
+      case "closest":
+        return bounties.sort((a, b) => new Date(a.deadline ?? "").getTime() - new Date(b.deadline ?? "").getTime());
+      default:
+        return bounties;
+    }
+  };
+
+  const filteredBounties = sortedBounties().filter((bounty) => {
+    if (filter === "all") return true;
+    if (filter === "open" && bounty.status === "open") return true;
+    if (filter === "in-progress" && bounty.status === "in-progress") return true;
+    if (filter === "completed" && bounty.status === "completed") return true;
+    return false;
+  });
+
+  const searchedBounties = filteredBounties.filter((bounty) => bounty.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
@@ -58,9 +117,38 @@ export default async function Home() {
           </Link>
         </section>
 
-        {bounties.length > 0 ? (
+        <section className="flex flex-col gap-4 md:flex-row md:justify-between">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="rounded-xl bg-slate-900 p-2 text-slate-200"
+          >
+            <option value="newest">Newest</option>
+            <option value="highest">Highest Reward</option>
+            <option value="closest">Closest Deadline</option>
+          </select>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="rounded-xl bg-slate-900 p-2 text-slate-200"
+          >
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="in-progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title"
+            className="rounded-xl bg-slate-900 p-2 text-slate-200"
+          />
+        </section>
+
+        {searchedBounties.length > 0 ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {bounties.map((bounty) => (
+            {searchedBounties.map((bounty) => (
               <BountyCard key={bounty.id} bounty={bounty} />
             ))}
           </section>
