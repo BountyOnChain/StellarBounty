@@ -10,7 +10,9 @@ import { BountiesController } from './bounties.controller';
 import { BountiesService } from './bounties.service';
 import { Bounty } from './entities/bounty.entity';
 import { Submission } from './entities/submission.entity';
+import { Nonce } from './entities/nonce.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
+import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { SubmissionsModule } from './submissions/submissions.module';
 
@@ -33,15 +35,15 @@ import { SubmissionsModule } from './submissions/submissions.module';
     AuthModule,
     SubmissionsModule,
     HealthModule,
-    TypeOrmModule.forFeature([Bounty]),
+    TypeOrmModule.forFeature([Bounty, Nonce]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [Bounty, Submission],
-        migrations: [InitSchema1747657200000],
+        entities: [Bounty, Submission, Nonce],
+        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
         synchronize: false,
       }),
     }),

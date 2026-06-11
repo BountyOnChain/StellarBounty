@@ -1,32 +1,44 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import * as crypto from 'crypto';
-
-interface NonceEntry {
-  nonce: string;
-  expiresAt: number;
-}
+import { Nonce } from '../entities/nonce.entity';
 
 @Injectable()
 export class AuthService {
-  private readonly nonces = new Map<string, NonceEntry>();
   private readonly NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    @InjectRepository(Nonce)
+    private readonly nonceRepository: Repository<Nonce>,
+  ) {}
 
-  getChallenge(address: string): { nonce: string } {
-    this.pruneExpired();
+  async getChallenge(address: string): Promise<{ nonce: string }> {
+    await this.pruneExpired();
     const nonce = crypto.randomBytes(32).toString('hex');
-    this.nonces.set(address, { nonce, expiresAt: Date.now() + this.NONCE_TTL_MS });
+    const expiresAt = new Date(Date.now() + this.NONCE_TTL_MS);
+
+    // Upsert nonce
+    let nonceEntity = await this.nonceRepository.findOne({ where: { address } });
+    if (!nonceEntity) {
+      nonceEntity = this.nonceRepository.create({ address, nonce, expiresAt });
+    } else {
+      nonceEntity.nonce = nonce;
+      nonceEntity.expiresAt = expiresAt;
+    }
+    await this.nonceRepository.save(nonceEntity);
+
     return { nonce };
   }
 
-  verify(address: string, signature: string, nonce: string): { accessToken: string } {
-    this.pruneExpired();
-    const entry = this.nonces.get(address);
+  async verify(address: string, signature: string, nonce: string): Promise<{ accessToken: string }> {
+    await this.pruneExpired();
+    const entry = await this.nonceRepository.findOne({ where: { address } });
 
-    if (!entry || entry.nonce !== nonce || Date.now() > entry.expiresAt) {
+    if (!entry || entry.nonce !== nonce || Date.now() > entry.expiresAt.getTime()) {
       throw new UnauthorizedException('Invalid or expired nonce');
     }
 
@@ -40,15 +52,18 @@ export class AuthService {
       throw new UnauthorizedException('Signature verification failed');
     }
 
-    this.nonces.delete(address);
+    await this.nonceRepository.delete({ address });
     const accessToken = this.jwtService.sign({ sub: address });
     return { accessToken };
   }
 
-  private pruneExpired(): void {
-    const now = Date.now();
-    for (const [addr, entry] of this.nonces) {
-      if (now > entry.expiresAt) this.nonces.delete(addr);
-    }
+  private async pruneExpired(): Promise<void> {
+    const now = new Date();
+    await this.nonceRepository
+      .createQueryBuilder()
+      .delete()
+      .from(Nonce)
+      .where('expiresAt < :now', { now })
+      .execute();
   }
 }
