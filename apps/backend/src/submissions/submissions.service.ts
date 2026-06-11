@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,6 +15,8 @@ import { CreateSubmissionDto } from './submissions.dto';
 
 @Injectable()
 export class SubmissionsService {
+  private readonly logger = new Logger(SubmissionsService.name);
+
   constructor(
     @InjectRepository(Submission)
     private readonly submissionRepo: Repository<Submission>,
@@ -95,26 +98,33 @@ export class SubmissionsService {
         ? StellarSdk.Networks.PUBLIC
         : StellarSdk.Networks.TESTNET;
 
-    const account = await server.getAccount(ownerAddress);
+    try {
+      const account = await server.getAccount(ownerAddress);
 
-    const contract = new StellarSdk.Contract(contractId);
-    const tx = new StellarSdk.TransactionBuilder(account, {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase,
-    })
-      .addOperation(
-        contract.call('approve', StellarSdk.nativeToScVal(ownerAddress, { type: 'address' })),
-      )
-      .setTimeout(30)
-      .build();
+      const contract = new StellarSdk.Contract(contractId);
+      const tx = new StellarSdk.TransactionBuilder(account, {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase,
+      })
+        .addOperation(
+          contract.call('approve', StellarSdk.nativeToScVal(ownerAddress, { type: 'address' })),
+        )
+        .setTimeout(30)
+        .build();
 
-    const prepared = await server.prepareTransaction(tx);
-    // The backend signs only if a server-side signing key is configured.
-    const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
-    if (signingSecret) {
-      const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
-      prepared.sign(signingKeypair);
-      await server.sendTransaction(prepared);
+      const prepared = await server.prepareTransaction(tx);
+      // The backend signs only if a server-side signing key is configured.
+      const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
+      if (signingSecret) {
+        const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
+        prepared.sign(signingKeypair);
+        await server.sendTransaction(prepared);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Stellar contract approval skipped after RPC failure: bountyId=${bountyId}, contractId=${contractId}, rpcUrl=${rpcUrl}, error=${message}`,
+      );
     }
     // If no signing secret, the transaction is prepared but not submitted —
     // the client is expected to sign and submit it separately.
