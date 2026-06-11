@@ -19,8 +19,21 @@ export class BountiesService {
     return this.bounties.save(bounty);
   }
 
-  async findAll() {
-    return this.bounties.find({ order: { createdAt: 'DESC' } });
+  async findAll(page: number = 1, limit: number = 20) {
+    const [bounties, total] = await this.bounties.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: Math.min(limit, 100),
+    });
+    const totalPages = Math.ceil(total / limit);
+    return {
+      data: bounties,
+      pagination: {
+        total,
+        page,
+        totalPages,
+      },
+    };
   }
 
   async findOne(id: string) {
