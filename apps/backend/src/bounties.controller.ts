@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { CreateBountyDto, UpdateBountyDto } from './bounties.dto';
@@ -14,8 +14,8 @@ export class BountiesController {
   }
 
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 20) {
+    return this.bountiesService.findAll(page, limit);
   }
 
   @Get(':id')
