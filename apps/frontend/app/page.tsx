@@ -140,15 +140,15 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const bounties = applyListingControls(allBounties, { sort, status, search });
 
   return (
-    <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
+    <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <section className="mb-10 flex flex-col justify-between gap-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 shadow-2xl shadow-black/20 sm:p-8 lg:flex-row lg:items-end">
+        <section className="mb-10 flex flex-col justify-between gap-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-6 shadow-2xl shadow-slate-200/70 transition-colors dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900 dark:shadow-black/20 sm:p-8 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-yellow-400">StellarBounty</p>
-            <h1 className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-yellow-400">StellarBounty</p>
+            <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
               Open bounties ready for builders
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400">
               Browse funded work, compare rewards and deadlines, then jump into a task that matches your skills.
             </p>
           </div>
@@ -160,25 +160,25 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           </Link>
         </section>
 
-        <section className="mb-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl shadow-black/10 sm:p-6">
+        <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:p-6">
           <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Search title</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Search title</span>
               <input
                 type="search"
                 name="search"
                 defaultValue={search}
                 placeholder="Search bounty titles"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-yellow-400"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Status</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
               <select
                 name="status"
                 defaultValue={status}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-400"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               >
                 <option value="all">All statuses</option>
                 <option value="open">Open</option>
@@ -188,11 +188,11 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Sort by</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Sort by</span>
               <select
                 name="sort"
                 defaultValue={sort}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-400"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               >
                 <option value="newest">Newest</option>
                 <option value="highest_reward">Highest reward</option>
@@ -209,19 +209,19 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
               </button>
               <Link
                 href="/"
-                className="inline-flex min-w-28 items-center justify-center rounded-2xl border border-slate-700 px-5 py-3 font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+                className="inline-flex min-w-28 items-center justify-center rounded-2xl border border-slate-300 px-5 py-3 font-medium text-slate-700 transition hover:border-slate-500 hover:text-slate-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
               >
                 Reset
               </Link>
             </div>
           </form>
 
-          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <p>
-              Showing <span className="font-semibold text-slate-200">{bounties.length}</span> of{" "}
-              <span className="font-semibold text-slate-200">{allBounties.length}</span> bounties
+              Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{allBounties.length}</span> bounties
             </p>
-            <p className="text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
+            <p className="text-slate-500 dark:text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
           </div>
         </section>
 
@@ -232,12 +232,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             ))}
           </section>
         ) : (
-          <section className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-16 text-center">
-            <p className="text-lg font-semibold text-slate-200">No bounties available yet.</p>
-            <p className="mt-2 text-slate-400">Create the first bounty and bring new work onto Stellar.</p>
+          <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center transition-colors dark:border-slate-700 dark:bg-slate-900/50">
+            <p className="text-lg font-semibold text-slate-900 dark:text-slate-200">No bounties available yet.</p>
+            <p className="mt-2 text-slate-600 dark:text-slate-400">Create the first bounty and bring new work onto Stellar.</p>
             <Link
               href="/bounties/new"
-              className="mt-6 inline-flex rounded-xl border border-slate-700 px-5 py-3 font-medium text-slate-200 transition hover:border-yellow-400 hover:text-yellow-300"
+              className="mt-6 inline-flex rounded-xl border border-slate-300 px-5 py-3 font-medium text-slate-700 transition hover:border-amber-500 hover:text-amber-700 dark:border-slate-700 dark:text-slate-200 dark:hover:border-yellow-400 dark:hover:text-yellow-300"
             >
               Post a bounty
             </Link>

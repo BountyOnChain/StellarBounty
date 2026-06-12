@@ -26,7 +26,7 @@ type Bounty = {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-12 text-center text-slate-500 text-sm">{message}</div>
+    <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-500">{message}</div>
   );
 }
 
@@ -58,7 +58,7 @@ export default function DashboardPage() {
 
   if (!publicKey) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-400">
+      <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-400">
         <p>Connect your wallet to view your dashboard.</p>
         <button
           onClick={connect}
@@ -71,11 +71,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <main className="mx-auto max-w-5xl bg-slate-50 px-4 py-8 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-700 mb-6">
+      <div className="mb-6 flex border-b border-slate-300 dark:border-slate-700">
         {(["submissions", "bounties"] as const).map((tab) => (
           <button
             key={tab}
@@ -83,7 +83,7 @@ export default function DashboardPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
               activeTab === tab
                 ? "border-blue-500 text-blue-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
             {tab === "submissions" ? "My Submissions" : "My Bounties"}
@@ -91,12 +91,12 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+      {error && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 rounded bg-slate-800 animate-pulse" />
+            <div key={i} className="h-12 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
           ))}
         </div>
       ) : activeTab === "submissions" ? (
@@ -104,19 +104,19 @@ export default function DashboardPage() {
           <EmptyState message="You haven't submitted to any bounties yet." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-400 uppercase border-b border-slate-700">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-300 text-xs uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 <tr>
                   <th className="py-3 pr-4">Bounty</th>
                   <th className="py-3 pr-4">Submitted</th>
                   <th className="py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {submissions.map((s) => (
                   <tr key={s.id}>
-                    <td className="py-3 pr-4 text-slate-100">{s.bountyTitle}</td>
-                    <td className="py-3 pr-4 text-slate-400">
+                    <td className="py-3 pr-4 text-slate-900 dark:text-slate-100">{s.bountyTitle}</td>
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">
                       {new Date(s.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-3">
@@ -132,8 +132,8 @@ export default function DashboardPage() {
         <EmptyState message="You haven't created any bounties yet." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-400 uppercase border-b border-slate-700">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-300 text-xs uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <tr>
                 <th className="py-3 pr-4">Title</th>
                 <th className="py-3 pr-4">Reward</th>
@@ -141,12 +141,12 @@ export default function DashboardPage() {
                 <th className="py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {bounties.map((b) => (
                 <tr key={b.id}>
-                  <td className="py-3 pr-4 text-slate-100">{b.title}</td>
-                  <td className="py-3 pr-4 text-slate-400">{b.rewardAmount} XLM</td>
-                  <td className="py-3 pr-4 text-slate-400">{b.openSubmissionCount}</td>
+                  <td className="py-3 pr-4 text-slate-900 dark:text-slate-100">{b.title}</td>
+                  <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{b.rewardAmount} XLM</td>
+                  <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{b.openSubmissionCount}</td>
                   <td className="py-3">
                     <StatusBadge status={b.status} />
                   </td>

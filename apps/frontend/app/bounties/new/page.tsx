@@ -71,7 +71,7 @@ export default function CreateBountyPage() {
     }
   }, [publicKey, router]);
 
-  const fieldErrorClass = useMemo(() => "mt-1 text-sm text-red-300", []);
+  const fieldErrorClass = useMemo(() => "mt-1 text-sm text-red-600 dark:text-red-300", []);
 
   const onSubmit = handleSubmit(async (values) => {
     if (!publicKey) {
@@ -141,20 +141,20 @@ export default function CreateBountyPage() {
   if (!publicKey) return null;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-6 break-words text-2xl font-bold sm:text-3xl">Create a New Bounty</h1>
 
         <form onSubmit={onSubmit} className="min-w-0 space-y-6">
           <div>
-            <label htmlFor="title" className="mb-1 block text-sm font-medium text-slate-300">
+            <label htmlFor="title" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Title
             </label>
             <input
               id="title"
               type="text"
               {...register("title")}
-              className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
+              className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               placeholder="e.g. Build a bounty listing page"
             />
             {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
@@ -162,7 +162,7 @@ export default function CreateBountyPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="reward" className="mb-1 block text-sm font-medium text-slate-300">
+              <label htmlFor="reward" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Reward (XLM)
               </label>
               <input
@@ -170,38 +170,38 @@ export default function CreateBountyPage() {
                 type="text"
                 inputMode="numeric"
                 {...register("reward")}
-                className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
+                className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 placeholder="e.g. 500"
               />
               {errors.reward && <p className={fieldErrorClass}>{errors.reward.message}</p>}
             </div>
             <div>
-              <label htmlFor="deadline" className="mb-1 block text-sm font-medium text-slate-300">
+              <label htmlFor="deadline" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Deadline
               </label>
               <input
                 id="deadline"
                 type="date"
                 {...register("deadline")}
-                className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
+                className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
               {errors.deadline && <p className={fieldErrorClass}>{errors.deadline.message}</p>}
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Description (supports Markdown)
             </label>
 
-            <div className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-700">
+            <div className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-300 dark:border-slate-700">
               <button
                 type="button"
                 onClick={() => setActiveTab("write")}
                 className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
                   activeTab === "write"
-                    ? "border-b-2 border-blue-500 text-blue-400"
-                    : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
+                    ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 Write
@@ -211,8 +211,8 @@ export default function CreateBountyPage() {
                 onClick={() => setActiveTab("preview")}
                 className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
                   activeTab === "preview"
-                    ? "border-b-2 border-blue-500 text-blue-400"
-                    : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
+                    ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 Preview
@@ -223,15 +223,15 @@ export default function CreateBountyPage() {
               <textarea
                 rows={12}
                 {...register("description")}
-                className="min-h-64 w-full resize-y rounded-b-lg border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                className="min-h-64 w-full resize-y rounded-b-lg border border-slate-300 bg-white p-4 font-mono text-sm text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 placeholder="Write your bounty requirements in markdown..."
               />
             ) : (
-              <div className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-700 bg-slate-900 p-4">
+              <div className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-300 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
                 {description ? (
                   <MarkdownRenderer content={description} />
                 ) : (
-                  <p className="text-sm italic text-slate-500">Nothing to preview yet...</p>
+                  <p className="text-sm italic text-slate-500 dark:text-slate-500">Nothing to preview yet...</p>
                 )}
               </div>
             )}
@@ -241,7 +241,7 @@ export default function CreateBountyPage() {
           </div>
 
           {submitError && (
-            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-lg border border-red-500/40 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-200">
               {submitError}
             </div>
           )}

@@ -117,10 +117,10 @@ export default async function BountyDetailPage({ params }: { params: { id: strin
 
   if (!bounty) {
     return (
-      <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100">
+      <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
         <section className="mx-auto max-w-3xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center">
-          <h1 className="text-2xl font-bold text-white">Bounty unavailable</h1>
-          <p className="mt-3 text-slate-300">
+          <h1 className="text-2xl font-bold text-slate-950 dark:text-white">Bounty unavailable</h1>
+          <p className="mt-3 text-slate-700 dark:text-slate-300">
             The bounty could not be loaded from the API. Please try again once the backend is available.
           </p>
         </section>
