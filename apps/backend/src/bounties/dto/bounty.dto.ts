@@ -118,7 +118,7 @@ export class CreateBountyDto {
 
   @ApiPropertyOptional({
     description: 'Deadline for the bounty (ISO 8601)',
-    example: '2025-12-31T23:59:59Z',
+    example: '2099-12-31T23:59:59Z',
   })
   @IsOptional()
   @IsISO8601()
