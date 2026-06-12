@@ -22,7 +22,7 @@ type ApiBounty = Partial<Omit<Bounty, "reward" | "deadline">> & {
 
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 
 function normalizeBounty(bounty: ApiBounty): Bounty | null {
   if (!bounty.id || !bounty.title || !bounty.description || !bounty.ownerAddress) {

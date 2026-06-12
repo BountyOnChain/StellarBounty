@@ -1,11 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { API_PREFIX } from './api-prefix';
 
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('StellarBounty API')
     .setDescription('Decentralized bounty platform on Stellar network')
     .setVersion('1.0')
+    .addServer(`/${API_PREFIX}`, 'Version 1 API')
     .addBearerAuth(
       {
         type: 'http',

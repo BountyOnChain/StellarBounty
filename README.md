@@ -43,6 +43,7 @@ cp .env.example .env
 npm run dev:frontend
 
 # Backend — http://localhost:4000
+# Versioned REST API — http://localhost:4000/api/v1
 npm run dev:backend
 ```
 
@@ -65,7 +66,7 @@ cargo test
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Secret for signing JWTs |
 | `STELLAR_NETWORK` | `testnet` or `mainnet` |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
+| `NEXT_PUBLIC_API_URL` | Versioned backend API URL used by the frontend, for example `http://localhost:4000/api/v1` |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
 
 ## Contributing

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 
 type SubmissionStatus = "pending" | "approved" | "rejected";
 type BountyStatus = "open" | "in_progress" | "completed" | "cancelled";

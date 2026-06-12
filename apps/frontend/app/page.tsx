@@ -43,7 +43,7 @@ type ApiBounty = Partial<BountyCardData> & {
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
 async function getBounties(): Promise<BountyCardData[]> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 
   try {
     const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });

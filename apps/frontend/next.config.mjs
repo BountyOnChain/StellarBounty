@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const publicEnvSchema = z.object({
-  NEXT_PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
+  NEXT_PUBLIC_API_URL: z.string().url().default("http://localhost:4000/api/v1"),
   NEXT_PUBLIC_STELLAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
 });
 

@@ -7,6 +7,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import { API_PREFIX } from './api-prefix';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { createCorsOptions } from './cors.config';
 import { setupSwagger } from './swagger.setup';
@@ -23,6 +24,7 @@ async function bootstrap() {
     next();
   });
   app.enableCors(createCorsOptions(config));
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['/'] });
   app.useGlobalPipes(new ValidationPipe(createValidationPipeOptions()));
   app.useGlobalFilters(new HttpExceptionFilter());
   setupSwagger(app);
