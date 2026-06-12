@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
 
 type Bounty = {
@@ -15,11 +16,6 @@ type Bounty = {
   ownerAddress: string;
 };
 
-type Toast = {
-  type: "success" | "error";
-  message: string;
-};
-
 function truncateAddress(address: string) {
   if (address.length <= 14) return address;
   return `${address.slice(0, 6)}...${address.slice(-6)}`;
@@ -27,11 +23,11 @@ function truncateAddress(address: string) {
 
 export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const { publicKey } = useWallet();
+  const toast = useToast();
   const { getToken, clearToken, apiUrl } = useAuth();
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<Toast | null>(null);
 
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
@@ -45,12 +41,11 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     event.preventDefault();
 
     if (!canSubmit) {
-      setToast({ type: "error", message: disabledReason || "Submission is disabled." });
+      toast.error(disabledReason || "Submission is disabled.");
       return;
     }
 
     setIsSubmitting(true);
-    setToast(null);
 
     try {
       const accessToken = await getToken(publicKey as string);
@@ -70,12 +65,9 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
       setWorkLink("");
       setNotes("");
-      setToast({ type: "success", message: "Work submitted successfully." });
+      toast.success("Work submitted successfully.");
     } catch (error) {
-      setToast({
-        type: "error",
-        message: error instanceof Error ? error.message : "Submission failed. Please try again.",
-      });
+      toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -129,19 +121,6 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
           <p className="mt-2 text-sm text-slate-400">
             Share a PR, demo, or document link with implementation notes.
           </p>
-
-          {toast && (
-            <div
-              className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
-                toast.type === "success"
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                  : "border-red-500/40 bg-red-500/10 text-red-200"
-              }`}
-              role="status"
-            >
-              {toast.message}
-            </div>
-          )}
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <label className="block">

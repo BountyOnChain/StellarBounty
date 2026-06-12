@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import { useWallet } from "@/components/WalletContext";
+import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
 
 const MAX_REWARD_AMOUNT = 1_000_000_000;
@@ -41,6 +42,7 @@ function formatErrorMessage(error: unknown) {
 export default function CreateBountyPage() {
   const router = useRouter();
   const { publicKey } = useWallet();
+  const toast = useToast();
   const { getToken, clearToken, apiUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,9 +129,12 @@ export default function CreateBountyPage() {
       }
 
       const created = (await response.json()) as CreateBountyResponse;
+      toast.success("Bounty created successfully.");
       router.push(`/bounties/${created.id}`);
     } catch (error) {
-      setSubmitError(formatErrorMessage(error));
+      const message = formatErrorMessage(error);
+      setSubmitError(message);
+      toast.error(message);
     }
   });
 
