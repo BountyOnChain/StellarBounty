@@ -4,12 +4,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
+import { WebhookService } from './webhooks/webhook.service';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let webhooks: { publish: jest.Mock };
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -38,6 +40,9 @@ describe('BountiesService', () => {
       findOne: jest.fn(),
       remove: jest.fn(),
     };
+    webhooks = {
+      publish: jest.fn().mockResolvedValue({ delivered: 0, failed: 0 }),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -45,6 +50,10 @@ describe('BountiesService', () => {
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: WebhookService,
+          useValue: webhooks,
         },
       ],
     }).compile();
@@ -69,6 +78,13 @@ describe('BountiesService', () => {
         }),
       );
       expect(repository.save).toHaveBeenCalled();
+      expect(webhooks.publish).toHaveBeenCalledWith(
+        'bounty.created',
+        expect.objectContaining({
+          ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+          rewardAmount: '10000000',
+        }),
+      );
       expect(result.rewardAmount).toBe('10000000');
     });
 

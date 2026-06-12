@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { WebhookService } from '../webhooks/webhook.service';
 import { CreateSubmissionDto } from './submissions.dto';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class SubmissionsService {
     @InjectRepository(Bounty)
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -35,7 +37,13 @@ export class SubmissionsService {
       notes: dto.notes ?? null,
       contributorAddress,
     });
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    await this.webhooks.publish('submission.received', {
+      bountyId,
+      submissionId: saved.id,
+      contributorAddress,
+    });
+    return saved;
   }
 
   async findAll(bountyId: string, ownerAddress: string) {
@@ -64,7 +72,19 @@ export class SubmissionsService {
     submission.status = SubmissionStatus.APPROVED;
     bounty.status = BountyStatus.COMPLETED;
     await this.bountyRepo.save(bounty);
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    await this.webhooks.publish('submission.approved', {
+      bountyId,
+      submissionId: saved.id,
+      ownerAddress,
+      contributorAddress: saved.contributorAddress,
+    });
+    await this.webhooks.publish('bounty.completed', {
+      bountyId,
+      approvedSubmissionId: saved.id,
+      ownerAddress,
+    });
+    return saved;
   }
 
   async reject(bountyId: string, subId: string, ownerAddress: string) {

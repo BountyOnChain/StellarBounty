@@ -20,6 +20,7 @@ import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+import { WebhookModule } from './webhooks/webhook.module';
 
 @Module({
   imports: [
@@ -38,10 +39,16 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
+        WEBHOOK_SUBSCRIPTIONS_JSON: Joi.string().default('[]'),
+        WEBHOOK_DELIVERY_MAX_ATTEMPTS: Joi.number().integer().positive().default(3),
+        WEBHOOK_DELIVERY_BASE_DELAY_MS: Joi.number().integer().min(0).default(250),
+        WEBHOOK_DELIVERY_TIMEOUT_MS: Joi.number().integer().positive().default(5000),
+        WEBHOOK_ENDPOINT_MIN_INTERVAL_MS: Joi.number().integer().min(0).default(0),
         PORT: Joi.number().default(4000),
       }),
     }),
     AuthModule,
+    WebhookModule,
     SubmissionsModule,
     HealthModule,
     MetricsModule,

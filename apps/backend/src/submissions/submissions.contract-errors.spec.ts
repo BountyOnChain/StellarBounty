@@ -3,6 +3,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { WebhookService } from '../webhooks/webhook.service';
 import { SubmissionsService } from './submissions.service';
 
 const mockServer = {
@@ -85,6 +86,7 @@ describe('SubmissionsService contract error handling', () => {
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      { publish: jest.fn().mockResolvedValue({ delivered: 0, failed: 0 }) } as unknown as WebhookService,
     );
 
     await expect(service.approve('bounty1', 'submission1', 'GOWNER')).resolves.toMatchObject({

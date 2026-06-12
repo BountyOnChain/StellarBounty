@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 import { Bounty } from './entities/bounty.entity';
+import { WebhookService } from './webhooks/webhook.service';
 
 @Injectable()
 export class BountiesService {
   constructor(
     @InjectRepository(Bounty)
     private readonly bounties: Repository<Bounty>,
+    private readonly webhooks: WebhookService,
   ) {}
 
   async create(dto: CreateBountyDto) {
@@ -16,7 +18,14 @@ export class BountiesService {
       ...dto,
       deadline: dto.deadline ? new Date(dto.deadline) : null,
     });
-    return this.bounties.save(bounty);
+    const saved = await this.bounties.save(bounty);
+    await this.webhooks.publish('bounty.created', {
+      bountyId: saved.id,
+      ownerAddress: saved.ownerAddress,
+      rewardAmount: saved.rewardAmount,
+      deadline: saved.deadline?.toISOString() ?? null,
+    });
+    return saved;
   }
 
   async findAll() {
