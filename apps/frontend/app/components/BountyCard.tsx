@@ -10,6 +10,7 @@ export type BountyCardData = {
 
 type BountyCardProps = {
   bounty: BountyCardData;
+  highlight?: string;
 };
 
 function formatReward(reward: BountyCardData["reward"]) {
@@ -37,7 +38,29 @@ function formatDeadline(deadline: BountyCardData["deadline"]) {
   }).format(parsed);
 }
 
-export default function BountyCard({ bounty }: BountyCardProps) {
+function HighlightedText({ text, query }: { text: string; query?: string }) {
+  const normalizedQuery = query?.trim();
+  if (!normalizedQuery) {
+    return <>{text}</>;
+  }
+
+  const matchIndex = text.toLowerCase().indexOf(normalizedQuery.toLowerCase());
+  if (matchIndex === -1) {
+    return <>{text}</>;
+  }
+
+  return (
+    <>
+      {text.slice(0, matchIndex)}
+      <mark className="rounded bg-yellow-300 px-0.5 text-slate-950">
+        {text.slice(matchIndex, matchIndex + normalizedQuery.length)}
+      </mark>
+      {text.slice(matchIndex + normalizedQuery.length)}
+    </>
+  );
+}
+
+export default function BountyCard({ bounty, highlight }: BountyCardProps) {
   const status = bounty.status ?? "open";
   const statusLabel = status.replace(/_/g, " ");
 
@@ -48,7 +71,7 @@ export default function BountyCard({ bounty }: BountyCardProps) {
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 className="line-clamp-2 break-words text-base font-semibold text-slate-100 group-hover:text-yellow-100 sm:text-lg">
-          {bounty.title}
+          <HighlightedText text={bounty.title} query={highlight} />
         </h2>
         <span className="min-h-7 w-fit shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium capitalize text-emerald-300">
           {statusLabel}

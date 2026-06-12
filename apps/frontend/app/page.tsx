@@ -42,11 +42,26 @@ type ApiBounty = Partial<BountyCardData> & {
 
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
-async function getBounties(): Promise<BountyCardData[]> {
+async function getBounties({
+  sort,
+  status,
+  search,
+}: {
+  sort: SortOption;
+  status: StatusFilter;
+  search: string;
+}): Promise<BountyCardData[]> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  const params = new URLSearchParams();
+  if (sort !== "newest") params.set("sort", sort);
+  if (status !== "all") params.set("status", status);
+  if (search.trim()) params.set("search", search.trim());
+  const query = params.toString();
 
   try {
-    const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });
+    const response = await fetch(`${apiUrl}/bounties${query ? `?${query}` : ""}`, {
+      next: { revalidate },
+    });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return [];
@@ -67,28 +82,6 @@ async function getBounties(): Promise<BountyCardData[]> {
   }
 }
 
-function getRewardValue(reward: BountyCardData["reward"]) {
-  if (typeof reward === "number") {
-    return reward;
-  }
-
-  if (typeof reward === "string") {
-    const numericValue = Number.parseFloat(reward.replace(/[^0-9.]/g, ""));
-    return Number.isFinite(numericValue) ? numericValue : -1;
-  }
-
-  return -1;
-}
-
-function getDeadlineValue(deadline: BountyCardData["deadline"]) {
-  if (!deadline) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const timestamp = new Date(deadline).getTime();
-  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
-}
-
 function normalizeSort(sort?: string): SortOption {
   if (sort === "highest_reward" || sort === "closest_deadline") {
     return sort;
@@ -105,39 +98,11 @@ function normalizeStatus(status?: string): StatusFilter {
   return "all";
 }
 
-function applyListingControls(
-  bounties: BountyCardData[],
-  { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
-) {
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filtered = bounties.filter((bounty) => {
-    const matchesStatus = status === "all" ? true : (bounty.status ?? "open") === status;
-    const matchesSearch =
-      normalizedSearch.length === 0 ? true : bounty.title.toLowerCase().includes(normalizedSearch);
-
-    return matchesStatus && matchesSearch;
-  });
-
-  return filtered.sort((left, right) => {
-    if (sort === "highest_reward") {
-      return getRewardValue(right.reward) - getRewardValue(left.reward);
-    }
-
-    if (sort === "closest_deadline") {
-      return getDeadlineValue(left.deadline) - getDeadlineValue(right.deadline);
-    }
-
-    return 0;
-  });
-}
-
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const allBounties = await getBounties();
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.search ?? "";
-  const bounties = applyListingControls(allBounties, { sort, status, search });
+  const bounties = await getBounties({ sort, status, search });
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
@@ -218,8 +183,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
           <div className="mt-4 flex flex-col gap-2 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <p>
-              Showing <span className="font-semibold text-slate-200">{bounties.length}</span> of{" "}
-              <span className="font-semibold text-slate-200">{allBounties.length}</span> bounties
+              Showing <span className="font-semibold text-slate-200">{bounties.length}</span> matching bounties
             </p>
             <p className="text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
           </div>
@@ -228,7 +192,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         {bounties.length > 0 ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {bounties.map((bounty) => (
-              <BountyCard key={bounty.id} bounty={bounty} />
+              <BountyCard key={bounty.id} bounty={bounty} highlight={search} />
             ))}
           </section>
         ) : (

@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { SelectQueryBuilder, Repository } from 'typeorm';
+import { BountySort } from './bounties/dto/list-bounties-query.dto';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
 
@@ -10,6 +11,7 @@ type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let queryBuilder: Partial<Record<keyof SelectQueryBuilder<Bounty>, jest.Mock>>;
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -31,9 +33,17 @@ describe('BountiesService', () => {
   }
 
   beforeEach(async () => {
+    queryBuilder = {
+      addSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
     repository = {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
+      createQueryBuilder: jest.fn(() => queryBuilder),
       find: jest.fn(),
       findOne: jest.fn(),
       remove: jest.fn(),
@@ -99,10 +109,40 @@ describe('BountiesService', () => {
 
   it('findAll returns bounties ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    queryBuilder.getMany!.mockResolvedValueOnce(bounties);
 
     await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    expect(repository.createQueryBuilder).toHaveBeenCalledWith('bounty');
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('bounty.createdAt', 'DESC');
+    expect(queryBuilder.getMany).toHaveBeenCalled();
+  });
+
+  it('filters by status and full-text search with relevance ordering', async () => {
+    const bounties = [createBounty({ title: 'Wallet integration' })];
+    queryBuilder.getMany!.mockResolvedValueOnce(bounties);
+
+    await expect(
+      service.findAll({ search: 'stellar wallet', status: BountyStatus.OPEN }),
+    ).resolves.toBe(bounties);
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('bounty.status = :status', {
+      status: BountyStatus.OPEN,
+    });
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(expect.stringContaining('ts_rank_cd'), 'search_rank');
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(expect.stringContaining('plainto_tsquery'), {
+      search: 'stellar wallet',
+    });
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('search_rank', 'DESC');
+    expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('bounty.createdAt', 'DESC');
+  });
+
+  it('supports non-relevance sort options', async () => {
+    queryBuilder.getMany!.mockResolvedValueOnce([]);
+
+    await service.findAll({ sort: BountySort.HIGHEST_REWARD });
+
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('bounty.rewardAmount', 'DESC');
+    expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('bounty.createdAt', 'DESC');
   });
 
   describe('findOne', () => {
