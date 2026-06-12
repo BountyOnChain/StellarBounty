@@ -9,6 +9,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
+import {
+  createPaginatedResponse,
+  normalizePagination,
+} from '../common/pagination/paginated-response';
+import { PaginationQueryDto } from '../common/pagination/pagination.dto';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { CreateSubmissionDto } from './submissions.dto';
@@ -38,11 +43,28 @@ export class SubmissionsService {
     return this.submissionRepo.save(submission);
   }
 
-  async findAll(bountyId: string, ownerAddress: string) {
+  async findAll(
+    bountyId: string,
+    ownerAddress: string,
+    query: PaginationQueryDto = new PaginationQueryDto(),
+  ) {
     const bounty = await this.bountyRepo.findOneBy({ id: bountyId });
     if (!bounty) throw new NotFoundException('Bounty not found');
     if (bounty.ownerAddress !== ownerAddress) throw new ForbiddenException();
-    return this.submissionRepo.findBy({ bountyId });
+    const pagination = normalizePagination(query);
+    const [submissions, totalCount] = await this.submissionRepo.findAndCount({
+      where: { bountyId },
+      order: { createdAt: 'DESC' },
+      skip: (pagination.page - 1) * pagination.pageSize,
+      take: pagination.pageSize,
+    });
+
+    return createPaginatedResponse(
+      submissions,
+      totalCount,
+      pagination,
+      `/bounties/${bountyId}/submissions`,
+    );
   }
 
   async approve(bountyId: string, subId: string, ownerAddress: string) {

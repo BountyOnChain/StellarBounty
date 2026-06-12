@@ -31,6 +31,7 @@ type SearchParams = {
   sort?: string;
   status?: string;
   search?: string;
+  page?: string;
 };
 
 type ApiBounty = Partial<BountyCardData> & {
@@ -40,30 +41,62 @@ type ApiBounty = Partial<BountyCardData> & {
   dueDate?: string | null;
 };
 
-type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
+type ApiBountiesResponse =
+  | ApiBounty[]
+  | {
+      data?: ApiBounty[];
+      totalCount?: number;
+      page?: number;
+      pageSize?: number;
+      totalPages?: number;
+      links?: {
+        next?: string | null;
+        prev?: string | null;
+      };
+    };
 
-async function getBounties(): Promise<BountyCardData[]> {
+type BountyListResult = {
+  bounties: BountyCardData[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+const PAGE_SIZE = 12;
+
+async function getBounties(page: number): Promise<BountyListResult> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
-    const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });
+    const response = await fetch(`${apiUrl}/bounties?page=${page}&pageSize=${PAGE_SIZE}`, {
+      next: { revalidate },
+    });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return [];
+      return { bounties: [], totalCount: 0, page, pageSize: PAGE_SIZE, totalPages: 0 };
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
     const bounties = Array.isArray(payload) ? payload : payload.data ?? [];
 
-    return bounties.map((bounty, index) => ({
-      id: bounty.id ?? bounty._id ?? index,
-      title: bounty.title ?? "Untitled bounty",
-      reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
-      deadline: bounty.deadline ?? bounty.dueDate ?? null,
-      status: bounty.status ?? "open",
-    }));
+    return {
+      bounties: bounties.map((bounty, index) => ({
+        id: bounty.id ?? bounty._id ?? index,
+        title: bounty.title ?? "Untitled bounty",
+        reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
+        deadline: bounty.deadline ?? bounty.dueDate ?? null,
+        status: bounty.status ?? "open",
+      })),
+      totalCount: Array.isArray(payload) ? bounties.length : payload.totalCount ?? bounties.length,
+      page: Array.isArray(payload) ? page : payload.page ?? page,
+      pageSize: Array.isArray(payload) ? PAGE_SIZE : payload.pageSize ?? PAGE_SIZE,
+      totalPages: Array.isArray(payload)
+        ? Math.ceil(bounties.length / PAGE_SIZE)
+        : payload.totalPages ?? Math.ceil(bounties.length / PAGE_SIZE),
+    };
   } catch {
-    return [];
+    return { bounties: [], totalCount: 0, page, pageSize: PAGE_SIZE, totalPages: 0 };
   }
 }
 
@@ -105,6 +138,23 @@ function normalizeStatus(status?: string): StatusFilter {
   return "all";
 }
 
+function normalizePage(page?: string) {
+  const parsed = Number.parseInt(page ?? "1", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function buildPageHref(
+  page: number,
+  { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
+) {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  if (sort !== "newest") params.set("sort", sort);
+  if (status !== "all") params.set("status", status);
+  if (search.trim()) params.set("search", search.trim());
+  return `/?${params.toString()}`;
+}
+
 function applyListingControls(
   bounties: BountyCardData[],
   { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
@@ -133,11 +183,12 @@ function applyListingControls(
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const allBounties = await getBounties();
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.search ?? "";
-  const bounties = applyListingControls(allBounties, { sort, status, search });
+  const requestedPage = normalizePage(searchParams?.page);
+  const { bounties: pageBounties, totalCount, page, totalPages } = await getBounties(requestedPage);
+  const bounties = applyListingControls(pageBounties, { sort, status, search });
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
@@ -219,9 +270,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           <div className="mt-4 flex flex-col gap-2 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <p>
               Showing <span className="font-semibold text-slate-200">{bounties.length}</span> of{" "}
-              <span className="font-semibold text-slate-200">{allBounties.length}</span> bounties
+              <span className="font-semibold text-slate-200">{totalCount}</span> bounties
             </p>
-            <p className="text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
+            <p className="text-slate-500">
+              Page <span className="text-slate-300">{page}</span> of{" "}
+              <span className="text-slate-300">{Math.max(totalPages, 1)}</span>
+            </p>
           </div>
         </section>
 
@@ -243,6 +297,36 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             </Link>
           </section>
         )}
+
+        {totalPages > 1 ? (
+          <nav className="mt-8 flex items-center justify-between gap-4 text-sm">
+            {page > 1 ? (
+              <Link
+                href={buildPageHref(page - 1, { sort, status, search })}
+                className="rounded-xl border border-slate-700 px-4 py-2 font-medium text-slate-200 transition hover:border-yellow-400 hover:text-yellow-300"
+              >
+                Previous
+              </Link>
+            ) : (
+              <span className="rounded-xl border border-slate-800 px-4 py-2 text-slate-600">Previous</span>
+            )}
+
+            <span className="text-slate-400">
+              {page} / {totalPages}
+            </span>
+
+            {page < totalPages ? (
+              <Link
+                href={buildPageHref(page + 1, { sort, status, search })}
+                className="rounded-xl border border-slate-700 px-4 py-2 font-medium text-slate-200 transition hover:border-yellow-400 hover:text-yellow-300"
+              >
+                Next
+              </Link>
+            ) : (
+              <span className="rounded-xl border border-slate-800 px-4 py-2 text-slate-600">Next</span>
+            )}
+          </nav>
+        ) : null}
       </div>
     </main>
   );

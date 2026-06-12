@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -12,6 +12,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PaginationQueryDto } from '../common/pagination/pagination.dto';
 import { CreateSubmissionDto, SubmissionResponseDto } from './submissions.dto';
 import { SubmissionsService } from './submissions.service';
 
@@ -49,8 +50,9 @@ export class SubmissionsController {
   findAll(
     @Param('bountyId') bountyId: string,
     @Request() req: { user: { address: string } },
+    @Query() pagination: PaginationQueryDto,
   ) {
-    return this.submissionsService.findAll(bountyId, req.user.address);
+    return this.submissionsService.findAll(bountyId, req.user.address, pagination);
   }
 
   @ApiBearerAuth('access-token')

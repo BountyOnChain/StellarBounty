@@ -2,6 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
+import {
+  createPaginatedResponse,
+  normalizePagination,
+} from './common/pagination/paginated-response';
+import { PaginationQueryDto } from './common/pagination/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
 
 @Injectable()
@@ -19,8 +24,15 @@ export class BountiesService {
     return this.bounties.save(bounty);
   }
 
-  async findAll() {
-    return this.bounties.find({ order: { createdAt: 'DESC' } });
+  async findAll(query: PaginationQueryDto = new PaginationQueryDto()) {
+    const pagination = normalizePagination(query);
+    const [bounties, totalCount] = await this.bounties.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (pagination.page - 1) * pagination.pageSize,
+      take: pagination.pageSize,
+    });
+
+    return createPaginatedResponse(bounties, totalCount, pagination, '/bounties');
   }
 
   async findOne(id: string) {

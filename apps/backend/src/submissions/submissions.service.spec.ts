@@ -93,7 +93,7 @@ describe('SubmissionsService', () => {
     submissionRepo = {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => input),
-      findBy: jest.fn(),
+      findAndCount: jest.fn(),
       findOneBy: jest.fn(),
     };
     bountyRepo = {
@@ -141,20 +141,35 @@ describe('SubmissionsService', () => {
   });
 
   describe('findAll', () => {
-    it('returns submissions for the bounty owner', async () => {
+    it('returns paginated submissions for the bounty owner', async () => {
       const submissions = [createSubmission()];
       bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
-      submissionRepo.findBy!.mockResolvedValueOnce(submissions);
+      submissionRepo.findAndCount!.mockResolvedValueOnce([submissions, 11]);
 
-      await expect(service.findAll('bounty1', 'GOWNER')).resolves.toBe(submissions);
-      expect(submissionRepo.findBy).toHaveBeenCalledWith({ bountyId: 'bounty1' });
+      await expect(service.findAll('bounty1', 'GOWNER', { page: 2, pageSize: 5 })).resolves.toEqual({
+        data: submissions,
+        totalCount: 11,
+        page: 2,
+        pageSize: 5,
+        totalPages: 3,
+        links: {
+          next: '/bounties/bounty1/submissions?page=3&pageSize=5',
+          prev: '/bounties/bounty1/submissions?page=1&pageSize=5',
+        },
+      });
+      expect(submissionRepo.findAndCount).toHaveBeenCalledWith({
+        where: { bountyId: 'bounty1' },
+        order: { createdAt: 'DESC' },
+        skip: 5,
+        take: 5,
+      });
     });
 
     it('throws ForbiddenException when a non-owner lists submissions', async () => {
       bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
 
       await expect(service.findAll('bounty1', 'GINTRUDER')).rejects.toThrow(ForbiddenException);
-      expect(submissionRepo.findBy).not.toHaveBeenCalled();
+      expect(submissionRepo.findAndCount).not.toHaveBeenCalled();
     });
   });
 

@@ -34,7 +34,7 @@ describe('BountiesService', () => {
     repository = {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
-      find: jest.fn(),
+      findAndCount: jest.fn(),
       findOne: jest.fn(),
       remove: jest.fn(),
     };
@@ -97,12 +97,26 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
+  it('findAll returns paginated bounties ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    repository.findAndCount!.mockResolvedValueOnce([bounties, 42]);
 
-    await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    await expect(service.findAll({ page: 2, pageSize: 10 })).resolves.toEqual({
+      data: bounties,
+      totalCount: 42,
+      page: 2,
+      pageSize: 10,
+      totalPages: 5,
+      links: {
+        next: '/bounties?page=3&pageSize=10',
+        prev: '/bounties?page=1&pageSize=10',
+      },
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 10,
+      take: 10,
+    });
   });
 
   describe('findOne', () => {
