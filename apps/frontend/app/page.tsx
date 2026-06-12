@@ -31,6 +31,8 @@ type SearchParams = {
   sort?: string;
   status?: string;
   search?: string;
+  category?: string;
+  tag?: string;
 };
 
 type ApiBounty = Partial<BountyCardData> & {
@@ -38,15 +40,40 @@ type ApiBounty = Partial<BountyCardData> & {
   amount?: string | number | null;
   rewardAmount?: string | number | null;
   dueDate?: string | null;
+  category?: string | null;
+  tags?: Array<string | { name?: string | null }> | null;
 };
 
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
-async function getBounties(): Promise<BountyCardData[]> {
+const CATEGORY_OPTIONS = [
+  "development",
+  "design",
+  "writing",
+  "research",
+  "marketing",
+  "other",
+] as const;
+
+type CategoryFilter = "all" | (typeof CATEGORY_OPTIONS)[number];
+
+async function getBounties({
+  category,
+  tag,
+}: {
+  category: CategoryFilter;
+  tag: string;
+}): Promise<BountyCardData[]> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  const params = new URLSearchParams();
+  if (category !== "all") params.set("category", category);
+  if (tag.trim()) params.set("tag", tag.trim().toLowerCase());
+  const query = params.toString();
 
   try {
-    const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });
+    const response = await fetch(`${apiUrl}/bounties${query ? `?${query}` : ""}`, {
+      next: { revalidate },
+    });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return [];
@@ -61,6 +88,8 @@ async function getBounties(): Promise<BountyCardData[]> {
       reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
       deadline: bounty.deadline ?? bounty.dueDate ?? null,
       status: bounty.status ?? "open",
+      category: bounty.category ?? "development",
+      tags: bounty.tags ?? [],
     }));
   } catch {
     return [];
@@ -105,6 +134,12 @@ function normalizeStatus(status?: string): StatusFilter {
   return "all";
 }
 
+function normalizeCategory(category?: string): CategoryFilter {
+  return CATEGORY_OPTIONS.includes(category as (typeof CATEGORY_OPTIONS)[number])
+    ? (category as CategoryFilter)
+    : "all";
+}
+
 function applyListingControls(
   bounties: BountyCardData[],
   { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
@@ -133,10 +168,12 @@ function applyListingControls(
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const allBounties = await getBounties();
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.search ?? "";
+  const category = normalizeCategory(searchParams?.category);
+  const tag = searchParams?.tag ?? "";
+  const allBounties = await getBounties({ category, tag });
   const bounties = applyListingControls(allBounties, { sort, status, search });
 
   return (
@@ -161,7 +198,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </section>
 
         <section className="mb-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl shadow-black/10 sm:p-6">
-          <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
+          <form className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(140px,0.7fr)_auto] lg:items-end">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-300">Search title</span>
               <input
@@ -185,6 +222,33 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 <option value="in_progress">In progress</option>
                 <option value="completed">Completed</option>
               </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-300">Category</span>
+              <select
+                name="category"
+                defaultValue={category}
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-400"
+              >
+                <option value="all">All categories</option>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option.replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-300">Tag</span>
+              <input
+                type="search"
+                name="tag"
+                defaultValue={tag}
+                placeholder="react"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-yellow-400"
+              />
             </label>
 
             <label className="block">

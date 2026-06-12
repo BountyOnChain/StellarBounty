@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { DeadlineAutomationService } from './deadline-automation.service';
-import { Bounty, BountyStatus } from '../entities/bounty.entity';
+import { Bounty, BountyCategory, BountyStatus } from '../entities/bounty.entity';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -19,7 +19,9 @@ describe('DeadlineAutomationService', () => {
       deadline: new Date('2026-06-10T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GOWNER',
+      category: BountyCategory.DEVELOPMENT,
       submissions: [],
+      tags: [],
       createdAt: new Date('2026-06-01T00:00:00.000Z'),
       updatedAt: new Date('2026-06-01T00:00:00.000Z'),
       ...overrides,

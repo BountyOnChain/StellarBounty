@@ -3,13 +3,21 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
-import { Bounty, BountyStatus } from './entities/bounty.entity';
+import { Bounty, BountyCategory, BountyStatus } from './entities/bounty.entity';
+import { Tag } from './entities/tag.entity';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let tagRepository: MockRepository<Tag>;
+  let queryBuilder: {
+    leftJoinAndSelect: jest.Mock;
+    orderBy: jest.Mock;
+    andWhere: jest.Mock;
+    getMany: jest.Mock;
+  };
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -23,6 +31,8 @@ describe('BountiesService', () => {
       deadline: new Date('2026-12-31T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+      category: BountyCategory.DEVELOPMENT,
+      tags: [],
       submissions: [],
       createdAt,
       updatedAt,
@@ -31,12 +41,23 @@ describe('BountiesService', () => {
   }
 
   beforeEach(async () => {
+    queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+    };
     repository = {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
+      createQueryBuilder: jest.fn(() => queryBuilder),
       find: jest.fn(),
       findOne: jest.fn(),
       remove: jest.fn(),
+    };
+    tagRepository = {
+      create: jest.fn((input) => input),
+      findOne: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -45,6 +66,10 @@ describe('BountiesService', () => {
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: getRepositoryToken(Tag),
+          useValue: tagRepository,
         },
       ],
     }).compile();
@@ -60,14 +85,20 @@ describe('BountiesService', () => {
         rewardAmount: '10000000',
         ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
         deadline: '2026-12-31T00:00:00.000Z',
+        category: BountyCategory.RESEARCH,
+        tags: ['Stellar', ' wallet ', 'stellar'],
       });
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           rewardAmount: '10000000',
           deadline: new Date('2026-12-31T00:00:00.000Z'),
+          category: BountyCategory.RESEARCH,
+          tags: [{ name: 'stellar' }, { name: 'wallet' }],
         }),
       );
+      expect(tagRepository.findOne).toHaveBeenCalledWith({ where: { name: 'stellar' } });
+      expect(tagRepository.findOne).toHaveBeenCalledWith({ where: { name: 'wallet' } });
       expect(repository.save).toHaveBeenCalled();
       expect(result.rewardAmount).toBe('10000000');
     });
@@ -97,12 +128,27 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
+  it('findAll returns bounties with tags ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    queryBuilder.getMany.mockResolvedValueOnce(bounties);
 
     await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    expect(repository.createQueryBuilder).toHaveBeenCalledWith('bounty');
+    expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('bounty.tags', 'tag');
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('bounty.createdAt', 'DESC');
+  });
+
+  it('findAll filters by category and tag', async () => {
+    queryBuilder.getMany.mockResolvedValueOnce([]);
+
+    await service.findAll({ category: BountyCategory.DESIGN, tag: 'ui-ux' });
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('bounty.category = :category', {
+      category: BountyCategory.DESIGN,
+    });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(expect.stringContaining('bounties_tags'), {
+      tag: 'ui-ux',
+    });
   });
 
   describe('findOne', () => {
@@ -111,7 +157,10 @@ describe('BountiesService', () => {
       repository.findOne!.mockResolvedValueOnce(bounty);
 
       await expect(service.findOne('bounty-1')).resolves.toBe(bounty);
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 'bounty-1' } });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: 'bounty-1' },
+        relations: { tags: true },
+      });
     });
 
     it('throws NotFoundException when the bounty does not exist', async () => {

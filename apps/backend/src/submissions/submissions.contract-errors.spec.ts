@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
-import { Bounty, BountyStatus } from '../entities/bounty.entity';
+import { Bounty, BountyCategory, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { SubmissionsService } from './submissions.service';
 
@@ -39,6 +39,8 @@ describe('SubmissionsService contract error handling', () => {
       deadline: null,
       status: BountyStatus.OPEN,
       ownerAddress: 'GOWNER',
+      category: BountyCategory.DEVELOPMENT,
+      tags: [],
       submissions: [],
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-02T00:00:00.000Z'),

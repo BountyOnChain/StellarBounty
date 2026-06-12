@@ -11,6 +11,23 @@ import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
 
 const MAX_REWARD_AMOUNT = 1_000_000_000;
+const CATEGORY_OPTIONS = [
+  "development",
+  "design",
+  "writing",
+  "research",
+  "marketing",
+  "other",
+] as const;
+
+const TAG_SUGGESTIONS = [
+  { tag: "react", keywords: ["react", "next", "frontend", "component"] },
+  { tag: "stellar", keywords: ["stellar", "soroban", "xlm", "wallet"] },
+  { tag: "api", keywords: ["api", "endpoint", "backend", "nestjs"] },
+  { tag: "ui-ux", keywords: ["design", "ui", "ux", "responsive"] },
+  { tag: "docs", keywords: ["docs", "documentation", "writing", "guide"] },
+  { tag: "testing", keywords: ["test", "testing", "coverage", "playwright"] },
+];
 
 const createBountySchema = z.object({
   title: z.string().trim().min(1, "Title is required."),
@@ -26,6 +43,8 @@ const createBountySchema = z.object({
       `Reward must be ${MAX_REWARD_AMOUNT.toLocaleString()} XLM or less.`
     ),
   deadline: z.string().min(1, "Deadline is required."),
+  category: z.enum(CATEGORY_OPTIONS),
+  tags: z.string().max(300, "Tags must be 300 characters or less.").optional(),
 });
 
 type CreateBountyFormValues = z.infer<typeof createBountySchema>;
@@ -37,6 +56,13 @@ type CreateBountyResponse = {
 function formatErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return "Unable to create bounty.";
+}
+
+function parseTags(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 export default function CreateBountyPage() {
@@ -51,6 +77,7 @@ export default function CreateBountyPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateBountyFormValues>({
@@ -60,10 +87,21 @@ export default function CreateBountyPage() {
       description: "",
       reward: "",
       deadline: "",
+      category: "development",
+      tags: "",
     },
   });
 
   const description = watch("description");
+  const title = watch("title");
+  const tags = watch("tags");
+  const suggestedTags = useMemo(() => {
+    const text = `${title} ${description}`.toLowerCase();
+    const existing = new Set(parseTags(tags));
+    return TAG_SUGGESTIONS.filter(
+      ({ tag, keywords }) => !existing.has(tag) && keywords.some((keyword) => text.includes(keyword)),
+    ).map(({ tag }) => tag);
+  }, [description, tags, title]);
 
   useEffect(() => {
     if (!publicKey) {
@@ -95,6 +133,11 @@ export default function CreateBountyPage() {
           rewardAmount: values.reward.trim(),
           ownerAddress: publicKey,
           deadline: new Date(values.deadline).toISOString(),
+          category: values.category,
+          tags: (values.tags ?? "")
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
         }),
       });
 
@@ -120,6 +163,10 @@ export default function CreateBountyPage() {
         }
         if (message?.toLowerCase().includes("deadline")) {
           setError("deadline", { message });
+          return;
+        }
+        if (message?.toLowerCase().includes("tag")) {
+          setError("tags", { message });
           return;
         }
 
@@ -186,6 +233,56 @@ export default function CreateBountyPage() {
                 className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
               />
               {errors.deadline && <p className={fieldErrorClass}>{errors.deadline.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="category" className="mb-1 block text-sm font-medium text-slate-300">
+                Category
+              </label>
+              <select
+                id="category"
+                {...register("category")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
+              >
+                {CATEGORY_OPTIONS.map((category) => (
+                  <option key={category} value={category}>
+                    {category.replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+              {errors.category && <p className={fieldErrorClass}>{errors.category.message}</p>}
+            </div>
+            <div>
+              <label htmlFor="tags" className="mb-1 block text-sm font-medium text-slate-300">
+                Tags
+              </label>
+              <input
+                id="tags"
+                type="text"
+                {...register("tags")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
+                placeholder="react, stellar, ui-ux"
+              />
+              {suggestedTags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {suggestedTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        const nextTags = [...parseTags(tags), tag];
+                        setValue("tags", nextTags.join(", "), { shouldValidate: true });
+                      }}
+                      className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 transition hover:border-blue-400 hover:text-blue-200"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {errors.tags && <p className={fieldErrorClass}>{errors.tags.message}</p>}
             </div>
           </div>
 

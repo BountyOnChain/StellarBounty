@@ -6,6 +6,8 @@ export type BountyCardData = {
   reward?: string | number | null;
   deadline?: string | null;
   status?: string | null;
+  category?: string | null;
+  tags?: Array<string | { name?: string | null }> | null;
 };
 
 type BountyCardProps = {
@@ -37,9 +39,22 @@ function formatDeadline(deadline: BountyCardData["deadline"]) {
   }).format(parsed);
 }
 
+function formatLabel(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeTags(tags: BountyCardData["tags"]) {
+  return (tags ?? [])
+    .map((tag) => (typeof tag === "string" ? tag : tag.name ?? ""))
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 export default function BountyCard({ bounty }: BountyCardProps) {
   const status = bounty.status ?? "open";
   const statusLabel = status.replace(/_/g, " ");
+  const category = bounty.category ?? "development";
+  const tags = normalizeTags(bounty.tags);
 
   return (
     <Link
@@ -53,6 +68,20 @@ export default function BountyCard({ bounty }: BountyCardProps) {
         <span className="min-h-7 w-fit shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium capitalize text-emerald-300">
           {statusLabel}
         </span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-xs font-medium text-sky-200">
+          {formatLabel(category)}
+        </span>
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-xs text-slate-300"
+          >
+            #{tag}
+          </span>
+        ))}
       </div>
 
       <div className="mt-6 flex flex-1 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

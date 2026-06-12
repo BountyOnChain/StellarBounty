@@ -9,9 +9,10 @@ import {
   IsNotEmpty,
   MinLength,
   MaxLength,
+  ArrayMaxSize,
   ValidateBy,
 } from 'class-validator';
-import { BountyStatus } from '../../entities/bounty.entity';
+import { BountyCategory, BountyStatus } from '../../entities/bounty.entity';
 
 export const MAX_REWARD_AMOUNT = 1_000_000_000n;
 
@@ -107,13 +108,24 @@ export class CreateBountyDto {
   ownerAddress!: string;
 
   @ApiPropertyOptional({
+    description: 'Predefined bounty category',
+    enum: BountyCategory,
+    example: BountyCategory.DEVELOPMENT,
+  })
+  @IsOptional()
+  @IsEnum(BountyCategory)
+  category?: BountyCategory;
+
+  @ApiPropertyOptional({
     description: 'Array of tags for categorization',
     example: ['Stellar', 'Payment', 'Integration'],
     type: [String],
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(10)
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   tags?: string[];
 
   @ApiPropertyOptional({
@@ -153,10 +165,20 @@ export class UpdateBountyDto {
   @IsStellarPublicKey()
   ownerAddress?: string;
 
+  @ApiPropertyOptional({
+    description: 'Updated bounty category',
+    enum: BountyCategory,
+  })
+  @IsOptional()
+  @IsEnum(BountyCategory)
+  category?: BountyCategory;
+
   @ApiPropertyOptional({ description: 'Updated tags', type: [String] })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(10)
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   tags?: string[];
 
   @ApiPropertyOptional({ description: 'Updated deadline (ISO 8601)' })
@@ -211,6 +233,10 @@ export class BountyResponseDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @ApiProperty({ description: 'Bounty category', enum: BountyCategory })
+  @IsString()
+  category!: string;
 
   @ApiProperty({ description: 'Creation timestamp' })
   @IsString()
