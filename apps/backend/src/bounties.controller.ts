@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
@@ -18,9 +18,11 @@ export class BountiesController {
   }
 
   @ApiOperation({ summary: 'List all bounties' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.bountiesService.findAll(page, limit);
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })

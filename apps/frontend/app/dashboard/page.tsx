@@ -23,6 +23,11 @@ type Bounty = {
   openSubmissionCount: number;
   status: BountyStatus;
 };
+type BountiesResponse = Bounty[] | { data?: Bounty[] };
+
+function getBountyRows(payload: BountiesResponse): Bounty[] {
+  return Array.isArray(payload) ? payload : payload.data ?? [];
+}
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -50,7 +55,7 @@ export default function DashboardPage() {
     ])
       .then(([subs, bounts]) => {
         setSubmissions(subs);
-        setBounties(bounts);
+        setBounties(getBountyRows(bounts));
       })
       .catch(() => setError("Failed to load dashboard data."))
       .finally(() => setLoading(false));

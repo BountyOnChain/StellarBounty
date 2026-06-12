@@ -35,6 +35,7 @@ describe('BountiesService', () => {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
+      findAndCount: jest.fn(),
       findOne: jest.fn(),
       remove: jest.fn(),
     };
@@ -97,12 +98,56 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
+  it('findAll returns paginated bounties ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    repository.findAndCount!.mockResolvedValueOnce([bounties, 42]);
 
-    await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    await expect(service.findAll()).resolves.toEqual({
+      data: bounties,
+      total: 42,
+      page: 1,
+      limit: 20,
+      totalPages: 3,
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 0,
+      take: 20,
+    });
+  });
+
+  it('findAll applies requested page and caps limit at 100', async () => {
+    repository.findAndCount!.mockResolvedValueOnce([[], 250]);
+
+    await expect(service.findAll('2', '200')).resolves.toEqual({
+      data: [],
+      total: 250,
+      page: 2,
+      limit: 100,
+      totalPages: 3,
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 100,
+      take: 100,
+    });
+  });
+
+  it('findAll falls back to defaults for invalid pagination values', async () => {
+    repository.findAndCount!.mockResolvedValueOnce([[], 0]);
+
+    await expect(service.findAll('0', 'abc')).resolves.toEqual({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 0,
+      take: 20,
+    });
   });
 
   describe('findOne', () => {

@@ -4,6 +4,14 @@ import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 import { Bounty } from './entities/bounty.entity';
 
+export type PaginatedBounties = {
+  data: Bounty[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
 @Injectable()
 export class BountiesService {
   constructor(
@@ -19,8 +27,22 @@ export class BountiesService {
     return this.bounties.save(bounty);
   }
 
-  async findAll() {
-    return this.bounties.find({ order: { createdAt: 'DESC' } });
+  async findAll(pageInput?: string, limitInput?: string): Promise<PaginatedBounties> {
+    const page = this.normalizePositiveInteger(pageInput, 1);
+    const limit = Math.min(this.normalizePositiveInteger(limitInput, 20), 100);
+    const [data, total] = await this.bounties.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: string) {
@@ -44,5 +66,10 @@ export class BountiesService {
     const bounty = await this.findOne(id);
     await this.bounties.remove(bounty);
     return { deleted: true };
+  }
+
+  private normalizePositiveInteger(value: string | undefined, fallback: number) {
+    const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 }

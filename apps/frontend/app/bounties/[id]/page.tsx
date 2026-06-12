@@ -17,6 +17,7 @@ type ApiBounty = Partial<Omit<Bounty, "reward" | "deadline">> & {
   deadline?: string | null;
   dueDate?: string | null;
 };
+type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -58,7 +59,8 @@ export async function generateStaticParams() {
       return [];
     }
 
-    const bounties = (await response.json()) as ApiBounty[];
+    const payload = (await response.json()) as ApiBountiesResponse;
+    const bounties = Array.isArray(payload) ? payload : payload.data ?? [];
 
     return bounties.flatMap((bounty) => (bounty.id ? [{ id: bounty.id }] : []));
   } catch {
