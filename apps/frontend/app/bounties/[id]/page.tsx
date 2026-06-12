@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { BountyDetailSkeleton, ErrorState } from "@/app/components/AsyncStates";
 import BountyDetailClient from "./BountyDetailClient";
 import { absoluteUrl, siteName } from "../../seo";
 
@@ -19,6 +21,7 @@ type ApiBounty = Partial<Omit<Bounty, "reward" | "deadline">> & {
   deadline?: string | null;
   dueDate?: string | null;
 };
+type BountyResult = { ok: true; bounty: Bounty } | { ok: false; message: string };
 
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
 
@@ -40,17 +43,20 @@ function normalizeBounty(bounty: ApiBounty): Bounty | null {
   };
 }
 
-async function getBounty(id: string): Promise<Bounty | null> {
+async function getBounty(id: string): Promise<BountyResult> {
   try {
     const response = await fetch(`${API_URL}/bounties/${encodeURIComponent(id)}`, { next: { revalidate: 60 } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return null;
+      return { ok: false, message: "The bounty could not be loaded from the API." };
     }
 
-    return normalizeBounty((await response.json()) as ApiBounty);
+    const bounty = normalizeBounty((await response.json()) as ApiBounty);
+    return bounty
+      ? { ok: true, bounty }
+      : { ok: false, message: "The bounty response was missing required fields." };
   } catch {
-    return null;
+    return { ok: false, message: "The bounty could not be loaded. Check the backend connection." };
   }
 }
 
@@ -60,9 +66,9 @@ function getBountyDescription(bounty: Bounty) {
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const bounty = await getBounty(params.id);
+  const result = await getBounty(params.id);
 
-  if (!bounty) {
+  if (!result.ok) {
     return {
       title: "Bounty Unavailable",
       description: "This StellarBounty listing could not be loaded.",
@@ -72,6 +78,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     };
   }
 
+  const bounty = result.bounty;
   const description = getBountyDescription(bounty);
   const url = absoluteUrl(`/bounties/${bounty.id}`);
 
@@ -113,21 +120,29 @@ export async function generateStaticParams() {
 }
 
 export default async function BountyDetailPage({ params }: { params: { id: string } }) {
-  const bounty = await getBounty(params.id);
+  const result = await getBounty(params.id);
 
-  if (!bounty) {
+  if (!result.ok) {
     return (
       <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100">
-        <section className="mx-auto max-w-3xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center">
-          <h1 className="text-2xl font-bold text-white">Bounty unavailable</h1>
-          <p className="mt-3 text-slate-300">
-            The bounty could not be loaded from the API. Please try again once the backend is available.
-          </p>
-        </section>
+        <div className="mx-auto max-w-6xl space-y-5">
+          <ErrorState
+            title="Bounty unavailable"
+            message={result.message}
+            retry={{ href: `/bounties/${params.id}`, label: "Retry bounty" }}
+          />
+          <BountyDetailSkeleton />
+          <div className="text-center">
+            <Link href="/" className="text-sm font-medium text-yellow-300 hover:text-yellow-200">
+              Back to listings
+            </Link>
+          </div>
+        </div>
       </main>
     );
   }
 
+  const bounty = result.bounty;
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "CreativeWork",

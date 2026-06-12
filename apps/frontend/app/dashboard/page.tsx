@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!publicKey) return;
@@ -54,7 +55,7 @@ export default function DashboardPage() {
       })
       .catch(() => setError("Failed to load dashboard data."))
       .finally(() => setLoading(false));
-  }, [publicKey]);
+  }, [publicKey, reloadKey]);
 
   if (!publicKey) {
     return (
@@ -91,7 +92,20 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="inline-flex rounded-lg border border-red-300/40 px-3 py-1.5 font-medium text-red-50 transition hover:border-red-200 hover:bg-red-400/10"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

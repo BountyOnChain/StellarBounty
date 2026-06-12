@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BountyGridSkeleton, ErrorState } from "@/app/components/AsyncStates";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
@@ -41,29 +42,35 @@ type ApiBounty = Partial<BountyCardData> & {
 };
 
 type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
+type BountyListResult =
+  | { ok: true; bounties: BountyCardData[] }
+  | { ok: false; message: string };
 
-async function getBounties(): Promise<BountyCardData[]> {
+async function getBounties(): Promise<BountyListResult> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
     const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return [];
+      return { ok: false, message: "Bounty listings could not be loaded from the API." };
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
     const bounties = Array.isArray(payload) ? payload : payload.data ?? [];
 
-    return bounties.map((bounty, index) => ({
-      id: bounty.id ?? bounty._id ?? index,
-      title: bounty.title ?? "Untitled bounty",
-      reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
-      deadline: bounty.deadline ?? bounty.dueDate ?? null,
-      status: bounty.status ?? "open",
-    }));
+    return {
+      ok: true,
+      bounties: bounties.map((bounty, index) => ({
+        id: bounty.id ?? bounty._id ?? index,
+        title: bounty.title ?? "Untitled bounty",
+        reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
+        deadline: bounty.deadline ?? bounty.dueDate ?? null,
+        status: bounty.status ?? "open",
+      })),
+    };
   } catch {
-    return [];
+    return { ok: false, message: "Bounty listings could not be loaded. Check the backend connection." };
   }
 }
 
@@ -133,10 +140,11 @@ function applyListingControls(
 }
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const allBounties = await getBounties();
+  const result = await getBounties();
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.search ?? "";
+  const allBounties = result.ok ? result.bounties : [];
   const bounties = applyListingControls(allBounties, { sort, status, search });
 
   return (
@@ -225,7 +233,16 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           </div>
         </section>
 
-        {bounties.length > 0 ? (
+        {!result.ok ? (
+          <div className="space-y-5">
+            <ErrorState
+              title="Bounties unavailable"
+              message={result.message}
+              retry={{ href: "/", label: "Retry listings" }}
+            />
+            <BountyGridSkeleton />
+          </div>
+        ) : bounties.length > 0 ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {bounties.map((bounty) => (
               <BountyCard key={bounty.id} bounty={bounty} />

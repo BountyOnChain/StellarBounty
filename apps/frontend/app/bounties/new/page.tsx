@@ -242,7 +242,16 @@ export default function CreateBountyPage() {
 
           {submitError && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {submitError}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p>{submitError}</p>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  className="rounded-lg border border-red-300/40 px-3 py-1.5 font-medium text-red-50 transition hover:border-red-200 hover:bg-red-400/10"
+                >
+                  Retry
+                </button>
+              </div>
             </div>
           )}
 
