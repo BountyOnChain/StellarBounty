@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useRealtimeNotifications, type RealtimePayload } from "@/lib/realtime";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -38,7 +39,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     if (!publicKey) return;
 
     setLoading(true);
@@ -55,6 +56,24 @@ export default function DashboardPage() {
       .catch(() => setError("Failed to load dashboard data."))
       .finally(() => setLoading(false));
   }, [publicKey]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  useRealtimeNotifications(
+    useCallback(
+      (_event, payload: RealtimePayload) => {
+        if (!publicKey) return;
+
+        if (payload.ownerAddress === publicKey || payload.contributorAddress === publicKey) {
+          loadDashboard();
+        }
+      },
+      [loadDashboard, publicKey],
+    ),
+    Boolean(publicKey),
+  );
 
   if (!publicKey) {
     return (

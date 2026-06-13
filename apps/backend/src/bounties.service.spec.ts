@@ -4,12 +4,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
+import { NotificationsService } from './notifications/notifications.service';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let notifications: { emitBountyCreated: jest.Mock; emitBountyUpdated: jest.Mock };
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -38,6 +40,10 @@ describe('BountiesService', () => {
       findOne: jest.fn(),
       remove: jest.fn(),
     };
+    notifications = {
+      emitBountyCreated: jest.fn(),
+      emitBountyUpdated: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -45,6 +51,10 @@ describe('BountiesService', () => {
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: NotificationsService,
+          useValue: notifications,
         },
       ],
     }).compile();
@@ -70,6 +80,7 @@ describe('BountiesService', () => {
       );
       expect(repository.save).toHaveBeenCalled();
       expect(result.rewardAmount).toBe('10000000');
+      expect(notifications.emitBountyCreated).toHaveBeenCalledWith(result);
     });
 
     it('stores a null deadline when the DTO omits one', async () => {
@@ -139,6 +150,7 @@ describe('BountiesService', () => {
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);
+      expect(notifications.emitBountyUpdated).toHaveBeenCalledWith(existing);
     });
 
     it('preserves the existing deadline when update deadline is undefined', async () => {

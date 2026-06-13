@@ -8,6 +8,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SubmissionsService } from './submissions.service';
 
 const mockPreparedTransaction = { sign: jest.fn() };
@@ -48,6 +49,11 @@ describe('SubmissionsService', () => {
   let submissionRepo: MockRepository<Submission>;
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
+  let notifications: {
+    emitSubmissionReceived: jest.Mock;
+    emitSubmissionStatusChanged: jest.Mock;
+    emitBountyCompleted: jest.Mock;
+  };
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
@@ -103,11 +109,17 @@ describe('SubmissionsService', () => {
     config = {
       get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     };
+    notifications = {
+      emitSubmissionReceived: jest.fn(),
+      emitSubmissionStatusChanged: jest.fn(),
+      emitBountyCompleted: jest.fn(),
+    };
 
     service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      notifications as unknown as NotificationsService,
     );
   });
 
@@ -128,6 +140,10 @@ describe('SubmissionsService', () => {
         contributorAddress: 'GCONTRIBUTOR',
       });
       expect(submissionRepo.save).toHaveBeenCalledWith(result);
+      expect(notifications.emitSubmissionReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'bounty1' }),
+        result,
+      );
     });
 
     it('throws NotFoundException when creating for a missing bounty', async () => {
@@ -174,6 +190,12 @@ describe('SubmissionsService', () => {
       expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
       expect(submissionRepo.save).toHaveBeenCalledWith(submission);
       expect(StellarSdk.rpc.Server).not.toHaveBeenCalled();
+      expect(notifications.emitSubmissionStatusChanged).toHaveBeenCalledWith(
+        'submission.approved',
+        bounty,
+        submission,
+      );
+      expect(notifications.emitBountyCompleted).toHaveBeenCalledWith(bounty, submission);
     });
 
     it('throws ForbiddenException when a non-owner approves', async () => {
@@ -249,6 +271,11 @@ describe('SubmissionsService', () => {
 
       expect(result.status).toBe(SubmissionStatus.REJECTED);
       expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+      expect(notifications.emitSubmissionStatusChanged).toHaveBeenCalledWith(
+        'submission.rejected',
+        expect.objectContaining({ id: 'bounty1' }),
+        submission,
+      );
     });
 
     it('throws NotFoundException when rejecting a missing submission', async () => {

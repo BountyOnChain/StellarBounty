@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
+import RealtimeBountyRefresh from "./RealtimeBountyRefresh";
 
 export const revalidate = 60;
 
@@ -141,6 +142,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
+      <RealtimeBountyRefresh />
       <div className="mx-auto max-w-7xl">
         <section className="mb-10 flex flex-col justify-between gap-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 shadow-2xl shadow-black/20 sm:p-8 lg:flex-row lg:items-end">
           <div className="max-w-3xl">

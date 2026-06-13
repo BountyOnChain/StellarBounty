@@ -20,6 +20,7 @@ import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       }),
     }),
     AuthModule,
+    NotificationsModule,
     SubmissionsModule,
     HealthModule,
     MetricsModule,

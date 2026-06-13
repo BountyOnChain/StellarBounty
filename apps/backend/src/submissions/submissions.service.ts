@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateSubmissionDto } from './submissions.dto';
 
 @Injectable()
@@ -23,6 +25,8 @@ export class SubmissionsService {
     @InjectRepository(Bounty)
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
+    @Optional()
+    private readonly notifications?: NotificationsService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -35,7 +39,9 @@ export class SubmissionsService {
       notes: dto.notes ?? null,
       contributorAddress,
     });
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    this.notifications?.emitSubmissionReceived(bounty, saved);
+    return saved;
   }
 
   async findAll(bountyId: string, ownerAddress: string) {
@@ -64,7 +70,10 @@ export class SubmissionsService {
     submission.status = SubmissionStatus.APPROVED;
     bounty.status = BountyStatus.COMPLETED;
     await this.bountyRepo.save(bounty);
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    this.notifications?.emitSubmissionStatusChanged('submission.approved', bounty, saved);
+    this.notifications?.emitBountyCompleted(bounty, saved);
+    return saved;
   }
 
   async reject(bountyId: string, subId: string, ownerAddress: string) {
@@ -76,7 +85,9 @@ export class SubmissionsService {
     if (!submission) throw new NotFoundException('Submission not found');
 
     submission.status = SubmissionStatus.REJECTED;
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    this.notifications?.emitSubmissionStatusChanged('submission.rejected', bounty, saved);
+    return saved;
   }
 
   private async callContractApprove(bountyId: string, ownerAddress: string): Promise<void> {

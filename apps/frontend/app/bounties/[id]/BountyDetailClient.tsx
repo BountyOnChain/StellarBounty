@@ -5,6 +5,7 @@ import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import RealtimeBountyRefresh from "../../RealtimeBountyRefresh";
 
 type Bounty = {
   id: string;
@@ -81,6 +82,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
   return (
     <main className="min-h-[calc(100vh-73px)] overflow-x-hidden bg-slate-950 px-3 py-6 text-slate-100 sm:px-4 sm:py-10">
+      <RealtimeBountyRefresh />
       <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
         <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
           <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
