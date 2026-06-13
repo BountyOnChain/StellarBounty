@@ -1,8 +1,14 @@
 "use client";
 
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import {
+  fallbackLocale,
+  getLocaleDirection,
+  normalizeLocale,
+  type Locale,
+} from "./i18n-utils";
 
-export type Locale = "en" | "es";
+export { getLocaleDirection, normalizeLocale, type Locale } from "./i18n-utils";
 
 type TranslationValues = Record<string, string | number>;
 type I18nContextValue = {
@@ -13,14 +19,10 @@ type I18nContextValue = {
 };
 
 const LOCALE_STORAGE_KEY = "stellar-bounty-locale";
-const FALLBACK_LOCALE: Locale = "en";
-
 export const localeOptions: Array<{ value: Locale; label: string }> = [
   { value: "en", label: "English" },
   { value: "es", label: "Español" },
 ];
-
-const rtlLocales = new Set(["ar", "he", "fa", "ur"]);
 
 const dictionaries: Record<Locale, Record<string, string>> = {
   en: {
@@ -133,6 +135,11 @@ const dictionaries: Record<Locale, Record<string, string>> = {
     "notFound.title": "Page not found",
     "notFound.body": "The page you are looking for doesn't exist or has been moved.",
     "notFound.backHome": "Back to home",
+    "demo.backHome": "Back to home",
+    "demo.title": "Build a bounty listing page",
+    "demo.descriptionHeading": "Description (rendered from Markdown)",
+    "demo.claimBounty": "Claim Bounty",
+    "demo.createNew": "Create New",
   },
   es: {
     "nav.bounties": "Recompensas",
@@ -244,18 +251,18 @@ const dictionaries: Record<Locale, Record<string, string>> = {
     "notFound.title": "Página no encontrada",
     "notFound.body": "La página que buscas no existe o fue movida.",
     "notFound.backHome": "Volver al inicio",
+    "demo.backHome": "Volver al inicio",
+    "demo.title": "Crear una página de listado de recompensas",
+    "demo.descriptionHeading": "Descripción (renderizada desde Markdown)",
+    "demo.claimBounty": "Reclamar recompensa",
+    "demo.createNew": "Crear nueva",
   },
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-export function normalizeLocale(value: string | null | undefined): Locale {
-  const normalized = value?.toLowerCase().split("-")[0];
-  return normalized === "es" ? "es" : FALLBACK_LOCALE;
-}
-
 function detectLocale(): Locale {
-  if (typeof window === "undefined") return FALLBACK_LOCALE;
+  if (typeof window === "undefined") return fallbackLocale;
 
   const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
   if (stored) return normalizeLocale(stored);
@@ -264,10 +271,6 @@ function detectLocale(): Locale {
     ? window.navigator.languages
     : [window.navigator.language];
   return normalizeLocale(browserLocales.find(Boolean));
-}
-
-export function getLocaleDirection(locale: string) {
-  return rtlLocales.has(locale.toLowerCase().split("-")[0]) ? "rtl" : "ltr";
 }
 
 function interpolate(message: string, values?: TranslationValues) {
@@ -279,7 +282,7 @@ function interpolate(message: string, values?: TranslationValues) {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(FALLBACK_LOCALE);
+  const [locale, setLocaleState] = useState<Locale>(fallbackLocale);
 
   useEffect(() => {
     setLocaleState(detectLocale());
@@ -292,8 +295,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   const value = useMemo<I18nContextValue>(() => {
-    const dictionary = dictionaries[locale] ?? dictionaries[FALLBACK_LOCALE];
-    const fallbackDictionary = dictionaries[FALLBACK_LOCALE];
+    const dictionary = dictionaries[locale] ?? dictionaries[fallbackLocale];
+    const fallbackDictionary = dictionaries[fallbackLocale];
 
     return {
       locale,

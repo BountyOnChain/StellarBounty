@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import MarkdownRenderer from "@/app/components/MarkdownRenderer";
+import LocalizedText from "@/app/components/LocalizedText";
 import Link from "next/link";
 import { absoluteUrl, siteName } from "../../seo";
 
@@ -65,25 +66,25 @@ Build a real bounty listing page that fetches from the backend.
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-8">
         {/* Back link */}
         <Link href="/" className="mb-6 inline-flex min-h-11 items-center text-sm text-blue-400 hover:text-blue-300">
-          &larr; Back to home
+          &larr; <LocalizedText id="demo.backHome" />
         </Link>
 
         {/* Header */}
         <div className="mb-6">
           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
             <span className="w-fit rounded border border-emerald-500/30 bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
-              open
+              <LocalizedText id="status.open" />
             </span>
-            <span className="break-words text-sm text-slate-400">Reward: 500 XLM</span>
-            <span className="break-words text-sm text-slate-400">Deadline: 2026-06-18</span>
+            <span className="break-words text-sm text-slate-400"><LocalizedText id="detail.reward" values={{ reward: "500 XLM" }} /></span>
+            <span className="break-words text-sm text-slate-400"><LocalizedText id="detail.deadline" values={{ deadline: "2026-06-18" }} /></span>
           </div>
-          <h1 className="break-words text-2xl font-bold">Build a bounty listing page</h1>
+          <h1 className="break-words text-2xl font-bold"><LocalizedText id="demo.title" /></h1>
         </div>
 
         {/* Markdown rendered description */}
         <div className="min-w-0 rounded-lg border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-4 py-3 text-sm text-slate-400">
-            Description (rendered from Markdown)
+            <LocalizedText id="demo.descriptionHeading" />
           </div>
           <div className="min-w-0 p-4 sm:p-6">
             <MarkdownRenderer content={demoDescription} />
@@ -93,13 +94,13 @@ Build a real bounty listing page that fetches from the backend.
         {/* Action buttons */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button className="min-h-11 rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700">
-            Claim Bounty
+            <LocalizedText id="demo.claimBounty" />
           </button>
           <Link
             href="/bounties/new"
             className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-6 py-2 font-medium text-slate-200 transition-colors hover:bg-slate-700"
           >
-            Create New
+            <LocalizedText id="demo.createNew" />
           </Link>
         </div>
       </div>

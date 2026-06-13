@@ -1,4 +1,4 @@
-import { getLocaleDirection, normalizeLocale } from "./i18n";
+import { getLocaleDirection, normalizeLocale } from "./i18n-utils";
 
 describe("i18n helpers", () => {
   it("normalizes supported browser locales", () => {
