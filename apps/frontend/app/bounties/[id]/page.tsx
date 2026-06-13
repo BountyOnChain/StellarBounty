@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import BountyDetailClient from "./BountyDetailClient";
 import { absoluteUrl, siteName } from "../../seo";
+import LocalizedText from "@/app/components/LocalizedText";
 
 type Bounty = {
   id: string;
@@ -119,9 +120,9 @@ export default async function BountyDetailPage({ params }: { params: { id: strin
     return (
       <main className="min-h-[calc(100vh-73px)] bg-slate-950 px-4 py-10 text-slate-100">
         <section className="mx-auto max-w-3xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center">
-          <h1 className="text-2xl font-bold text-white">Bounty unavailable</h1>
+          <h1 className="text-2xl font-bold text-white"><LocalizedText id="detail.unavailableTitle" /></h1>
           <p className="mt-3 text-slate-300">
-            The bounty could not be loaded from the API. Please try again once the backend is available.
+            <LocalizedText id="detail.unavailableBody" />
           </p>
         </section>
       </main>

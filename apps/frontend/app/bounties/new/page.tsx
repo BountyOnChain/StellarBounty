@@ -9,26 +9,29 @@ import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import { useWallet } from "@/components/WalletContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 const MAX_REWARD_AMOUNT = 1_000_000_000;
 
-const createBountySchema = z.object({
-  title: z.string().trim().min(1, "Title is required."),
-  description: z.string().trim().min(1, "Description is required."),
-  reward: z
-    .string()
-    .trim()
-    .min(1, "Reward amount is required.")
-    .regex(/^\d+$/, "Reward must be a whole number.")
-    .refine((value) => Number(value) > 0, "Reward must be greater than 0.")
-    .refine(
-      (value) => Number(value) <= MAX_REWARD_AMOUNT,
-      `Reward must be ${MAX_REWARD_AMOUNT.toLocaleString()} XLM or less.`
-    ),
-  deadline: z.string().min(1, "Deadline is required."),
-});
+function createBountySchema(t: (key: string, values?: Record<string, string | number>) => string) {
+  return z.object({
+    title: z.string().trim().min(1, t("create.validationTitle")),
+    description: z.string().trim().min(1, t("create.validationDescription")),
+    reward: z
+      .string()
+      .trim()
+      .min(1, t("create.validationRewardRequired"))
+      .regex(/^\d+$/, t("create.validationRewardWhole"))
+      .refine((value) => Number(value) > 0, t("create.validationRewardPositive"))
+      .refine(
+        (value) => Number(value) <= MAX_REWARD_AMOUNT,
+        t("create.validationRewardMax", { max: MAX_REWARD_AMOUNT.toLocaleString() })
+      ),
+    deadline: z.string().min(1, t("create.validationDeadline")),
+  });
+}
 
-type CreateBountyFormValues = z.infer<typeof createBountySchema>;
+type CreateBountyFormValues = z.infer<ReturnType<typeof createBountySchema>>;
 
 type CreateBountyResponse = {
   id: string;
@@ -36,13 +39,14 @@ type CreateBountyResponse = {
 
 function formatErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
-  return "Unable to create bounty.";
+  return null;
 }
 
 export default function CreateBountyPage() {
   const router = useRouter();
   const { publicKey } = useWallet();
   const toast = useToast();
+  const { t } = useI18n();
   const { getToken, clearToken, apiUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -54,7 +58,7 @@ export default function CreateBountyPage() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateBountyFormValues>({
-    resolver: zodResolver(createBountySchema),
+    resolver: zodResolver(createBountySchema(t)),
     defaultValues: {
       title: "",
       description: "",
@@ -125,14 +129,14 @@ export default function CreateBountyPage() {
 
         if (response.status === 401) clearToken();
 
-        throw new Error(message || "Unable to create bounty.");
+        throw new Error(message || t("create.error"));
       }
 
       const created = (await response.json()) as CreateBountyResponse;
-      toast.success("Bounty created successfully.");
+      toast.success(t("create.success"));
       router.push(`/bounties/${created.id}`);
     } catch (error) {
-      const message = formatErrorMessage(error);
+      const message = formatErrorMessage(error) ?? t("create.error");
       setSubmitError(message);
       toast.error(message);
     }
@@ -143,19 +147,19 @@ export default function CreateBountyPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="mb-6 break-words text-2xl font-bold sm:text-3xl">Create a New Bounty</h1>
+        <h1 className="mb-6 break-words text-2xl font-bold sm:text-3xl">{t("create.title")}</h1>
 
         <form onSubmit={onSubmit} className="min-w-0 space-y-6">
           <div>
             <label htmlFor="title" className="mb-1 block text-sm font-medium text-slate-300">
-              Title
+              {t("create.fieldTitle")}
             </label>
             <input
               id="title"
               type="text"
               {...register("title")}
               className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
-              placeholder="e.g. Build a bounty listing page"
+              placeholder={t("create.titlePlaceholder")}
             />
             {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
           </div>
@@ -163,7 +167,7 @@ export default function CreateBountyPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="reward" className="mb-1 block text-sm font-medium text-slate-300">
-                Reward (XLM)
+                {t("create.reward")}
               </label>
               <input
                 id="reward"
@@ -171,13 +175,13 @@ export default function CreateBountyPage() {
                 inputMode="numeric"
                 {...register("reward")}
                 className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-blue-500 focus:outline-none"
-                placeholder="e.g. 500"
+                placeholder={t("create.rewardPlaceholder")}
               />
               {errors.reward && <p className={fieldErrorClass}>{errors.reward.message}</p>}
             </div>
             <div>
               <label htmlFor="deadline" className="mb-1 block text-sm font-medium text-slate-300">
-                Deadline
+                {t("create.deadline")}
               </label>
               <input
                 id="deadline"
@@ -191,7 +195,7 @@ export default function CreateBountyPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-300">
-              Description (supports Markdown)
+              {t("create.description")}
             </label>
 
             <div className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-700">
@@ -204,7 +208,7 @@ export default function CreateBountyPage() {
                     : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
                 }`}
               >
-                Write
+                {t("create.write")}
               </button>
               <button
                 type="button"
@@ -215,7 +219,7 @@ export default function CreateBountyPage() {
                     : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
                 }`}
               >
-                Preview
+                {t("create.preview")}
               </button>
             </div>
 
@@ -224,14 +228,14 @@ export default function CreateBountyPage() {
                 rows={12}
                 {...register("description")}
                 className="min-h-64 w-full resize-y rounded-b-lg border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-                placeholder="Write your bounty requirements in markdown..."
+                placeholder={t("create.descriptionPlaceholder")}
               />
             ) : (
               <div className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-700 bg-slate-900 p-4">
                 {description ? (
                   <MarkdownRenderer content={description} />
                 ) : (
-                  <p className="text-sm italic text-slate-500">Nothing to preview yet...</p>
+                  <p className="text-sm italic text-slate-500">{t("create.emptyPreview")}</p>
                 )}
               </div>
             )}
@@ -252,7 +256,7 @@ export default function CreateBountyPage() {
               disabled={isSubmitting}
               className="min-h-11 w-full rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
             >
-              {isSubmitting ? "Creating..." : "Create Bounty"}
+              {isSubmitting ? t("create.creating") : t("create.submit")}
             </button>
           </div>
         </form>

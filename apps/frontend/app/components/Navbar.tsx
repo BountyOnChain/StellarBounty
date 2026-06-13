@@ -4,14 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { localeOptions, useI18n } from "../../lib/i18n";
 
 const NAV_LINKS = [
-    { label: "Bounties", href: "/bounties" },
-    { label: "Dashboard", href: "/dashboard" },
+    { labelKey: "nav.bounties", href: "/bounties" },
+    { labelKey: "nav.dashboard", href: "/dashboard" },
 ];
 
 export default function Navbar() {
     const pathname = usePathname();
+    const { locale, setLocale, t } = useI18n();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
 
@@ -49,7 +51,7 @@ export default function Navbar() {
             >
                 <nav
                     className="mx-auto flex h-full max-w-6xl items-center justify-between gap-3 px-3 sm:px-6"
-                    aria-label="Main navigation"
+                    aria-label={t("nav.mainNavigation")}
                 >
                     <Link
                         href="/"
@@ -59,7 +61,7 @@ export default function Navbar() {
                     </Link>
 
                     <ul className="hidden md:flex items-center gap-1 flex-1 ml-8" role="list">
-                        {NAV_LINKS.map(({ label, href }) => (
+                        {NAV_LINKS.map(({ labelKey, href }) => (
                             <li key={href}>
                                 <Link
                                     href={href}
@@ -73,7 +75,7 @@ export default function Navbar() {
                   `}
                                     aria-current={isActive(href) ? "page" : undefined}
                                 >
-                                    {label}
+                                    {t(labelKey)}
                                     {isActive(href) && (
                                         <span className="absolute bottom-0.5 left-4 right-4 h-[2px] rounded-full bg-indigo-500" />
                                     )}
@@ -83,6 +85,21 @@ export default function Navbar() {
                     </ul>
 
                     <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                        <label className="hidden items-center gap-2 md:flex">
+                            <span className="sr-only">{t("nav.language")}</span>
+                            <select
+                                value={locale}
+                                onChange={(event) => setLocale(event.target.value as typeof locale)}
+                                className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
+                            >
+                                {localeOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
                         <div className="hidden md:block">
                             <ConnectWalletButton />
                         </div>
@@ -90,7 +107,7 @@ export default function Navbar() {
                         <button
                             onClick={() => setDrawerOpen((v) => !v)}
                             className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 md:hidden"
-                            aria-label={drawerOpen ? "Close menu" : "Open menu"}
+                            aria-label={drawerOpen ? t("nav.closeMenu") : t("nav.openMenu")}
                             aria-expanded={drawerOpen}
                             aria-controls="mobile-drawer"
                         >
@@ -120,7 +137,7 @@ export default function Navbar() {
                 id="mobile-drawer"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Mobile navigation"
+                aria-label={t("nav.mobileNavigation")}
                 className={`
           fixed top-16 right-0 bottom-0 z-40 w-[min(18rem,100vw)]
           bg-slate-900 border-l border-slate-800
@@ -129,9 +146,9 @@ export default function Navbar() {
         `}
             >
                 <div className="flex h-full flex-col gap-2 overflow-y-auto p-4 sm:p-6">
-                    <nav aria-label="Mobile navigation">
+                    <nav aria-label={t("nav.mobileNavigation")}>
                         <ul className="space-y-1" role="list">
-                            {NAV_LINKS.map(({ label, href }) => (
+                            {NAV_LINKS.map(({ labelKey, href }) => (
                                 <li key={href}>
                                     <Link
                                         href={href}
@@ -149,12 +166,29 @@ export default function Navbar() {
                                         {isActive(href) && (
                                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
                                         )}
-                                        {label}
+                                        {t(labelKey)}
                                     </Link>
                                 </li>
                             ))}
                         </ul>
                     </nav>
+
+                    <div className="my-2 border-t border-slate-800" />
+
+                    <label className="flex flex-col gap-2 text-sm text-slate-400">
+                        <span>{t("nav.language")}</span>
+                        <select
+                            value={locale}
+                            onChange={(event) => setLocale(event.target.value as typeof locale)}
+                            className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none focus:border-indigo-500"
+                        >
+                            {localeOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
 
                     <div className="my-2 border-t border-slate-800" />
 

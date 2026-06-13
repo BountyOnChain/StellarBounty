@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { WalletProvider } from "../components/WalletContext";
 import { ToastProvider } from "../components/toast/ToastProvider";
+import { I18nProvider } from "../lib/i18n";
 import Navbar from "./components/Navbar";
 import { absoluteUrl, defaultDescription, siteName, siteUrl } from "./seo";
 import "./globals.css";
@@ -33,14 +34,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <WalletProvider>
-          <ToastProvider>
-            <div className="min-h-screen bg-slate-950 text-slate-100">
-              <Navbar />
-              {children}
-            </div>
-          </ToastProvider>
-        </WalletProvider>
+        <I18nProvider>
+          <WalletProvider>
+            <ToastProvider>
+              <div className="min-h-screen bg-slate-950 text-slate-100">
+                <Navbar />
+                {children}
+              </div>
+            </ToastProvider>
+          </WalletProvider>
+        </I18nProvider>
       </body>
     </html>
   );

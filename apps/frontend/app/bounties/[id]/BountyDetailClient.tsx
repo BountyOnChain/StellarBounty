@@ -5,6 +5,7 @@ import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 type Bounty = {
   id: string;
@@ -24,6 +25,7 @@ function truncateAddress(address: string) {
 export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const { publicKey } = useWallet();
   const toast = useToast();
+  const { t } = useI18n();
   const { getToken, clearToken, apiUrl } = useAuth();
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
@@ -32,16 +34,16 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
   const disabledReason = useMemo(() => {
-    if (!isOpen) return "Submissions are closed for this bounty.";
-    if (!publicKey) return "Connect your wallet to submit work.";
+    if (!isOpen) return t("detail.closed");
+    if (!publicKey) return t("detail.connectRequired");
     return null;
-  }, [isOpen, publicKey]);
+  }, [isOpen, publicKey, t]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canSubmit) {
-      toast.error(disabledReason || "Submission is disabled.");
+      toast.error(disabledReason || t("detail.disabled"));
       return;
     }
 
@@ -60,14 +62,14 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
       if (!response.ok) {
         if (response.status === 401) clearToken();
-        throw new Error("Submission failed. Please try again.");
+        throw new Error(t("detail.submitFailed"));
       }
 
       setWorkLink("");
       setNotes("");
-      toast.success("Work submitted successfully.");
+      toast.success(t("detail.submitSuccess"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
+      toast.error(error instanceof Error ? error.message : t("detail.submitFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -85,8 +87,8 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
         <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
           <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <StatusBadge status={statusKey} />
-            <span className="break-words text-sm text-slate-400">Reward: {bounty.reward}</span>
-            <span className="break-words text-sm text-slate-400">Deadline: {bounty.deadline}</span>
+            <span className="break-words text-sm text-slate-400">{t("detail.reward", { reward: bounty.reward })}</span>
+            <span className="break-words text-sm text-slate-400">{t("detail.deadline", { deadline: bounty.deadline })}</span>
           </div>
 
           <h1 className="break-words text-2xl font-bold tracking-tight text-white sm:text-4xl">
@@ -98,33 +100,33 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
           <dl className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Owner</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">{t("detail.owner")}</dt>
               <dd className="mt-2 break-all font-mono text-sm text-slate-200">
                 {truncateAddress(bounty.ownerAddress)}
               </dd>
             </div>
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Reward</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">{t("card.reward")}</dt>
               <dd className="mt-2 break-words text-sm font-semibold text-slate-200">{bounty.reward}</dd>
             </div>
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Status</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">{t("detail.status")}</dt>
               <dd className="mt-2 text-sm font-semibold capitalize text-slate-200">
-                {bounty.status}
+                {t(`status.${statusKey}`)}
               </dd>
             </div>
           </dl>
         </section>
 
         <aside className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
-          <h2 className="text-xl font-semibold text-white">Submit work</h2>
+          <h2 className="text-xl font-semibold text-white">{t("detail.submitWork")}</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Share a PR, demo, or document link with implementation notes.
+            {t("detail.submitIntro")}
           </p>
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-300">Work link</span>
+              <span className="text-sm font-medium text-slate-300">{t("detail.workLink")}</span>
               <input
                 required
                 type="url"
@@ -137,14 +139,14 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-300">Notes</span>
+              <span className="text-sm font-medium text-slate-300">{t("detail.notes")}</span>
               <textarea
                 required
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={!canSubmit || isSubmitting}
                 rows={5}
-                placeholder="Summarize the work and verification steps."
+                placeholder={t("detail.notesPlaceholder")}
                 className="mt-2 min-h-32 w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </label>
@@ -156,7 +158,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
               disabled={!canSubmit || isSubmitting}
               className="min-h-11 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
             >
-              {isSubmitting ? "Submitting..." : "Submit work"}
+              {isSubmitting ? t("detail.submitting") : t("detail.submit")}
             </button>
           </form>
         </aside>

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
+import BountyFilters from "@/app/components/BountyFilters";
+import LocalizedText from "@/app/components/LocalizedText";
 
 export const revalidate = 60;
 
@@ -57,7 +59,7 @@ async function getBounties(): Promise<BountyCardData[]> {
 
     return bounties.map((bounty, index) => ({
       id: bounty.id ?? bounty._id ?? index,
-      title: bounty.title ?? "Untitled bounty",
+      title: bounty.title ?? "",
       reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
       deadline: bounty.deadline ?? bounty.dueDate ?? null,
       status: bounty.status ?? "open",
@@ -144,86 +146,31 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
       <div className="mx-auto max-w-7xl">
         <section className="mb-10 flex flex-col justify-between gap-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 shadow-2xl shadow-black/20 sm:p-8 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-yellow-400">StellarBounty</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-yellow-400">
+              <LocalizedText id="home.eyebrow" />
+            </p>
             <h1 className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
-              Open bounties ready for builders
+              <LocalizedText id="home.title" />
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
-              Browse funded work, compare rewards and deadlines, then jump into a task that matches your skills.
+              <LocalizedText id="home.subtitle" />
             </p>
           </div>
           <Link
             href="/bounties/new"
             className="inline-flex items-center justify-center rounded-xl bg-yellow-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-yellow-300"
           >
-            Create Bounty
+            <LocalizedText id="home.createBounty" />
           </Link>
         </section>
 
-        <section className="mb-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl shadow-black/10 sm:p-6">
-          <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Search title</span>
-              <input
-                type="search"
-                name="search"
-                defaultValue={search}
-                placeholder="Search bounty titles"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-yellow-400"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Status</span>
-              <select
-                name="status"
-                defaultValue={status}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-400"
-              >
-                <option value="all">All statuses</option>
-                <option value="open">Open</option>
-                <option value="in_progress">In progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-300">Sort by</span>
-              <select
-                name="sort"
-                defaultValue={sort}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-400"
-              >
-                <option value="newest">Newest</option>
-                <option value="highest_reward">Highest reward</option>
-                <option value="closest_deadline">Closest deadline</option>
-              </select>
-            </label>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                className="inline-flex min-w-28 items-center justify-center rounded-2xl bg-yellow-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-yellow-300"
-              >
-                Apply
-              </button>
-              <Link
-                href="/"
-                className="inline-flex min-w-28 items-center justify-center rounded-2xl border border-slate-700 px-5 py-3 font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
-              >
-                Reset
-              </Link>
-            </div>
-          </form>
-
-          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              Showing <span className="font-semibold text-slate-200">{bounties.length}</span> of{" "}
-              <span className="font-semibold text-slate-200">{allBounties.length}</span> bounties
-            </p>
-            <p className="text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
-          </div>
-        </section>
+        <BountyFilters
+          search={search}
+          status={status}
+          sort={sort}
+          visibleCount={bounties.length}
+          totalCount={allBounties.length}
+        />
 
         {bounties.length > 0 ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -233,13 +180,13 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           </section>
         ) : (
           <section className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-16 text-center">
-            <p className="text-lg font-semibold text-slate-200">No bounties available yet.</p>
-            <p className="mt-2 text-slate-400">Create the first bounty and bring new work onto Stellar.</p>
+            <p className="text-lg font-semibold text-slate-200"><LocalizedText id="home.emptyTitle" /></p>
+            <p className="mt-2 text-slate-400"><LocalizedText id="home.emptyBody" /></p>
             <Link
               href="/bounties/new"
               className="mt-6 inline-flex rounded-xl border border-slate-700 px-5 py-3 font-medium text-slate-200 transition hover:border-yellow-400 hover:text-yellow-300"
             >
-              Post a bounty
+              <LocalizedText id="home.postBounty" />
             </Link>
           </section>
         )}

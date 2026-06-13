@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useI18n } from "../lib/i18n";
 
 type WalletState = {
   publicKey: string | null;
@@ -35,12 +36,12 @@ function normalizeNetwork(network: string | undefined) {
   return (network || DEFAULT_NETWORK).trim().toUpperCase();
 }
 
-function formatFreighterError(error: unknown) {
+function formatFreighterError(error: unknown, fallbackMessage: string) {
   if (error instanceof Error) {
     return error.message;
   }
 
-  return "Unable to connect to Freighter.";
+  return fallbackMessage;
 }
 
 async function loadFreighter(): Promise<FreighterApi> {
@@ -48,6 +49,7 @@ async function loadFreighter(): Promise<FreighterApi> {
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [freighterNetwork, setFreighterNetwork] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -90,14 +92,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const connection = await freighter.isConnected();
 
       if (connection.error || !connection.isConnected) {
-        setError("Freighter is not installed.");
+        setError(t("wallet.freighterMissing"));
         return;
       }
 
       const access = await freighter.requestAccess();
 
       if (access.error || !access.address) {
-        setError(access.error?.message || "Freighter did not return a public key.");
+        setError(access.error?.message || t("wallet.freighterNoPublicKey"));
         return;
       }
 
@@ -118,14 +120,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       );
 
       if (activeNetwork !== targetNetwork) {
-        setError(`Freighter is on ${activeNetwork}. This app is configured for ${targetNetwork}.`);
+        setError(t("wallet.wrongNetwork", { activeNetwork, targetNetwork }));
       }
     } catch (caughtError) {
-      setError(formatFreighterError(caughtError));
+      setError(formatFreighterError(caughtError, t("wallet.freighterConnectFailed")));
     } finally {
       setIsConnecting(false);
     }
-  }, [targetNetwork]);
+  }, [t, targetNetwork]);
 
   const value = useMemo(
     () => ({

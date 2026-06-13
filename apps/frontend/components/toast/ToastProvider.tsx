@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useI18n } from "../../lib/i18n";
 import {
   createToast,
   dismissToast,
@@ -33,6 +34,7 @@ function getToastClasses(type: ToastType) {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <p className="leading-6">{toast.message}</p>
               <button
                 type="button"
-                aria-label="Dismiss notification"
+                aria-label={t("toast.dismiss")}
                 className="rounded px-1 text-lg leading-6 opacity-80 transition hover:opacity-100"
                 onClick={() => dismiss(toast.id)}
               >

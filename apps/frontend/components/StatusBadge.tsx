@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "../lib/i18n";
+
 type StatusVariant = "pending" | "approved" | "rejected" | "open" | "in_progress" | "completed" | "cancelled";
 
 const STATUS_STYLES: Record<StatusVariant, string> = {
@@ -18,13 +20,14 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const { t } = useI18n();
   const baseClass = STATUS_STYLES[status] ?? "bg-slate-500/20 text-slate-400 border-slate-500/30";
 
   return (
     <span
       className={`px-2 py-0.5 text-xs font-medium rounded border ${baseClass} ${className ?? ""}`}
     >
-      {status.replace(/_/g, " ")}
+      {t(`status.${status}`)}
     </span>
   );
 }

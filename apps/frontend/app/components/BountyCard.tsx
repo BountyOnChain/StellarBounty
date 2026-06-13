@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useI18n } from "../../lib/i18n";
 
 export type BountyCardData = {
   id: string | number;
@@ -12,17 +15,21 @@ type BountyCardProps = {
   bounty: BountyCardData;
 };
 
-function formatReward(reward: BountyCardData["reward"]) {
+function formatReward(reward: BountyCardData["reward"], rewardTbd: string) {
   if (reward === null || reward === undefined || reward === "") {
-    return "Reward TBD";
+    return rewardTbd;
   }
 
   return typeof reward === "number" ? `${reward.toLocaleString()} XLM` : reward;
 }
 
-function formatDeadline(deadline: BountyCardData["deadline"]) {
+function formatDeadline(
+  deadline: BountyCardData["deadline"],
+  noDeadline: string,
+  formatDate: (value: string | Date) => string,
+) {
   if (!deadline) {
-    return "No deadline";
+    return noDeadline;
   }
 
   const parsed = new Date(deadline);
@@ -30,16 +37,14 @@ function formatDeadline(deadline: BountyCardData["deadline"]) {
     return deadline;
   }
 
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
+  return formatDate(parsed);
 }
 
 export default function BountyCard({ bounty }: BountyCardProps) {
+  const { t, formatDate } = useI18n();
   const status = bounty.status ?? "open";
-  const statusLabel = status.replace(/_/g, " ");
+  const statusKey = status.replace(/-/g, "_");
+  const statusLabel = t(`status.${statusKey}`);
 
   return (
     <Link
@@ -57,12 +62,16 @@ export default function BountyCard({ bounty }: BountyCardProps) {
 
       <div className="mt-6 flex flex-1 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Reward</p>
-          <p className="mt-1 break-words text-xl font-bold text-yellow-400 sm:text-2xl">{formatReward(bounty.reward)}</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("card.reward")}</p>
+          <p className="mt-1 break-words text-xl font-bold text-yellow-400 sm:text-2xl">
+            {formatReward(bounty.reward, t("card.rewardTbd"))}
+          </p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Deadline</p>
-          <p className="mt-1 text-sm text-slate-300">{formatDeadline(bounty.deadline)}</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("card.deadline")}</p>
+          <p className="mt-1 text-sm text-slate-300">
+            {formatDeadline(bounty.deadline, t("card.noDeadline"), formatDate)}
+          </p>
         </div>
       </div>
     </Link>

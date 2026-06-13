@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useI18n } from "../../lib/i18n";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -32,6 +33,7 @@ function EmptyState({ message }: { message: string }) {
 
 export default function DashboardPage() {
   const { publicKey, connect } = useWallet();
+  const { t, formatDate } = useI18n();
   const [activeTab, setActiveTab] = useState<"submissions" | "bounties">("submissions");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [bounties, setBounties] = useState<Bounty[]>([]);
@@ -52,19 +54,19 @@ export default function DashboardPage() {
         setSubmissions(subs);
         setBounties(bounts);
       })
-      .catch(() => setError("Failed to load dashboard data."))
+      .catch(() => setError(t("dashboard.loadError")))
       .finally(() => setLoading(false));
-  }, [publicKey]);
+  }, [publicKey, t]);
 
   if (!publicKey) {
     return (
       <main className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-400">
-        <p>Connect your wallet to view your dashboard.</p>
+        <p>{t("dashboard.connectPrompt")}</p>
         <button
           onClick={connect}
           className="rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-300 transition"
         >
-          Connect wallet
+          {t("wallet.connect")}
         </button>
       </main>
     );
@@ -72,7 +74,7 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-6">{t("dashboard.title")}</h1>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-700 mb-6">
@@ -86,7 +88,7 @@ export default function DashboardPage() {
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            {tab === "submissions" ? "My Submissions" : "My Bounties"}
+            {tab === "submissions" ? t("dashboard.submissionsTab") : t("dashboard.bountiesTab")}
           </button>
         ))}
       </div>
@@ -101,15 +103,15 @@ export default function DashboardPage() {
         </div>
       ) : activeTab === "submissions" ? (
         submissions.length === 0 ? (
-          <EmptyState message="You haven't submitted to any bounties yet." />
+          <EmptyState message={t("dashboard.emptySubmissions")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-400 uppercase border-b border-slate-700">
                 <tr>
-                  <th className="py-3 pr-4">Bounty</th>
-                  <th className="py-3 pr-4">Submitted</th>
-                  <th className="py-3">Status</th>
+                  <th className="py-3 pr-4">{t("dashboard.bounty")}</th>
+                  <th className="py-3 pr-4">{t("dashboard.submitted")}</th>
+                  <th className="py-3">{t("detail.status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -117,7 +119,7 @@ export default function DashboardPage() {
                   <tr key={s.id}>
                     <td className="py-3 pr-4 text-slate-100">{s.bountyTitle}</td>
                     <td className="py-3 pr-4 text-slate-400">
-                      {new Date(s.createdAt).toLocaleDateString()}
+                      {formatDate(s.createdAt)}
                     </td>
                     <td className="py-3">
                       <StatusBadge status={s.status} />
@@ -129,16 +131,16 @@ export default function DashboardPage() {
           </div>
         )
       ) : bounties.length === 0 ? (
-        <EmptyState message="You haven't created any bounties yet." />
+        <EmptyState message={t("dashboard.emptyBounties")} />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-400 uppercase border-b border-slate-700">
               <tr>
-                <th className="py-3 pr-4">Title</th>
-                <th className="py-3 pr-4">Reward</th>
-                <th className="py-3 pr-4">Submissions</th>
-                <th className="py-3">Status</th>
+                <th className="py-3 pr-4">{t("dashboard.titleColumn")}</th>
+                <th className="py-3 pr-4">{t("card.reward")}</th>
+                <th className="py-3 pr-4">{t("dashboard.submissions")}</th>
+                <th className="py-3">{t("detail.status")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
