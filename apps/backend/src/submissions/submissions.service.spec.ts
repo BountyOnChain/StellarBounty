@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
+import { existsSync } from 'fs';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import * as path from 'path';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
-import { SubmissionsService } from './submissions.service';
+import { SubmissionsService, UploadedSubmissionFile } from './submissions.service';
 
 const mockPreparedTransaction = { sign: jest.fn() };
 const mockServer = {
@@ -48,6 +52,7 @@ describe('SubmissionsService', () => {
   let submissionRepo: MockRepository<Submission>;
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
+  let uploadDir: string;
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
@@ -73,13 +78,26 @@ describe('SubmissionsService', () => {
       contributorAddress: 'GCONTRIBUTOR',
       link: 'https://github.com/example/repo/pull/1',
       notes: null,
+      attachments: [],
       status: SubmissionStatus.PENDING,
       createdAt: new Date('2026-01-03T00:00:00.000Z'),
       ...overrides,
     };
   }
 
-  beforeEach(() => {
+  function createFile(overrides: Partial<UploadedSubmissionFile> = {}): UploadedSubmissionFile {
+    const buffer = Buffer.from('file-content');
+    return {
+      originalname: 'proof.pdf',
+      mimetype: 'application/pdf',
+      size: buffer.byteLength,
+      buffer,
+      ...overrides,
+    };
+  }
+
+  beforeEach(async () => {
+    uploadDir = await mkdtemp(path.join(tmpdir(), 'stellar-submissions-'));
     mockPreparedTransaction.sign.mockClear();
     mockServer.getAccount.mockReset().mockResolvedValue({ accountId: 'GOWNER' });
     mockServer.prepareTransaction.mockReset().mockResolvedValue(mockPreparedTransaction);
@@ -101,7 +119,13 @@ describe('SubmissionsService', () => {
       save: jest.fn(async (input) => input),
     };
     config = {
-      get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, unknown> = {
+          JWT_SECRET: 'test-jwt-secret',
+          SUBMISSION_UPLOAD_DIR: uploadDir,
+        };
+        return values[key] ?? defaultValue;
+      }),
     };
 
     service = new SubmissionsService(
@@ -109,6 +133,10 @@ describe('SubmissionsService', () => {
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
     );
+  });
+
+  afterEach(async () => {
+    await rm(uploadDir, { recursive: true, force: true });
   });
 
   describe('create', () => {
@@ -122,12 +150,76 @@ describe('SubmissionsService', () => {
       );
 
       expect(submissionRepo.create).toHaveBeenCalledWith({
+        id: expect.any(String),
         bountyId: 'bounty1',
         link: 'https://github.com/example/repo/pull/1',
         notes: null,
         contributorAddress: 'GCONTRIBUTOR',
+        attachments: [],
       });
-      expect(submissionRepo.save).toHaveBeenCalledWith(result);
+      expect(submissionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ attachments: [] }),
+      );
+      expect(result.attachments).toEqual([]);
+    });
+
+    it('stores supported attachments and returns signed download URLs', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
+
+      const result = await service.create(
+        'bounty1',
+        { link: 'https://github.com/example/repo/pull/1', notes: 'See attached proof.' },
+        'GCONTRIBUTOR',
+        [createFile()],
+      );
+
+      expect(result.attachments).toHaveLength(1);
+      expect(result.attachments[0]).toMatchObject({
+        originalName: 'proof.pdf',
+        mimeType: 'application/pdf',
+        size: Buffer.byteLength('file-content'),
+      });
+      expect(result.attachments[0].downloadUrl).toContain(
+        `/bounties/bounty1/submissions/${result.id}/attachments/${result.attachments[0].id}/download?token=`,
+      );
+      expect(
+        existsSync(path.join(uploadDir, result.attachments[0].storageKey)),
+      ).toBe(true);
+    });
+
+    it('rejects unsupported attachment types', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
+
+      await expect(
+        service.create(
+          'bounty1',
+          { link: 'https://github.com/example/repo/pull/1' },
+          'GCONTRIBUTOR',
+          [createFile({ originalname: 'malware.exe', mimetype: 'application/octet-stream' })],
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(submissionRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('enforces configurable attachment size limits', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, unknown> = {
+          JWT_SECRET: 'test-jwt-secret',
+          SUBMISSION_UPLOAD_DIR: uploadDir,
+          SUBMISSION_UPLOAD_MAX_FILE_SIZE_BYTES: 4,
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await expect(
+        service.create(
+          'bounty1',
+          { link: 'https://github.com/example/repo/pull/1' },
+          'GCONTRIBUTOR',
+          [createFile()],
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when creating for a missing bounty', async () => {
@@ -146,7 +238,7 @@ describe('SubmissionsService', () => {
       bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
       submissionRepo.findBy!.mockResolvedValueOnce(submissions);
 
-      await expect(service.findAll('bounty1', 'GOWNER')).resolves.toBe(submissions);
+      await expect(service.findAll('bounty1', 'GOWNER')).resolves.toEqual(submissions);
       expect(submissionRepo.findBy).toHaveBeenCalledWith({ bountyId: 'bounty1' });
     });
 
@@ -267,6 +359,36 @@ describe('SubmissionsService', () => {
         ForbiddenException,
       );
       expect(submissionRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveAttachmentDownload', () => {
+    it('resolves an attachment from a valid signed URL token', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
+      const created = await service.create(
+        'bounty1',
+        { link: 'https://github.com/example/repo/pull/1' },
+        'GCONTRIBUTOR',
+        [createFile({ originalname: 'screen shot.png', mimetype: 'image/png' })],
+      );
+      const attachment = created.attachments[0];
+      const token = new URL(`http://localhost${attachment.downloadUrl}`).searchParams.get('token');
+      submissionRepo.findOneBy!.mockResolvedValueOnce(created);
+
+      await expect(
+        service.resolveAttachmentDownload('bounty1', created.id, attachment.id, token ?? ''),
+      ).resolves.toMatchObject({
+        originalName: 'screen shot.png',
+        mimeType: 'image/png',
+        size: attachment.size,
+      });
+    });
+
+    it('rejects tampered attachment tokens', async () => {
+      await expect(
+        service.resolveAttachmentDownload('bounty1', 'submission1', 'attachment1', 'bad.token'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(submissionRepo.findOneBy).not.toHaveBeenCalled();
     });
   });
 });

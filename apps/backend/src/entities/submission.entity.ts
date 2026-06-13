@@ -13,6 +13,16 @@ export enum SubmissionStatus {
   REJECTED = 'rejected',
 }
 
+export type SubmissionAttachment = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  storageKey: string;
+  uploadedAt: string;
+  downloadUrl?: string;
+};
+
 @Entity('submissions')
 export class Submission {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +42,9 @@ export class Submission {
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  attachments!: SubmissionAttachment[];
 
   @Column({ type: 'enum', enum: SubmissionStatus, enumName: 'submission_status_enum', default: SubmissionStatus.PENDING })
   status!: SubmissionStatus;

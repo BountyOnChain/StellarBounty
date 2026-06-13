@@ -1,7 +1,25 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { createReadStream } from 'fs';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  Res,
+  StreamableFile,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -11,9 +29,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSubmissionDto, SubmissionResponseDto } from './submissions.dto';
-import { SubmissionsService } from './submissions.service';
+import { SubmissionsService, UploadedSubmissionFile } from './submissions.service';
 
 @ApiTags('submissions')
 @Controller('bounties/:bountyId/submissions')
@@ -23,18 +42,47 @@ export class SubmissionsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Submit work for a bounty' })
   @ApiParam({ name: 'bountyId', description: 'Bounty UUID that receives the submission' })
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiCreatedResponse({ description: 'Submission created.', type: SubmissionResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid submission payload.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FilesInterceptor('files'))
   @Post()
   create(
     @Param('bountyId') bountyId: string,
     @Body() dto: CreateSubmissionDto,
+    @UploadedFiles() files: UploadedSubmissionFile[] | undefined,
     @Request() req: { user: { address: string } },
   ) {
-    return this.submissionsService.create(bountyId, dto, req.user.address);
+    return this.submissionsService.create(bountyId, dto, req.user.address, files ?? []);
+  }
+
+  @ApiOperation({ summary: 'Download a submitted attachment using a signed URL' })
+  @Header('Cache-Control', 'private, max-age=60')
+  @Get(':subId/attachments/:attachmentId/download')
+  async downloadAttachment(
+    @Param('bountyId') bountyId: string,
+    @Param('subId') subId: string,
+    @Param('attachmentId') attachmentId: string,
+    @Query('token') token: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const download = await this.submissionsService.resolveAttachmentDownload(
+      bountyId,
+      subId,
+      attachmentId,
+      token,
+    );
+
+    response.setHeader('Content-Type', download.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${download.originalName.replace(/["\\]/g, '_')}"`,
+    );
+    response.setHeader('Content-Length', download.size.toString());
+    return new StreamableFile(createReadStream(download.filePath));
   }
 
   @ApiBearerAuth('access-token')

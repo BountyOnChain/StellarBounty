@@ -13,6 +13,7 @@ import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
+import { AddSubmissionAttachments1747657400000 } from './migrations/1747657400000-AddSubmissionAttachments';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { MetricsModule } from './metrics/metrics.module';
@@ -38,6 +39,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
+        SUBMISSION_UPLOAD_DIR: Joi.string().default('uploads/submissions'),
+        SUBMISSION_UPLOAD_MAX_FILES: Joi.number().integer().positive().default(5),
+        SUBMISSION_UPLOAD_MAX_FILE_SIZE_BYTES: Joi.number().integer().positive().default(10485760),
+        SUBMISSION_UPLOAD_SIGNED_URL_TTL_SECONDS: Joi.number().integer().positive().default(900),
+        SUBMISSION_UPLOAD_SIGNING_SECRET: Joi.string().optional(),
         PORT: Joi.number().default(4000),
       }),
     }),
@@ -53,7 +59,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         entities: [Bounty, Submission, Nonce],
-        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
+        migrations: [
+          InitSchema1747657200000,
+          AddNoncesTable1747657300000,
+          AddSubmissionAttachments1747657400000,
+        ],
         logger: new TypeOrmMetricsLogger(metrics),
         maxQueryExecutionTime: 250,
         synchronize: false,

@@ -53,6 +53,7 @@ describe('SubmissionsService contract error handling', () => {
       contributorAddress: 'GCONTRIBUTOR',
       link: 'https://github.com/example/repo/pull/1',
       notes: null,
+      attachments: [],
       status: SubmissionStatus.PENDING,
       createdAt: new Date('2026-01-03T00:00:00.000Z'),
     };
