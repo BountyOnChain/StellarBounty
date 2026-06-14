@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import BountyDetailClient from "./BountyDetailClient";
 
 type Bounty = {
@@ -50,6 +51,46 @@ async function getBounty(id: string): Promise<Bounty | null> {
   }
 }
 
+function truncateDescription(description: string) {
+  const normalized = description.replace(/\s+/g, " ").trim();
+  return normalized.length > 155 ? `${normalized.slice(0, 152)}...` : normalized;
+}
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const bounty = await getBounty(params.id);
+
+  if (!bounty) {
+    return {
+      title: "Bounty unavailable",
+      description: "This StellarBounty task could not be loaded from the API.",
+      alternates: {
+        canonical: `/bounties/${params.id}`,
+      },
+    };
+  }
+
+  const description = truncateDescription(bounty.description);
+
+  return {
+    title: bounty.title,
+    description,
+    alternates: {
+      canonical: `/bounties/${bounty.id}`,
+    },
+    openGraph: {
+      title: bounty.title,
+      description,
+      url: `/bounties/${bounty.id}`,
+      type: "article",
+    },
+    twitter: {
+      card: "summary",
+      title: bounty.title,
+      description,
+    },
+  };
+}
+
 export async function generateStaticParams() {
   try {
     const response = await fetch(`${API_URL}/bounties`, { next: { revalidate: 60 } });
@@ -82,5 +123,27 @@ export default async function BountyDetailPage({ params }: { params: { id: strin
     );
   }
 
-  return <BountyDetailClient bounty={bounty} />;
+  const bountyJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: bounty.title,
+    description: bounty.description,
+    datePosted: new Date().toISOString(),
+    validThrough: bounty.deadline === "No deadline" ? undefined : bounty.deadline,
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "StellarBounty",
+    },
+    incentiveCompensation: `${bounty.reward} XLM`,
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(bountyJsonLd) }}
+      />
+      <BountyDetailClient bounty={bounty} />
+    </>
+  );
 }

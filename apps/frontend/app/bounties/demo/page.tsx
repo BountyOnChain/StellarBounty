@@ -1,5 +1,15 @@
 import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Demo bounty",
+  description:
+    "Preview a sample StellarBounty task with markdown requirements, reward details, and submission flow.",
+  alternates: {
+    canonical: "/bounties/demo",
+  },
+};
 
 /**
  * Demo bounty page to showcase markdown rendering.

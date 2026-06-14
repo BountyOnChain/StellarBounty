@@ -1,7 +1,17 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
 
 export const revalidate = 60;
+export const metadata: Metadata = {
+  title: "Open bounties",
+  description:
+    "Browse open StellarBounty tasks, compare rewards and deadlines, and find funded work to complete.",
+  alternates: {
+    canonical: "/",
+  },
+};
+
 type SortOption = "newest" | "highest_reward" | "closest_deadline";
 type StatusFilter = "all" | "open" | "in_progress" | "completed";
 
