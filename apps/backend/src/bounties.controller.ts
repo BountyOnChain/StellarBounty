@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -33,8 +33,8 @@ export class BountiesController {
   @ApiOperation({ summary: 'List all bounties' })
   @ApiOkResponse({ description: 'Bounties ordered newest first.', type: [BountyResponseDto] })
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.bountiesService.findAll({ page, limit });
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })

@@ -4,6 +4,18 @@ import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 import { Bounty } from './entities/bounty.entity';
 
+type FindAllOptions = {
+  page?: string;
+  limit?: string;
+};
+
+function normalizePositiveInteger(value: string | undefined, fallback: number, max?: number) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  const normalized = Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+
+  return max ? Math.min(normalized, max) : normalized;
+}
+
 @Injectable()
 export class BountiesService {
   constructor(
@@ -19,8 +31,27 @@ export class BountiesService {
     return this.bounties.save(bounty);
   }
 
-  async findAll() {
-    return this.bounties.find({ order: { createdAt: 'DESC' } });
+  async findAll(options: FindAllOptions = {}) {
+    const page = normalizePositiveInteger(options.page, 1);
+    const pageSize = normalizePositiveInteger(options.limit, 20, 100);
+    const [data, total] = await this.bounties.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+    const totalPages = Math.ceil(total / pageSize);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages,
+        next: page < totalPages ? `/bounties?page=${page + 1}&limit=${pageSize}` : null,
+        prev: page > 1 ? `/bounties?page=${page - 1}&limit=${pageSize}` : null,
+      },
+    };
   }
 
   async findOne(id: string) {

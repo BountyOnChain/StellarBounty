@@ -35,6 +35,7 @@ describe('BountiesService', () => {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
+      findAndCount: jest.fn(),
       findOne: jest.fn(),
       remove: jest.fn(),
     };
@@ -97,12 +98,47 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
+  it('findAll returns paginated bounties ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    repository.findAndCount!.mockResolvedValueOnce([bounties, 42]);
 
-    await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    await expect(service.findAll({ page: '2', limit: '20' })).resolves.toEqual({
+      data: bounties,
+      pagination: {
+        total: 42,
+        page: 2,
+        pageSize: 20,
+        totalPages: 3,
+        next: '/bounties?page=3&limit=20',
+        prev: '/bounties?page=1&limit=20',
+      },
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 20,
+      take: 20,
+    });
+  });
+
+  it('findAll applies default pagination and caps large limits', async () => {
+    repository.findAndCount!.mockResolvedValueOnce([[], 0]);
+
+    await expect(service.findAll({ page: 'bad', limit: '1000' })).resolves.toEqual({
+      data: [],
+      pagination: {
+        total: 0,
+        page: 1,
+        pageSize: 100,
+        totalPages: 0,
+        next: null,
+        prev: null,
+      },
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 0,
+      take: 100,
+    });
   });
 
   describe('findOne', () => {
