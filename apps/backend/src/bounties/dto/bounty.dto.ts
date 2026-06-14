@@ -10,6 +10,7 @@ import {
   MaxLength,
   ValidateBy,
 } from 'class-validator';
+import { StrKey } from '@stellar/stellar-sdk';
 import { BountyStatus } from '../../entities/bounty.entity';
 
 export const MAX_REWARD_AMOUNT = 1_000_000_000n;
@@ -28,6 +29,39 @@ function IsRewardAmount() {
       },
       defaultMessage() {
         return `rewardAmount must be a whole number between 1 and ${MAX_REWARD_AMOUNT.toString()}`;
+      },
+    },
+  });
+}
+
+function IsStellarPublicKey() {
+  return ValidateBy({
+    name: 'isStellarPublicKey',
+    validator: {
+      validate(value: unknown) {
+        return typeof value === 'string' && StrKey.isValidEd25519PublicKey(value);
+      },
+      defaultMessage() {
+        return 'ownerAddress must be a valid Stellar public key';
+      },
+    },
+  });
+}
+
+function IsFutureIso8601() {
+  return ValidateBy({
+    name: 'isFutureIso8601',
+    validator: {
+      validate(value: unknown) {
+        if (typeof value !== 'string') {
+          return false;
+        }
+
+        const timestamp = Date.parse(value);
+        return Number.isFinite(timestamp) && timestamp > Date.now();
+      },
+      defaultMessage() {
+        return 'deadline must be a future ISO 8601 date';
       },
     },
   });
@@ -69,6 +103,7 @@ export class CreateBountyDto {
   })
   @IsString()
   @IsNotEmpty()
+  @IsStellarPublicKey()
   ownerAddress!: string;
 
   @ApiPropertyOptional({
@@ -87,6 +122,7 @@ export class CreateBountyDto {
   })
   @IsOptional()
   @IsISO8601()
+  @IsFutureIso8601()
   deadline?: string;
 }
 
@@ -114,6 +150,7 @@ export class UpdateBountyDto {
   @ApiPropertyOptional({ description: 'Bounty owner wallet address' })
   @IsOptional()
   @IsString()
+  @IsStellarPublicKey()
   ownerAddress?: string;
 
   @ApiPropertyOptional({ description: 'Updated tags', type: [String] })
@@ -125,6 +162,7 @@ export class UpdateBountyDto {
   @ApiPropertyOptional({ description: 'Updated deadline (ISO 8601)' })
   @IsOptional()
   @IsISO8601()
+  @IsFutureIso8601()
   deadline?: string;
 
   @ApiPropertyOptional({

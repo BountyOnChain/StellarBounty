@@ -6,8 +6,8 @@ describe('Bounty DTO rewardAmount validation', () => {
     const dto = new CreateBountyDto();
     dto.title = 'Build the bounty page';
     dto.description = 'Create a working bounty page with wallet-gated submission.';
-    dto.ownerAddress = 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX';
-    dto.deadline = '2026-12-31T00:00:00.000Z';
+    dto.ownerAddress = 'GBU5ADWMR5EBCYGM6MLJVIEIGK2F536ZOMVHIVU2S4E6HF2T7UHTSXBB';
+    dto.deadline = '2099-12-31T00:00:00.000Z';
     dto.rewardAmount = rewardAmount;
     return dto;
   }
@@ -32,5 +32,34 @@ describe('Bounty DTO rewardAmount validation', () => {
     const errors = await validate(dto);
 
     expect(errors.some((error) => error.property === 'rewardAmount')).toBe(true);
+  });
+
+  it('rejects invalid ownerAddress values', async () => {
+    const dto = createValidDto('10000000');
+    dto.ownerAddress = 'not-a-stellar-address';
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'ownerAddress')).toBe(true);
+  });
+
+  it('rejects deadlines that are not in the future', async () => {
+    const dto = createValidDto('10000000');
+    dto.deadline = '2000-01-01T00:00:00.000Z';
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'deadline')).toBe(true);
+  });
+
+  it('validates optional update ownerAddress and deadline when present', async () => {
+    const dto = new UpdateBountyDto();
+    dto.ownerAddress = 'bad-address';
+    dto.deadline = '2000-01-01T00:00:00.000Z';
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'ownerAddress')).toBe(true);
+    expect(errors.some((error) => error.property === 'deadline')).toBe(true);
   });
 });
