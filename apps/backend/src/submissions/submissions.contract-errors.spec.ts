@@ -7,6 +7,8 @@ import { SubmissionsService } from './submissions.service';
 
 const mockServer = {
   getAccount: jest.fn(),
+  getFeeStats: jest.fn(),
+  simulateTransaction: jest.fn(),
   prepareTransaction: jest.fn(),
   sendTransaction: jest.fn(),
 };
@@ -20,6 +22,9 @@ jest.mock('@stellar/stellar-sdk', () => ({
     TESTNET: 'TESTNET',
   },
   rpc: {
+    Api: {
+      isSimulationSuccess: jest.fn((simulation) => Boolean(simulation?.minResourceFee)),
+    },
     Server: jest.fn(() => mockServer),
   },
   TransactionBuilder: jest.fn(() => ({

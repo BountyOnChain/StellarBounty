@@ -13,6 +13,8 @@ import { SubmissionsService } from './submissions.service';
 const mockPreparedTransaction = { sign: jest.fn() };
 const mockServer = {
   getAccount: jest.fn(),
+  getFeeStats: jest.fn(),
+  simulateTransaction: jest.fn(),
   prepareTransaction: jest.fn(),
   sendTransaction: jest.fn(),
 };
@@ -36,6 +38,9 @@ jest.mock('@stellar/stellar-sdk', () => ({
     TESTNET: 'TESTNET',
   },
   rpc: {
+    Api: {
+      isSimulationSuccess: jest.fn((simulation) => Boolean(simulation?.minResourceFee)),
+    },
     Server: jest.fn(() => mockServer),
   },
   TransactionBuilder: jest.fn(() => mockTransactionBuilder),
@@ -82,6 +87,12 @@ describe('SubmissionsService', () => {
   beforeEach(() => {
     mockPreparedTransaction.sign.mockClear();
     mockServer.getAccount.mockReset().mockResolvedValue({ accountId: 'GOWNER' });
+    mockServer.getFeeStats.mockReset().mockResolvedValue({
+      inclusionFee: { p95: '250' },
+    });
+    mockServer.simulateTransaction.mockReset().mockResolvedValue({
+      minResourceFee: '1200',
+    });
     mockServer.prepareTransaction.mockReset().mockResolvedValue(mockPreparedTransaction);
     mockServer.sendTransaction.mockReset().mockResolvedValue({ status: 'PENDING' });
     mockContractCall.mockReset().mockReturnValue('approve-operation');
@@ -229,13 +240,63 @@ describe('SubmissionsService', () => {
       expect(StellarSdk.nativeToScVal).toHaveBeenCalledWith('GOWNER', { type: 'address' });
       expect(StellarSdk.TransactionBuilder).toHaveBeenCalledWith(
         { accountId: 'GOWNER' },
-        { fee: StellarSdk.BASE_FEE, networkPassphrase: StellarSdk.Networks.PUBLIC },
+        { fee: '250', networkPassphrase: StellarSdk.Networks.PUBLIC },
       );
       expect(mockTransactionBuilder.addOperation).toHaveBeenCalledWith('approve-operation');
+      expect(mockServer.getFeeStats).toHaveBeenCalledTimes(1);
+      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
       expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
       expect(StellarSdk.Keypair.fromSecret).toHaveBeenCalledWith('secret');
       expect(mockPreparedTransaction.sign).toHaveBeenCalledWith(mockSigningKeypair);
       expect(mockServer.sendTransaction).toHaveBeenCalledWith(mockPreparedTransaction);
+    });
+
+    it('falls back to STELLAR_MAX_FEE when fee stats cannot be fetched', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      mockServer.getFeeStats.mockRejectedValueOnce(new Error('fee stats unavailable'));
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_MAX_FEE: '5000',
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(StellarSdk.TransactionBuilder).toHaveBeenCalledWith(
+        { accountId: 'GOWNER' },
+        { fee: '5000', networkPassphrase: StellarSdk.Networks.TESTNET },
+      );
+      expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
+    });
+
+    it('continues preparing the transaction when simulation fails', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      mockServer.simulateTransaction.mockRejectedValueOnce(new Error('simulation unavailable'));
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
+      expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
     });
   });
 

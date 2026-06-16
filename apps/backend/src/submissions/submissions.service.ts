@@ -16,6 +16,7 @@ import { CreateSubmissionDto } from './submissions.dto';
 @Injectable()
 export class SubmissionsService {
   private readonly logger = new Logger(SubmissionsService.name);
+  private static readonly DEFAULT_MAX_FEE = '100000';
 
   constructor(
     @InjectRepository(Submission)
@@ -100,10 +101,11 @@ export class SubmissionsService {
 
     try {
       const account = await server.getAccount(ownerAddress);
+      const fee = await this.resolveTransactionFee(server, bountyId);
 
       const contract = new StellarSdk.Contract(contractId);
       const tx = new StellarSdk.TransactionBuilder(account, {
-        fee: StellarSdk.BASE_FEE,
+        fee,
         networkPassphrase,
       })
         .addOperation(
@@ -111,6 +113,8 @@ export class SubmissionsService {
         )
         .setTimeout(30)
         .build();
+
+      await this.logSimulatedTransactionFee(server, tx, bountyId, fee);
 
       const prepared = await server.prepareTransaction(tx);
       // The backend signs only if a server-side signing key is configured.
@@ -128,5 +132,60 @@ export class SubmissionsService {
     }
     // If no signing secret, the transaction is prepared but not submitted —
     // the client is expected to sign and submit it separately.
+  }
+
+  private async resolveTransactionFee(
+    server: StellarSdk.rpc.Server,
+    bountyId: string,
+  ): Promise<string> {
+    const fallbackFee = this.config.get<string>(
+      'STELLAR_MAX_FEE',
+      SubmissionsService.DEFAULT_MAX_FEE,
+    );
+
+    try {
+      const feeStats = await server.getFeeStats();
+      const p95Fee = feeStats.inclusionFee.p95;
+      if (!p95Fee || Number(p95Fee) <= 0) {
+        throw new Error(`invalid p95 fee: ${p95Fee}`);
+      }
+
+      this.logger.debug(
+        `Using Stellar p95 inclusion fee: bountyId=${bountyId}, fee=${p95Fee}`,
+      );
+      return p95Fee;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Stellar fee estimation failed; using fallback fee: bountyId=${bountyId}, fallbackFee=${fallbackFee}, error=${message}`,
+      );
+      return fallbackFee;
+    }
+  }
+
+  private async logSimulatedTransactionFee(
+    server: StellarSdk.rpc.Server,
+    tx: StellarSdk.Transaction,
+    bountyId: string,
+    inclusionFee: string,
+  ): Promise<void> {
+    try {
+      const simulation = await server.simulateTransaction(tx);
+      if (StellarSdk.rpc.Api.isSimulationSuccess(simulation)) {
+        this.logger.log(
+          `Estimated Stellar transaction fee: bountyId=${bountyId}, inclusionFee=${inclusionFee}, resourceFee=${simulation.minResourceFee}`,
+        );
+        return;
+      }
+
+      this.logger.warn(
+        `Stellar transaction simulation returned without fee estimate: bountyId=${bountyId}, inclusionFee=${inclusionFee}`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Stellar transaction simulation failed; continuing with inclusion fee: bountyId=${bountyId}, inclusionFee=${inclusionFee}, error=${message}`,
+      );
+    }
   }
 }
