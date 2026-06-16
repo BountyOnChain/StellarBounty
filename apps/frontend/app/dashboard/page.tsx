@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useFetch } from "../../lib/use-fetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -33,28 +34,18 @@ function EmptyState({ message }: { message: string }) {
 export default function DashboardPage() {
   const { publicKey, connect } = useWallet();
   const [activeTab, setActiveTab] = useState<"submissions" | "bounties">("submissions");
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [bounties, setBounties] = useState<Bounty[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!publicKey) return;
-
-    setLoading(true);
-    setError(null);
-
-    Promise.all([
-      fetch(`${API_URL}/submissions?contributor=${publicKey}`).then((r) => r.json()),
-      fetch(`${API_URL}/bounties?owner=${publicKey}`).then((r) => r.json()),
-    ])
-      .then(([subs, bounts]) => {
-        setSubmissions(subs);
-        setBounties(bounts);
-      })
-      .catch(() => setError("Failed to load dashboard data."))
-      .finally(() => setLoading(false));
-  }, [publicKey]);
+  const encodedPublicKey = publicKey ? encodeURIComponent(publicKey) : null;
+  const submissionsUrl = encodedPublicKey
+    ? `${API_URL}/submissions?contributor=${encodedPublicKey}`
+    : null;
+  const bountiesUrl = encodedPublicKey ? `${API_URL}/bounties?owner=${encodedPublicKey}` : null;
+  const submissionsRequest = useFetch<Submission[]>(submissionsUrl, { enabled: Boolean(publicKey) });
+  const bountiesRequest = useFetch<Bounty[]>(bountiesUrl, { enabled: Boolean(publicKey) });
+  const submissions = submissionsRequest.data ?? [];
+  const bounties = bountiesRequest.data ?? [];
+  const loading = submissionsRequest.loading || bountiesRequest.loading;
+  const error =
+    submissionsRequest.error || bountiesRequest.error ? "Failed to load dashboard data." : null;
 
   if (!publicKey) {
     return (

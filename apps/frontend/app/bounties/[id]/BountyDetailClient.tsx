@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
@@ -21,6 +21,10 @@ function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-6)}`;
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const { publicKey } = useWallet();
   const toast = useToast();
@@ -28,6 +32,8 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
@@ -36,6 +42,13 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     if (!publicKey) return "Connect your wallet to submit work.";
     return null;
   }, [isOpen, publicKey]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      submitAbortRef.current?.abort();
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,11 +59,16 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     }
 
     setIsSubmitting(true);
+    let controller: AbortController | null = null;
 
     try {
       const accessToken = await getToken(publicKey as string);
+      submitAbortRef.current?.abort();
+      controller = new AbortController();
+      submitAbortRef.current = controller;
       const response = await fetch(`${apiUrl}/bounties/${bounty.id}/submissions`, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
@@ -63,13 +81,23 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
         throw new Error("Submission failed. Please try again.");
       }
 
-      setWorkLink("");
-      setNotes("");
-      toast.success("Work submitted successfully.");
+      if (mountedRef.current) {
+        setWorkLink("");
+        setNotes("");
+        toast.success("Work submitted successfully.");
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
+      if (mountedRef.current && !isAbortError(error)) {
+        toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
+      }
     } finally {
-      setIsSubmitting(false);
+      if (submitAbortRef.current === controller) {
+        submitAbortRef.current = null;
+      }
+
+      if (mountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   }
 
