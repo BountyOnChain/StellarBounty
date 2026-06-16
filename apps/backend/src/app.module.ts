@@ -1,5 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
@@ -20,6 +22,7 @@ import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+import { createApiThrottleOptions } from './auth/auth-rate-limit.config';
 
 @Module({
   imports: [
@@ -34,12 +37,20 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
+        BOUNTY_CREATE_RATE_LIMIT: Joi.number().integer().positive().default(10),
+        SUBMISSION_CREATE_RATE_LIMIT: Joi.number().integer().positive().default(20),
+        GLOBAL_GET_RATE_LIMIT: Joi.number().integer().positive().default(100),
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
         PORT: Joi.number().default(4000),
       }),
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: createApiThrottleOptions,
     }),
     AuthModule,
     SubmissionsModule,
@@ -61,7 +72,15 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
     }),
   ],
   controllers: [AppController, BountiesController],
-  providers: [AppService, BountiesService, DeadlineAutomationService],
+  providers: [
+    AppService,
+    BountiesService,
+    DeadlineAutomationService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -10,7 +10,13 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import {
+  getAuthenticatedAddressTracker,
+  getAuthRateLimitTtl,
+  getBountyCreateRateLimit,
+} from './auth/auth-rate-limit.config';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 
@@ -25,6 +31,13 @@ export class BountiesController {
   @ApiBadRequestResponse({ description: 'Invalid bounty payload.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getBountyCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Post()
   create(@Body() dto: CreateBountyDto) {
     return this.bountiesService.create(dto);
@@ -54,6 +67,13 @@ export class BountiesController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getBountyCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateBountyDto) {
     return this.bountiesService.update(id, dto);
@@ -66,6 +86,13 @@ export class BountiesController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getBountyCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.bountiesService.remove(id);

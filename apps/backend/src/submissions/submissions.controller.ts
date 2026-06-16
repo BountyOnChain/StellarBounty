@@ -11,7 +11,13 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  getAuthenticatedAddressTracker,
+  getAuthRateLimitTtl,
+  getSubmissionCreateRateLimit,
+} from '../auth/auth-rate-limit.config';
 import { CreateSubmissionDto, SubmissionResponseDto } from './submissions.dto';
 import { SubmissionsService } from './submissions.service';
 
@@ -28,6 +34,13 @@ export class SubmissionsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getSubmissionCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Post()
   create(
     @Param('bountyId') bountyId: string,
@@ -63,6 +76,13 @@ export class SubmissionsController {
   @ApiForbiddenResponse({ description: 'Only the bounty owner can approve submissions.' })
   @ApiNotFoundResponse({ description: 'Bounty or submission not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getSubmissionCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Patch(':subId/approve')
   approve(
     @Param('bountyId') bountyId: string,
@@ -81,6 +101,13 @@ export class SubmissionsController {
   @ApiForbiddenResponse({ description: 'Only the bounty owner can reject submissions.' })
   @ApiNotFoundResponse({ description: 'Bounty or submission not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: getSubmissionCreateRateLimit,
+      ttl: getAuthRateLimitTtl,
+      getTracker: getAuthenticatedAddressTracker,
+    },
+  })
   @Patch(':subId/reject')
   reject(
     @Param('bountyId') bountyId: string,
