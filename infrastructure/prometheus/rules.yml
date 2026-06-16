@@ -1,0 +1,96 @@
+groups:
+  - name: stellar-bounty-api
+    interval: 30s
+    rules:
+      - record: stellar_bounty:http_error_rate5m
+        expr: |
+          sum(rate(stellar_bounty_http_requests_total{status_code=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(stellar_bounty_http_requests_total[5m])), 1)
+
+      - record: stellar_bounty:http_latency_p95_seconds5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(stellar_bounty_http_request_duration_seconds_bucket[5m])) by (le, route)
+          )
+
+      - record: stellar_bounty:database_query_error_rate5m
+        expr: |
+          sum(rate(stellar_bounty_database_query_errors_total[5m]))
+          /
+          clamp_min(sum(rate(stellar_bounty_database_queries_total[5m])), 1)
+
+      - record: stellar_bounty:database_pool_usage_ratio
+        expr: |
+          max(
+            stellar_bounty_database_pool_active_connections
+            /
+            clamp_min(stellar_bounty_database_pool_max_connections, 1)
+          )
+
+      - record: stellar_bounty:stellar_rpc_failure_rate5m
+        expr: |
+          sum(rate(stellar_bounty_stellar_rpc_requests_total{status="error"}[5m]))
+          /
+          clamp_min(sum(rate(stellar_bounty_stellar_rpc_requests_total[5m])), 1)
+
+      - alert: StellarBountyHighHttpErrorRate
+        expr: stellar_bounty:http_error_rate5m > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: stellar-bounty-backend
+        annotations:
+          summary: StellarBounty HTTP 5xx rate is above 5%
+          description: HTTP 5xx responses have exceeded 5% of all backend requests for 10 minutes.
+
+      - alert: StellarBountyHighApiLatencyP95
+        expr: stellar_bounty:http_latency_p95_seconds5m > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: stellar-bounty-backend
+        annotations:
+          summary: StellarBounty API p95 latency is above 2 seconds
+          description: Route {{ $labels.route }} has p95 latency above 2 seconds for 10 minutes.
+
+      - alert: StellarBountyDatabaseQueryErrors
+        expr: stellar_bounty:database_query_error_rate5m > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: stellar-bounty-backend
+        annotations:
+          summary: StellarBounty database query error rate is elevated
+          description: Database query errors have exceeded 5% of total database queries for 10 minutes.
+
+      - alert: StellarBountyDatabasePoolHighUsage
+        expr: stellar_bounty:database_pool_usage_ratio > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: stellar-bounty-postgres
+        annotations:
+          summary: StellarBounty database pool usage is above 80%
+          description: Database pool usage has stayed above 80% for 10 minutes.
+
+      - alert: StellarBountyStellarRpcFailureRate
+        expr: stellar_bounty:stellar_rpc_failure_rate5m > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          service: stellar-bounty-backend
+        annotations:
+          summary: Stellar RPC failure rate is above 10%
+          description: Stellar RPC calls have failed more than 10% of the time for 10 minutes.
+
+      - alert: StellarBountyMetricsTargetDown
+        expr: up{job="stellar-bounty-backend"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: stellar-bounty-backend
+        annotations:
+          summary: StellarBounty backend metrics target is down
+          description: Prometheus has not been able to scrape the backend metrics endpoint for 5 minutes.

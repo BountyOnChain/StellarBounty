@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
+import { MetricsService } from '../metrics/metrics.service';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { SubmissionsService } from './submissions.service';
 
@@ -79,12 +80,16 @@ describe('SubmissionsService contract error handling', () => {
         return values[key] ?? defaultValue;
       }),
     };
+    const metrics = {
+      recordStellarRpcRequest: jest.fn(),
+    };
     mockServer.getAccount.mockRejectedValueOnce(new Error('rpc unavailable'));
 
     const service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      metrics as unknown as MetricsService,
     );
 
     await expect(service.approve('bounty1', 'submission1', 'GOWNER')).resolves.toMatchObject({
@@ -94,5 +99,8 @@ describe('SubmissionsService contract error handling', () => {
     expect(bounty.status).toBe(BountyStatus.COMPLETED);
     expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
     expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+    expect(metrics.recordStellarRpcRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'getAccount', status: 'error' }),
+    );
   });
 });

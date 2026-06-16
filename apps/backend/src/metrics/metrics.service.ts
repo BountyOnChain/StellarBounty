@@ -16,6 +16,15 @@ type DatabaseQueryMetric = {
   failed?: boolean;
 };
 
+type StellarRpcMetricLabels = {
+  operation: string;
+  status: 'success' | 'error';
+};
+
+type StellarRpcMetric = StellarRpcMetricLabels & {
+  durationSeconds: number;
+};
+
 const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 
 @Injectable()
@@ -27,12 +36,18 @@ export class MetricsService {
   private readonly databaseQueryCounts = new Map<string, number>();
   private readonly databaseQueryErrors = new Map<string, number>();
   private readonly databaseQueryDurations: number[] = [];
+  private readonly stellarRpcCounts = new Map<string, number>();
+  private readonly stellarRpcLatencyBuckets = new Map<string, number[]>();
+  private readonly stellarRpcLatencySums = new Map<string, number>();
   private activeWebSocketConnections = 0;
 
   recordHttpRequest(metric: RequestMetric): void {
     const key = this.httpKey(metric);
     this.requestCounts.set(key, (this.requestCounts.get(key) ?? 0) + 1);
-    this.requestLatencySums.set(key, (this.requestLatencySums.get(key) ?? 0) + metric.durationSeconds);
+    this.requestLatencySums.set(
+      key,
+      (this.requestLatencySums.get(key) ?? 0) + metric.durationSeconds,
+    );
 
     const buckets = this.requestLatencyBuckets.get(key) ?? LATENCY_BUCKETS_SECONDS.map(() => 0);
     LATENCY_BUCKETS_SECONDS.forEach((bucket, index) => {
@@ -44,19 +59,46 @@ export class MetricsService {
   }
 
   recordDatabaseQuery(metric: DatabaseQueryMetric): void {
-    this.databaseQueryCounts.set(metric.operation, (this.databaseQueryCounts.get(metric.operation) ?? 0) + 1);
+    this.databaseQueryCounts.set(
+      metric.operation,
+      (this.databaseQueryCounts.get(metric.operation) ?? 0) + 1,
+    );
 
     if (metric.failed) {
-      this.databaseQueryErrors.set(metric.operation, (this.databaseQueryErrors.get(metric.operation) ?? 0) + 1);
+      this.databaseQueryErrors.set(
+        metric.operation,
+        (this.databaseQueryErrors.get(metric.operation) ?? 0) + 1,
+      );
     }
 
-    if (metric.durationSeconds !== undefined && Number.isFinite(metric.durationSeconds) && metric.durationSeconds >= 0) {
+    if (
+      metric.durationSeconds !== undefined &&
+      Number.isFinite(metric.durationSeconds) &&
+      metric.durationSeconds >= 0
+    ) {
       this.databaseQueryDurations.push(metric.durationSeconds);
     }
   }
 
   setActiveWebSocketConnections(count: number): void {
     this.activeWebSocketConnections = Math.max(0, Math.trunc(count));
+  }
+
+  recordStellarRpcRequest(metric: StellarRpcMetric): void {
+    const key = this.stellarRpcKey(metric);
+    this.stellarRpcCounts.set(key, (this.stellarRpcCounts.get(key) ?? 0) + 1);
+    this.stellarRpcLatencySums.set(
+      key,
+      (this.stellarRpcLatencySums.get(key) ?? 0) + metric.durationSeconds,
+    );
+
+    const buckets = this.stellarRpcLatencyBuckets.get(key) ?? LATENCY_BUCKETS_SECONDS.map(() => 0);
+    LATENCY_BUCKETS_SECONDS.forEach((bucket, index) => {
+      if (metric.durationSeconds <= bucket) {
+        buckets[index] += 1;
+      }
+    });
+    this.stellarRpcLatencyBuckets.set(key, buckets);
   }
 
   incrementActiveWebSocketConnections(): void {
@@ -81,6 +123,7 @@ export class MetricsService {
     this.appendCpuMetrics(lines);
     this.appendHttpMetrics(lines);
     this.appendDatabaseMetrics(lines);
+    this.appendStellarRpcMetrics(lines);
     this.appendWebSocketMetrics(lines);
 
     return `${lines.join('\n')}\n`;
@@ -118,23 +161,35 @@ export class MetricsService {
       '# TYPE stellar_bounty_http_requests_total counter',
     );
 
-    [...this.requestCounts.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, count]) => {
-      lines.push(`stellar_bounty_http_requests_total{${key}} ${count}`);
-    });
+    [...this.requestCounts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, count]) => {
+        lines.push(`stellar_bounty_http_requests_total{${key}} ${count}`);
+      });
 
     lines.push(
       '# HELP stellar_bounty_http_request_duration_seconds HTTP request latency in seconds.',
       '# TYPE stellar_bounty_http_request_duration_seconds histogram',
     );
 
-    [...this.requestLatencyBuckets.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, counts]) => {
-      counts.forEach((count, index) => {
-        lines.push(`stellar_bounty_http_request_duration_seconds_bucket{${key},le="${LATENCY_BUCKETS_SECONDS[index]}"} ${count}`);
+    [...this.requestLatencyBuckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, counts]) => {
+        counts.forEach((count, index) => {
+          lines.push(
+            `stellar_bounty_http_request_duration_seconds_bucket{${key},le="${LATENCY_BUCKETS_SECONDS[index]}"} ${count}`,
+          );
+        });
+        lines.push(
+          `stellar_bounty_http_request_duration_seconds_bucket{${key},le="+Inf"} ${this.requestCounts.get(key) ?? 0}`,
+        );
+        lines.push(
+          `stellar_bounty_http_request_duration_seconds_sum{${key}} ${this.formatNumber(this.requestLatencySums.get(key) ?? 0)}`,
+        );
+        lines.push(
+          `stellar_bounty_http_request_duration_seconds_count{${key}} ${this.requestCounts.get(key) ?? 0}`,
+        );
       });
-      lines.push(`stellar_bounty_http_request_duration_seconds_bucket{${key},le="+Inf"} ${this.requestCounts.get(key) ?? 0}`);
-      lines.push(`stellar_bounty_http_request_duration_seconds_sum{${key}} ${this.formatNumber(this.requestLatencySums.get(key) ?? 0)}`);
-      lines.push(`stellar_bounty_http_request_duration_seconds_count{${key}} ${this.requestCounts.get(key) ?? 0}`);
-    });
   }
 
   private appendDatabaseMetrics(lines: string[]): void {
@@ -149,7 +204,9 @@ export class MetricsService {
     [...this.databaseQueryCounts.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .forEach(([operation, count]) => {
-        lines.push(`stellar_bounty_database_queries_total{operation="${this.escapeLabel(operation)}"} ${count}`);
+        lines.push(
+          `stellar_bounty_database_queries_total{operation="${this.escapeLabel(operation)}"} ${count}`,
+        );
       });
 
     lines.push(
@@ -160,7 +217,9 @@ export class MetricsService {
     [...this.databaseQueryErrors.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .forEach(([operation, count]) => {
-        lines.push(`stellar_bounty_database_query_errors_total{operation="${this.escapeLabel(operation)}"} ${count}`);
+        lines.push(
+          `stellar_bounty_database_query_errors_total{operation="${this.escapeLabel(operation)}"} ${count}`,
+        );
       });
 
     lines.push(
@@ -172,6 +231,43 @@ export class MetricsService {
       '# TYPE stellar_bounty_database_slow_queries_total counter',
       `stellar_bounty_database_slow_queries_total ${slowQueries}`,
     );
+  }
+
+  private appendStellarRpcMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_stellar_rpc_requests_total Stellar RPC requests by operation and status.',
+      '# TYPE stellar_bounty_stellar_rpc_requests_total counter',
+    );
+
+    [...this.stellarRpcCounts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, count]) => {
+        lines.push(`stellar_bounty_stellar_rpc_requests_total{${key}} ${count}`);
+      });
+
+    lines.push(
+      '# HELP stellar_bounty_stellar_rpc_request_duration_seconds Stellar RPC request latency in seconds.',
+      '# TYPE stellar_bounty_stellar_rpc_request_duration_seconds histogram',
+    );
+
+    [...this.stellarRpcLatencyBuckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, counts]) => {
+        counts.forEach((count, index) => {
+          lines.push(
+            `stellar_bounty_stellar_rpc_request_duration_seconds_bucket{${key},le="${LATENCY_BUCKETS_SECONDS[index]}"} ${count}`,
+          );
+        });
+        lines.push(
+          `stellar_bounty_stellar_rpc_request_duration_seconds_bucket{${key},le="+Inf"} ${this.stellarRpcCounts.get(key) ?? 0}`,
+        );
+        lines.push(
+          `stellar_bounty_stellar_rpc_request_duration_seconds_sum{${key}} ${this.formatNumber(this.stellarRpcLatencySums.get(key) ?? 0)}`,
+        );
+        lines.push(
+          `stellar_bounty_stellar_rpc_request_duration_seconds_count{${key}} ${this.stellarRpcCounts.get(key) ?? 0}`,
+        );
+      });
   }
 
   private appendWebSocketMetrics(lines: string[]): void {
@@ -187,6 +283,13 @@ export class MetricsService {
       `method="${this.escapeLabel(metric.method)}"`,
       `route="${this.escapeLabel(metric.route)}"`,
       `status_code="${metric.statusCode}"`,
+    ].join(',');
+  }
+
+  private stellarRpcKey(metric: StellarRpcMetricLabels): string {
+    return [
+      `operation="${this.escapeLabel(metric.operation)}"`,
+      `status="${this.escapeLabel(metric.status)}"`,
     ].join(',');
   }
 

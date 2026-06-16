@@ -15,12 +15,12 @@ apps/
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20+ |
-| Rust + cargo | stable |
+| Tool          | Version                                    |
+| ------------- | ------------------------------------------ |
+| Node.js       | 20+                                        |
+| Rust + cargo  | stable                                     |
 | wasm32 target | `rustup target add wasm32-unknown-unknown` |
-| Stellar CLI | `cargo install --locked stellar-cli` |
+| Stellar CLI   | `cargo install --locked stellar-cli`       |
 
 ## Setup
 
@@ -58,14 +58,18 @@ cargo build --target wasm32-unknown-unknown --release
 cargo test
 ```
 
+## Monitoring
+
+The backend exposes Prometheus metrics at `/metrics`. Alert rules, Alertmanager configuration, a Grafana dashboard, and the metric catalog are documented in [docs/metrics.md](docs/metrics.md).
+
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `STELLAR_NETWORK` | `testnet` or `mainnet` |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
+| Variable               | Description                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | PostgreSQL connection string                                                      |
+| `JWT_SECRET`           | Secret for signing JWTs                                                           |
+| `STELLAR_NETWORK`      | `testnet` or `mainnet`                                                            |
+| `NEXT_PUBLIC_API_URL`  | Backend URL used by the frontend                                                  |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
 
 ## Contributing

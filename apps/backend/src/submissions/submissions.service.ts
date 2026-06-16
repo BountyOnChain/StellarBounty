@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { MetricsService } from '../metrics/metrics.service';
 import { CreateSubmissionDto } from './submissions.dto';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class SubmissionsService {
     @InjectRepository(Bounty)
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -54,7 +56,8 @@ export class SubmissionsService {
       bountyId,
       status: SubmissionStatus.APPROVED,
     });
-    if (alreadyApproved) throw new BadRequestException('A submission is already approved for this bounty');
+    if (alreadyApproved)
+      throw new BadRequestException('A submission is already approved for this bounty');
 
     const submission = await this.submissionRepo.findOneBy({ id: subId, bountyId });
     if (!submission) throw new NotFoundException('Submission not found');
@@ -94,12 +97,12 @@ export class SubmissionsService {
 
     const server = new StellarSdk.rpc.Server(rpcUrl);
     const networkPassphrase =
-      network === 'mainnet'
-        ? StellarSdk.Networks.PUBLIC
-        : StellarSdk.Networks.TESTNET;
+      network === 'mainnet' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
 
     try {
-      const account = await server.getAccount(ownerAddress);
+      const account = await this.recordStellarRpc('getAccount', () =>
+        server.getAccount(ownerAddress),
+      );
 
       const contract = new StellarSdk.Contract(contractId);
       const tx = new StellarSdk.TransactionBuilder(account, {
@@ -112,13 +115,15 @@ export class SubmissionsService {
         .setTimeout(30)
         .build();
 
-      const prepared = await server.prepareTransaction(tx);
+      const prepared = await this.recordStellarRpc('prepareTransaction', () =>
+        server.prepareTransaction(tx),
+      );
       // The backend signs only if a server-side signing key is configured.
       const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
       if (signingSecret) {
         const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
         prepared.sign(signingKeypair);
-        await server.sendTransaction(prepared);
+        await this.recordStellarRpc('sendTransaction', () => server.sendTransaction(prepared));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -128,5 +133,29 @@ export class SubmissionsService {
     }
     // If no signing secret, the transaction is prepared but not submitted —
     // the client is expected to sign and submit it separately.
+  }
+
+  private async recordStellarRpc<T>(operation: string, callback: () => Promise<T>): Promise<T> {
+    const startedAt = process.hrtime.bigint();
+    try {
+      const result = await callback();
+      this.metrics.recordStellarRpcRequest({
+        operation,
+        status: 'success',
+        durationSeconds: this.elapsedSeconds(startedAt),
+      });
+      return result;
+    } catch (error) {
+      this.metrics.recordStellarRpcRequest({
+        operation,
+        status: 'error',
+        durationSeconds: this.elapsedSeconds(startedAt),
+      });
+      throw error;
+    }
+  }
+
+  private elapsedSeconds(startedAt: bigint): number {
+    return Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
   }
 }

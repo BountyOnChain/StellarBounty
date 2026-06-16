@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
+import { MetricsService } from '../metrics/metrics.service';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { SubmissionsService } from './submissions.service';
 
@@ -48,6 +45,7 @@ describe('SubmissionsService', () => {
   let submissionRepo: MockRepository<Submission>;
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
+  let metrics: { recordStellarRpcRequest: jest.Mock };
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
@@ -103,11 +101,15 @@ describe('SubmissionsService', () => {
     config = {
       get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     };
+    metrics = {
+      recordStellarRpcRequest: jest.fn(),
+    };
 
     service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      metrics as unknown as MetricsService,
     );
   });
 
@@ -134,7 +136,11 @@ describe('SubmissionsService', () => {
       bountyRepo.findOneBy!.mockResolvedValueOnce(null);
 
       await expect(
-        service.create('missing', { link: 'https://github.com/example/repo/pull/1' }, 'GCONTRIBUTOR'),
+        service.create(
+          'missing',
+          { link: 'https://github.com/example/repo/pull/1' },
+          'GCONTRIBUTOR',
+        ),
       ).rejects.toThrow(NotFoundException);
       expect(submissionRepo.create).not.toHaveBeenCalled();
     });
@@ -163,9 +169,7 @@ describe('SubmissionsService', () => {
       const bounty = createBounty();
       const submission = createSubmission();
       bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
-      submissionRepo.findOneBy!
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(submission);
+      submissionRepo.findOneBy!.mockResolvedValueOnce(null).mockResolvedValueOnce(submission);
 
       const result = await service.approve('bounty1', 'submission1', 'GOWNER');
 
@@ -209,9 +213,7 @@ describe('SubmissionsService', () => {
       const bounty = createBounty();
       const submission = createSubmission();
       bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
-      submissionRepo.findOneBy!
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(submission);
+      submissionRepo.findOneBy!.mockResolvedValueOnce(null).mockResolvedValueOnce(submission);
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
           SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
@@ -236,6 +238,15 @@ describe('SubmissionsService', () => {
       expect(StellarSdk.Keypair.fromSecret).toHaveBeenCalledWith('secret');
       expect(mockPreparedTransaction.sign).toHaveBeenCalledWith(mockSigningKeypair);
       expect(mockServer.sendTransaction).toHaveBeenCalledWith(mockPreparedTransaction);
+      expect(metrics.recordStellarRpcRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'getAccount', status: 'success' }),
+      );
+      expect(metrics.recordStellarRpcRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'prepareTransaction', status: 'success' }),
+      );
+      expect(metrics.recordStellarRpcRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'sendTransaction', status: 'success' }),
+      );
     });
   });
 
