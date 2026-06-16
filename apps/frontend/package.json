@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "jest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
+    "typecheck": "tsc --noEmit --incremental false --project tsconfig.json",
     "lint": "next lint",
     "format": "prettier --write ."
   },

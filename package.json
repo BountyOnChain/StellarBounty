@@ -10,9 +10,16 @@
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "build": "npm run build --workspaces --if-present",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "lint-staged": "lint-staged",
+    "prepare": "husky",
+    "test:workspaces": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.4",
     "typescript": "^5.5.4"
   }
 }

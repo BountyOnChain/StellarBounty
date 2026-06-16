@@ -15,12 +15,12 @@ apps/
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20+ |
-| Rust + cargo | stable |
+| Tool          | Version                                    |
+| ------------- | ------------------------------------------ |
+| Node.js       | 20+                                        |
+| Rust + cargo  | stable                                     |
 | wasm32 target | `rustup target add wasm32-unknown-unknown` |
-| Stellar CLI | `cargo install --locked stellar-cli` |
+| Stellar CLI   | `cargo install --locked stellar-cli`       |
 
 ## Setup
 
@@ -60,19 +60,20 @@ cargo test
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `STELLAR_NETWORK` | `testnet` or `mainnet` |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
+| Variable               | Description                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | PostgreSQL connection string                                                      |
+| `JWT_SECRET`           | Secret for signing JWTs                                                           |
+| `STELLAR_NETWORK`      | `testnet` or `mainnet`                                                            |
+| `NEXT_PUBLIC_API_URL`  | Backend URL used by the frontend                                                  |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
 
 ## Contributing
 
 1. Browse [open issues](https://github.com/BountyOnChain/StellarBounty/issues) — issues tagged [`good first issue`](https://github.com/BountyOnChain/StellarBounty/issues?q=is%3Aopen+label%3A%22good+first+issue%22) are a great starting point.
 2. Fork the repo and create a branch: `git checkout -b feat/your-feature`
-3. Make your changes and open a pull request referencing the issue.
+3. Run the local quality checks described in [CONTRIBUTING.md](CONTRIBUTING.md).
+4. Make your changes and open a pull request referencing the issue.
 
 ## License
 
