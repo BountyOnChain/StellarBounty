@@ -1,0 +1,25 @@
+# StellarBounty review routing
+#
+# Keep domain-specific ownership close to the code areas reviewers maintain.
+# Repository maintainers can map these team handles to the actual GitHub teams.
+
+# Default maintainers for files without a narrower rule.
+* @BountyOnChain/maintainers
+
+# Frontend application: Next.js, React, Tailwind, and browser tests.
+/apps/frontend/ @BountyOnChain/frontend-reviewers
+
+# Backend API: NestJS, TypeORM, auth, metrics, and API tests.
+/apps/backend/ @BountyOnChain/backend-reviewers
+
+# Soroban contracts: Rust escrow contract code and contract tests.
+/apps/contracts/ @BountyOnChain/contracts-reviewers
+
+# CI, automation, and repository operations.
+/.github/ @BountyOnChain/devops-reviewers
+
+# Root-level runtime and environment configuration should involve maintainers.
+/docker-compose.yml @BountyOnChain/maintainers @BountyOnChain/devops-reviewers
+/.env.example @BountyOnChain/maintainers @BountyOnChain/devops-reviewers
+/package.json @BountyOnChain/maintainers
+/package-lock.json @BountyOnChain/maintainers
