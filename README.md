@@ -15,12 +15,12 @@ apps/
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20+ |
-| Rust + cargo | stable |
+| Tool          | Version                                    |
+| ------------- | ------------------------------------------ |
+| Node.js       | 20+                                        |
+| Rust + cargo  | stable                                     |
 | wasm32 target | `rustup target add wasm32-unknown-unknown` |
-| Stellar CLI | `cargo install --locked stellar-cli` |
+| Stellar CLI   | `cargo install --locked stellar-cli`       |
 
 ## Setup
 
@@ -46,6 +46,25 @@ npm run dev:frontend
 npm run dev:backend
 ```
 
+## Docker Compose Development
+
+Run the full local stack with one command:
+
+```bash
+docker compose up --watch
+```
+
+Services:
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:4000`
+- Stellar Quickstart RPC: `http://localhost:8000/rpc`
+- PostgreSQL: `localhost:5432`
+
+The Compose stack starts PostgreSQL, the NestJS backend in watch mode, the Next.js frontend with HMR, and `stellar/quickstart` for a local Soroban RPC endpoint. Backend containers use `COMPOSE_STELLAR_RPC_URL=http://quickstart:8000/rpc` by default so contract calls stay inside the Compose network. Source files are mounted into the Node containers, and Compose watch syncs frontend/backend source changes while preserving container-managed build output and dependencies in named volumes.
+
+For local overrides, copy `.env.example` to `.env`; the Compose defaults already provide development-safe values for the database, JWT secret, frontend API URL, and Stellar testnet RPC. After changing `package.json` or `package-lock.json`, rerun `docker compose run --rm deps` so the shared dependency volume is refreshed.
+
 ## Contracts
 
 ```bash
@@ -60,12 +79,12 @@ cargo test
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `STELLAR_NETWORK` | `testnet` or `mainnet` |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
+| Variable               | Description                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | PostgreSQL connection string                                                      |
+| `JWT_SECRET`           | Secret for signing JWTs                                                           |
+| `STELLAR_NETWORK`      | `testnet` or `mainnet`                                                            |
+| `NEXT_PUBLIC_API_URL`  | Backend URL used by the frontend                                                  |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
 
 ## Contributing

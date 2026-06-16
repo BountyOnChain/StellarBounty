@@ -1,40 +1,95 @@
 services:
+  deps:
+    image: node:20-alpine
+    working_dir: /app
+    command: npm install
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
   backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: node:20-alpine
+    working_dir: /app
+    command: npm run dev:backend
     environment:
-      DATABASE_URL: postgres://postgres:password@postgres:5432/stellar_bounty
-      JWT_SECRET: local-development-secret
-      STELLAR_NETWORK: testnet
-      CORS_ORIGIN: http://localhost:3000
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://postgres:password@postgres:5432/stellar_bounty}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret}
+      STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
+      STELLAR_RPC_URL: ${COMPOSE_STELLAR_RPC_URL:-http://quickstart:8000/rpc}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     depends_on:
-      - postgres
+      deps:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      quickstart:
+        condition: service_started
     ports:
-      - '4000:4000'
+      - "4000:4000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - backend_dist:/app/apps/backend/dist
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/backend/src
+          target: /app/apps/backend/src
+        - action: sync
+          path: ./apps/backend/package.json
+          target: /app/apps/backend/package.json
 
   frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:4000
-        NEXT_PUBLIC_STELLAR_NETWORK: testnet
+    image: node:20-alpine
+    working_dir: /app
+    command: npm run dev:frontend -- --hostname 0.0.0.0
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      NEXT_PUBLIC_STELLAR_NETWORK: ${NEXT_PUBLIC_STELLAR_NETWORK:-testnet}
     depends_on:
-      - backend
+      deps:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
     ports:
-      - '3000:3000'
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - frontend_next:/app/apps/frontend/.next
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/frontend
+          target: /app/apps/frontend
+          ignore:
+            - .next/
+            - node_modules/
+
+  quickstart:
+    image: stellar/quickstart:latest
+    command: --testnet
+    ports:
+      - "8000:8000"
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: stellar_bounty
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-stellar_bounty}
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
 volumes:
+  backend_dist:
+  frontend_next:
+  node_modules:
   postgres_data:
