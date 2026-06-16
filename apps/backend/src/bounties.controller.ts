@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -7,12 +7,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
+import { PaginationDto } from './bounties/dto/pagination.dto';
 
 @ApiTags('bounties')
 @Controller('bounties')
@@ -31,10 +33,12 @@ export class BountiesController {
   }
 
   @ApiOperation({ summary: 'List all bounties' })
-  @ApiOkResponse({ description: 'Bounties ordered newest first.', type: [BountyResponseDto] })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (1-indexed)', type: Number })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (max 100)', type: Number })
+  @ApiOkResponse({ description: 'Paginated bounties ordered newest first.' })
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  findAll(@Query() pagination: PaginationDto) {
+    return this.bountiesService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })

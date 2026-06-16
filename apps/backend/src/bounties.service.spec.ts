@@ -97,12 +97,42 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
+  it('findAll returns paginated bounties ordered newest first', async () => {
     const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+    (repository as any).findAndCount = jest.fn().mockResolvedValueOnce([bounties, 2]);
 
-    await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+    const result = await service.findAll();
+    expect(result).toEqual({
+      data: bounties,
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    });
+    expect((repository as any).findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 0,
+      take: 20,
+    });
+  });
+
+  it('findAll respects custom page and limit', async () => {
+    const bounties = [createBounty({ id: 'third' })];
+    (repository as any).findAndCount = jest.fn().mockResolvedValueOnce([bounties, 25]);
+
+    const result = await service.findAll({ page: 3, limit: 10 });
+    expect(result).toEqual({
+      data: bounties,
+      total: 25,
+      page: 3,
+      limit: 10,
+      totalPages: 3,
+    });
+    expect((repository as any).findAndCount).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
+      skip: 20,
+      take: 10,
+    });
   });
 
   describe('findOne', () => {
