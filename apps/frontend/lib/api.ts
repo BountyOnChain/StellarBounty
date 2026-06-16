@@ -10,6 +10,30 @@ type AuthTokenResponse = {
   accessToken: string;
 };
 
+export function clearAuthToken(): void {
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+export function getAuthTokenSubject(token: string): string | null {
+  const [, payload] = token.split(".");
+
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      "=",
+    );
+    const decodedPayload = JSON.parse(atob(paddedPayload)) as { sub?: unknown };
+    return typeof decodedPayload.sub === "string" ? decodedPayload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getAccessToken(publicKey: string): Promise<string> {
   const savedToken =
     typeof window !== "undefined"
@@ -17,7 +41,11 @@ async function getAccessToken(publicKey: string): Promise<string> {
       : null;
 
   if (savedToken) {
-    return savedToken;
+    if (getAuthTokenSubject(savedToken) === publicKey) {
+      return savedToken;
+    }
+
+    clearAuthToken();
   }
 
   const challengeResponse = await fetch(
@@ -58,10 +86,6 @@ async function getAccessToken(publicKey: string): Promise<string> {
 
   window.localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
   return accessToken;
-}
-
-function clearAuthToken(): void {
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
 export function useAuth() {

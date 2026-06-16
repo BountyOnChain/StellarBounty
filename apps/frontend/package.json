@@ -45,6 +45,9 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testRegex": ".*\\.spec\\.ts$",
+    "modulePathIgnorePatterns": [
+      "<rootDir>/.next/"
+    ],
     "testPathIgnorePatterns": [
       "<rootDir>/tests/e2e/"
     ],

@@ -15,7 +15,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `NEXT_PUBLIC_API_URL=http://127.0.0.1:${apiPort} NEXT_PUBLIC_STELLAR_NETWORK=testnet npm run start -- -H 127.0.0.1 -p ${frontendPort}`,
+    command: "node .next/standalone/apps/frontend/server.js",
     url: `http://127.0.0.1:${frontendPort}`,
     reuseExistingServer: false,
     timeout: 30_000,

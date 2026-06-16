@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { cp } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 const apiPort = process.env.E2E_API_PORT ?? "4100";
 const frontendPort = process.env.E2E_FRONTEND_PORT ?? "3100";
@@ -9,6 +12,8 @@ const childEnv = {
   E2E_FRONTEND_PORT: frontendPort,
   NEXT_PUBLIC_API_URL: apiUrl,
   NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
+  HOSTNAME: "127.0.0.1",
+  PORT: frontendPort,
 };
 
 function run(command, args) {
@@ -51,6 +56,18 @@ async function waitForHealth(url) {
   throw lastError ?? new Error(`Timed out waiting for ${url}`);
 }
 
+async function copyStandaloneAssets() {
+  const standaloneAppDir = path.join(".next", "standalone", "apps", "frontend");
+
+  await cp(path.join(".next", "static"), path.join(standaloneAppDir, ".next", "static"), {
+    recursive: true,
+  });
+
+  if (existsSync("public")) {
+    await cp("public", path.join(standaloneAppDir, "public"), { recursive: true });
+  }
+}
+
 const mockApi = spawn("node", ["tests/e2e/mock-api-server.mjs", apiPort], {
   env: childEnv,
   stdio: "inherit",
@@ -62,6 +79,7 @@ let exitCode = 0;
 try {
   await waitForHealth(`${apiUrl}/health`);
   await run("npm", ["run", "build"]);
+  await copyStandaloneAssets();
   await run("npx", ["playwright", "test", ...process.argv.slice(2)]);
 } catch (error) {
   exitCode = 1;

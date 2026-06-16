@@ -4,13 +4,20 @@ const ownerAddress = "GOWNERTESTWALLET000000000000000000000000000000000000000000
 const contributorAddress = "GCONTRIBUTORTESTWALLET000000000000000000000000000000000";
 
 async function seedWallet(page: Page, address = ownerAddress) {
-  await page.addInitScript(
+  await page.goto("/");
+  await page.evaluate(
     ({ walletAddress }) => {
+      const encodeBase64Url = (value: unknown) =>
+        btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const token = `${encodeBase64Url({ alg: "none", typ: "JWT" })}.${encodeBase64Url({
+        sub: walletAddress,
+      })}.`;
+
       window.localStorage.setItem(
         "stellar-bounty.wallet",
         JSON.stringify({ publicKey: walletAddress, freighterNetwork: "TESTNET" }),
       );
-      window.localStorage.setItem("stellar-bounty.auth-token", "e2e-token");
+      window.localStorage.setItem("stellar-bounty.auth-token", token);
     },
     { walletAddress: address },
   );
@@ -18,7 +25,7 @@ async function seedWallet(page: Page, address = ownerAddress) {
 
 async function hydrateWallet(page: Page, address = ownerAddress) {
   await seedWallet(page, address);
-  await page.goto("/");
+  await page.reload();
   await expect(page.getByRole("button", { name: /disconnect/i })).toBeVisible();
 }
 
@@ -59,6 +66,18 @@ test.describe("critical bounty flows", () => {
     await expect(page).toHaveURL(/\/bounties\/bounty-/);
     await expect(page.getByRole("heading", { name: "Write Playwright onboarding tests" })).toBeVisible();
     await expect(page.getByText("Bounty created successfully.")).toBeVisible();
+  });
+
+  test("disconnect clears wallet and auth token storage", async ({ page }) => {
+    await hydrateWallet(page);
+
+    await page.getByRole("button", { name: /disconnect/i }).click();
+
+    const storage = await page.evaluate(() => ({
+      wallet: window.localStorage.getItem("stellar-bounty.wallet"),
+      token: window.localStorage.getItem("stellar-bounty.auth-token"),
+    }));
+    expect(storage).toEqual({ wallet: null, token: null });
   });
 
   test("submits work to an open bounty", async ({ page }) => {

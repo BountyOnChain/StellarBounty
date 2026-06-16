@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { clearAuthToken } from "@/lib/api";
 
 type WalletState = {
   publicKey: string | null;
@@ -76,6 +77,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const disconnect = useCallback(() => {
     window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    clearAuthToken();
     setPublicKey(null);
     setFreighterNetwork(null);
     setError(null);
