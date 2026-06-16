@@ -3,16 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "apps/frontend",
-    "apps/backend"
+        "apps/frontend",
+        "apps/backend"
   ],
   "scripts": {
-    "dev:frontend": "npm run dev --workspace=apps/frontend",
-    "dev:backend": "npm run dev --workspace=apps/backend",
-    "build": "npm run build --workspaces --if-present",
-    "install:all": "npm install"
+        "dev:frontend": "npm run dev --workspace=apps/frontend",
+        "dev:backend": "npm run dev --workspace=apps/backend",
+        "build": "npm run build --workspaces --if-present",
+        "install:all": "npm install",
+        "version": "npm run version:check",
+        "version:check": "node -e \"const fs=require('fs');const pkgs=['package.json','apps/frontend/package.json','apps/backend/package.json'];const semver=/^\\d+\\.\\d+\\.\\d+$/;const versions=pkgs.map(p=>[p,JSON.parse(fs.readFileSync(p,'utf8')).version]);for(const [p,v] of versions){if(!semver.test(v)){throw new Error(p+' version '+v+' must use MAJOR.MINOR.PATCH')}}const root=versions[0][1];const mismatch=versions.filter(([,v])=>v!==root);if(mismatch.length){throw new Error('workspace versions must match root '+root+': '+versions.map(([p,v])=>p+'='+v).join(', '))}console.log('version '+root+' is valid semver across workspaces')\"",
+        "release:check": "npm run version:check && npm run build --workspaces --if-present"
   },
   "devDependencies": {
-    "typescript": "^5.5.4"
+        "typescript": "^5.5.4"
   }
 }
