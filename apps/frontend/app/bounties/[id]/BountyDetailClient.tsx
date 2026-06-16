@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { isAbortError } from "@/lib/use-fetch";
 
 type Bounty = {
   id: string;
@@ -28,6 +29,8 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
@@ -37,6 +40,13 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     return null;
   }, [isOpen, publicKey]);
 
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      submitAbortRef.current?.abort();
+    };
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -45,10 +55,17 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       return;
     }
 
+    submitAbortRef.current?.abort();
+    const controller = new AbortController();
+    submitAbortRef.current = controller;
     setIsSubmitting(true);
 
     try {
       const accessToken = await getToken(publicKey as string);
+      if (controller.signal.aborted) {
+        return;
+      }
+
       const response = await fetch(`${apiUrl}/bounties/${bounty.id}/submissions`, {
         method: "POST",
         headers: {
@@ -56,6 +73,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -67,9 +85,20 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       setNotes("");
       toast.success("Work submitted successfully.");
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+
       toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
     } finally {
-      setIsSubmitting(false);
+      const isCurrentRequest = submitAbortRef.current === controller;
+      if (isCurrentRequest) {
+        submitAbortRef.current = null;
+      }
+
+      if (mountedRef.current && isCurrentRequest) {
+        setIsSubmitting(false);
+      }
     }
   }
 
