@@ -32,6 +32,19 @@ export default function Navbar() {
         };
     }, [drawerOpen]);
 
+    useEffect(() => {
+        if (!drawerOpen) return;
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setDrawerOpen(false);
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [drawerOpen]);
+
     const isActive = (href: string) =>
         pathname === href || pathname.startsWith(href + "/");
 
@@ -58,7 +71,7 @@ export default function Navbar() {
                         StellarBounty
                     </Link>
 
-                    <ul className="hidden md:flex items-center gap-1 flex-1 ml-8" role="list">
+                    <ul className="hidden md:flex items-center gap-1 flex-1 ml-8">
                         {NAV_LINKS.map(({ label, href }) => (
                             <li key={href}>
                                 <Link
@@ -109,18 +122,20 @@ export default function Navbar() {
             </header>
 
             {drawerOpen && (
-                <div
+                <button
+                    type="button"
+                    aria-label="Close menu"
                     className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
-                    aria-hidden="true"
                     onClick={() => setDrawerOpen(false)}
                 />
             )}
 
-            <aside
+            <div
                 id="mobile-drawer"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Mobile navigation"
+                role={drawerOpen ? "dialog" : undefined}
+                aria-modal={drawerOpen ? true : undefined}
+                aria-label={drawerOpen ? "Mobile navigation" : undefined}
+                aria-hidden={drawerOpen ? undefined : true}
                 className={`
           fixed top-16 right-0 bottom-0 z-40 w-[min(18rem,100vw)]
           bg-slate-900 border-l border-slate-800
@@ -130,7 +145,7 @@ export default function Navbar() {
             >
                 <div className="flex h-full flex-col gap-2 overflow-y-auto p-4 sm:p-6">
                     <nav aria-label="Mobile navigation">
-                        <ul className="space-y-1" role="list">
+                        <ul className="space-y-1">
                             {NAV_LINKS.map(({ label, href }) => (
                                 <li key={href}>
                                     <Link
@@ -160,7 +175,7 @@ export default function Navbar() {
 
                     <ConnectWalletButton />
                 </div>
-            </aside>
+            </div>
 
             <div className="h-16" aria-hidden="true" />
         </>

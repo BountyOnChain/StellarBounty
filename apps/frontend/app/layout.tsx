@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AxeDevTools } from "../components/AxeDevTools";
 import { WalletProvider } from "../components/WalletContext";
 import { ToastProvider } from "../components/toast/ToastProvider";
 import Navbar from "./components/Navbar";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <AxeDevTools />
         <WalletProvider>
           <ToastProvider>
             <div className="min-h-screen bg-slate-950 text-slate-100">

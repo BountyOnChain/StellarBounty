@@ -27,11 +27,16 @@ export function ConnectWalletButton() {
         <button
           type="button"
           onClick={disconnect}
-          className="min-h-11 rounded-md border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+          aria-label="Disconnect wallet"
+          className="min-h-11 rounded-md border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         >
           Disconnect
         </button>
-        {error ? <p className="max-w-72 text-xs text-amber-300">{error}</p> : null}
+        {error ? (
+          <p className="max-w-72 text-xs text-amber-200" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -42,19 +47,20 @@ export function ConnectWalletButton() {
         type="button"
         onClick={connect}
         disabled={isConnecting}
-        className="min-h-11 rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-70"
+        aria-label={isConnecting ? "Connecting wallet" : "Connect wallet"}
+        className="min-h-11 rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isConnecting ? "Connecting..." : "Connect wallet"}
       </button>
       <div className="text-xs text-slate-400">
         <span>{targetNetwork}</span>
         {error ? (
-          <p className="mt-1 max-w-72 text-amber-300">
+          <p className="mt-1 max-w-72 text-amber-200" role="alert">
             {error}{" "}
             {error === "Freighter is not installed." ? (
               <a
                 href="https://www.freighter.app/"
-                className="font-medium text-teal-300 underline underline-offset-2"
+                className="font-medium text-teal-300 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 target="_blank"
                 rel="noreferrer"
               >

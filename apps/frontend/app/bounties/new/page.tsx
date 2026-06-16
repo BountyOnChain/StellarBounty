@@ -190,15 +190,23 @@ export default function CreateBountyPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">
+            <span id="description-label" className="mb-1 block text-sm font-medium text-slate-300">
               Description (supports Markdown)
-            </label>
+            </span>
 
-            <div className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-700">
+            <div
+              className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-700"
+              role="tablist"
+              aria-label="Description editor mode"
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === "write"}
+                aria-controls="description-write-panel"
+                id="description-write-tab"
                 onClick={() => setActiveTab("write")}
-                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:flex-none ${
                   activeTab === "write"
                     ? "border-b-2 border-blue-500 text-blue-400"
                     : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
@@ -208,8 +216,12 @@ export default function CreateBountyPage() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === "preview"}
+                aria-controls="description-preview-panel"
+                id="description-preview-tab"
                 onClick={() => setActiveTab("preview")}
-                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:flex-none ${
                   activeTab === "preview"
                     ? "border-b-2 border-blue-500 text-blue-400"
                     : "border-b-2 border-transparent text-slate-400 hover:text-slate-200"
@@ -220,14 +232,27 @@ export default function CreateBountyPage() {
             </div>
 
             {activeTab === "write" ? (
-              <textarea
-                rows={12}
-                {...register("description")}
-                className="min-h-64 w-full resize-y rounded-b-lg border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-                placeholder="Write your bounty requirements in markdown..."
-              />
+              <div
+                id="description-write-panel"
+                role="tabpanel"
+                aria-labelledby="description-write-tab"
+              >
+                <textarea
+                  id="description"
+                  aria-labelledby="description-label"
+                  rows={12}
+                  {...register("description")}
+                  className="min-h-64 w-full resize-y rounded-b-lg border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                  placeholder="Write your bounty requirements in markdown..."
+                />
+              </div>
             ) : (
-              <div className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-700 bg-slate-900 p-4">
+              <div
+                id="description-preview-panel"
+                role="tabpanel"
+                aria-labelledby="description-preview-tab"
+                className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-700 bg-slate-900 p-4"
+              >
                 {description ? (
                   <MarkdownRenderer content={description} />
                 ) : (

@@ -44,7 +44,8 @@ export default function BountyCard({ bounty }: BountyCardProps) {
   return (
     <Link
       href={`/bounties/${bounty.id}`}
-      className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl shadow-black/10 transition hover:-translate-y-1 hover:border-yellow-400/60 hover:bg-slate-900 sm:p-5"
+      aria-label={`View bounty: ${bounty.title}`}
+      className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl shadow-black/10 transition hover:-translate-y-1 hover:border-yellow-400/60 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:p-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 className="line-clamp-2 break-words text-base font-semibold text-slate-100 group-hover:text-yellow-100 sm:text-lg">

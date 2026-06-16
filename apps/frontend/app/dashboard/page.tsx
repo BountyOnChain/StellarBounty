@@ -61,8 +61,10 @@ export default function DashboardPage() {
       <main className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-400">
         <p>Connect your wallet to view your dashboard.</p>
         <button
+          type="button"
           onClick={connect}
-          className="rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-300 transition"
+          aria-label="Connect wallet"
+          className="min-h-11 rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         >
           Connect wallet
         </button>
@@ -75,12 +77,17 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-700 mb-6">
+      <div className="mb-6 flex border-b border-slate-700" role="tablist" aria-label="Dashboard views">
         {(["submissions", "bounties"] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`dashboard-panel-${tab}`}
+            id={`dashboard-tab-${tab}`}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+            className={`min-h-11 border-b-2 px-4 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               activeTab === tab
                 ? "border-blue-500 text-blue-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -91,8 +98,13 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+      {error && <p className="mb-4 text-sm text-red-400" role="alert">{error}</p>}
 
+      <div
+        id={`dashboard-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`dashboard-tab-${activeTab}`}
+      >
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
@@ -156,6 +168,7 @@ export default function DashboardPage() {
           </table>
         </div>
       )}
+      </div>
     </main>
   );
 }

@@ -30,8 +30,14 @@ jobs:
       - name: Lint
         run: npm run lint --workspace=apps/frontend
 
+      - name: Test
+        run: npm run test --workspace=apps/frontend
+
       - name: Build
         run: npm run build --workspace=apps/frontend
+
+      - name: Lighthouse accessibility audit
+        run: npm run lhci --workspace=apps/frontend
 
   backend:
     name: Backend
