@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'crypto';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import compression from 'compression';
@@ -9,6 +9,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { createCorsOptions } from './cors.config';
+import { createGracefulShutdownHandler } from './graceful-shutdown';
 import { setupSwagger } from './swagger.setup';
 import { createValidationPipeOptions } from './validation-pipe.config';
 
@@ -29,6 +30,11 @@ async function bootstrap() {
 
   const port = config.get<number>('PORT', 4000);
   await app.listen(port);
+  app.enableShutdownHooks();
+
+  const shutdown = createGracefulShutdownHandler(app, { logger: new Logger('Shutdown') });
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
 }
 
 bootstrap();
