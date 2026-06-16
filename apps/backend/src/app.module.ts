@@ -29,6 +29,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         STELLAR_NETWORK: Joi.string().valid('testnet', 'mainnet').required(),
+        STELLAR_MAX_FEE: Joi.number().integer().positive().default(100000),
         CORS_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
         CORS_ORIGINS: Joi.string().optional(),
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),

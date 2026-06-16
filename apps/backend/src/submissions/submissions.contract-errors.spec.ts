@@ -7,6 +7,7 @@ import { SubmissionsService } from './submissions.service';
 
 const mockServer = {
   getAccount: jest.fn(),
+  getFeeStats: jest.fn(),
   prepareTransaction: jest.fn(),
   sendTransaction: jest.fn(),
 };
