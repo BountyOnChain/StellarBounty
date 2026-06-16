@@ -213,13 +213,39 @@ impl EscrowContract {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use soroban_sdk::{
         testutils::Address as _,
         token::{Client as TokenClient, StellarAssetClient},
         Address, Env,
     };
 
+    #[derive(Clone, Copy, Debug)]
+    enum ModelStatus {
+        Created,
+        Funded,
+        InProgress,
+        UnderReview,
+        Disputed,
+        Completed,
+        Cancelled,
+    }
+
     fn setup() -> (
+        Env,
+        EscrowContractClient<'static>,
+        Address,
+        Address,
+        Address,
+        Address,
+        i128,
+    ) {
+        setup_with_amount(1000)
+    }
+
+    fn setup_with_amount(
+        amount: i128,
+    ) -> (
         Env,
         EscrowContractClient<'static>,
         Address,
@@ -241,7 +267,6 @@ mod tests {
 
         let owner = Address::generate(&env);
         let arbitrator = Address::generate(&env);
-        let amount: i128 = 1000;
 
         token_admin_client.mint(&owner, &amount);
 
@@ -249,6 +274,32 @@ mod tests {
         token_client.approve(&owner, &contract_id, &amount, &200);
 
         (env, client, owner, token_address, contract_id, arbitrator, amount)
+    }
+
+    fn assert_model_status(client: &EscrowContractClient<'static>, expected: ModelStatus) {
+        let actual = client.get_status();
+        match expected {
+            ModelStatus::Created => assert_eq!(actual, BountyStatus::Created),
+            ModelStatus::Funded => assert_eq!(actual, BountyStatus::Funded),
+            ModelStatus::InProgress => assert_eq!(actual, BountyStatus::InProgress),
+            ModelStatus::UnderReview => assert_eq!(actual, BountyStatus::UnderReview),
+            ModelStatus::Disputed => assert_eq!(actual, BountyStatus::Disputed),
+            ModelStatus::Completed => assert_eq!(actual, BountyStatus::Completed),
+            ModelStatus::Cancelled => assert_eq!(actual, BountyStatus::Cancelled),
+        }
+    }
+
+    fn assert_token_conservation(
+        token: &TokenClient<'static>,
+        owner: &Address,
+        contributor: &Address,
+        contract_id: &Address,
+        amount: i128,
+    ) {
+        assert_eq!(
+            token.balance(owner) + token.balance(contributor) + token.balance(contract_id),
+            amount
+        );
     }
 
     fn setup_under_review() -> (
@@ -566,5 +617,89 @@ mod tests {
     fn test_resolve_before_dispute_panics() {
         let (_, client, _, _, _, arbitrator, contributor, _) = setup_under_review();
         client.resolve(&arbitrator, &contributor);
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn prop_happy_path_completes_with_correct_funds(amount in 1_i128..=1_000_000_000_i128) {
+            let (env, client, owner, token_address, contract_id, arbitrator, amount) = setup_with_amount(amount);
+            let contributor = Address::generate(&env);
+            let token = TokenClient::new(&env, &token_address);
+
+            client.initialize(&owner, &amount, &token_address, &arbitrator);
+            client.fund(&owner);
+            client.start_work(&contributor);
+            client.submit(&contributor);
+            client.approve(&owner);
+
+            assert_eq!(client.get_status(), BountyStatus::Completed);
+            assert_eq!(token.balance(&contributor), amount);
+            assert_eq!(token.balance(&contract_id), 0);
+            assert_token_conservation(&token, &owner, &contributor, &contract_id, amount);
+        }
+
+        #[test]
+        fn prop_valid_state_machine_sequences_do_not_panic(
+            amount in 1_i128..=1_000_000_000_i128,
+            choices in prop::collection::vec(0_u8..=255, 0..20),
+        ) {
+            let (env, client, owner, token_address, contract_id, arbitrator, amount) = setup_with_amount(amount);
+            let contributor = Address::generate(&env);
+            let token = TokenClient::new(&env, &token_address);
+            let mut status = ModelStatus::Created;
+
+            client.initialize(&owner, &amount, &token_address, &arbitrator);
+
+            for choice in choices {
+                match status {
+                    ModelStatus::Created => {
+                        if choice % 2 == 0 {
+                            client.fund(&owner);
+                            status = ModelStatus::Funded;
+                        } else {
+                            client.cancel(&owner);
+                            status = ModelStatus::Cancelled;
+                        }
+                    }
+                    ModelStatus::Funded => {
+                        if choice % 2 == 0 {
+                            client.start_work(&contributor);
+                            status = ModelStatus::InProgress;
+                        } else {
+                            client.cancel(&owner);
+                            status = ModelStatus::Cancelled;
+                        }
+                    }
+                    ModelStatus::InProgress => {
+                        client.submit(&contributor);
+                        status = ModelStatus::UnderReview;
+                    }
+                    ModelStatus::UnderReview => {
+                        if choice % 2 == 0 {
+                            client.approve(&owner);
+                            status = ModelStatus::Completed;
+                        } else {
+                            let dispute_caller = if choice % 4 == 1 { &owner } else { &contributor };
+                            client.dispute(dispute_caller);
+                            status = ModelStatus::Disputed;
+                        }
+                    }
+                    ModelStatus::Disputed => {
+                        let winner = if choice % 2 == 0 { &owner } else { &contributor };
+                        client.resolve(&arbitrator, winner);
+                        status = ModelStatus::Completed;
+                    }
+                    ModelStatus::Completed | ModelStatus::Cancelled => break,
+                }
+
+                assert_model_status(&client, status);
+                assert_token_conservation(&token, &owner, &contributor, &contract_id, amount);
+            }
+
+            assert_model_status(&client, status);
+            assert_token_conservation(&token, &owner, &contributor, &contract_id, amount);
+        }
     }
 }
