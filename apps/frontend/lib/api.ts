@@ -5,9 +5,11 @@ import { signMessage } from "@stellar/freighter-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
+const REFRESH_TOKEN_STORAGE_KEY = "stellar-bounty.refresh-token";
 
 type AuthTokenResponse = {
   accessToken: string;
+  refreshToken: string;
 };
 
 async function getAccessToken(publicKey: string): Promise<string> {
@@ -51,17 +53,20 @@ async function getAccessToken(publicKey: string): Promise<string> {
     throw new Error("Wallet verification failed.");
   }
 
-  const { accessToken } = (await verifyResponse.json()) as AuthTokenResponse;
-  if (!accessToken) {
+  const { accessToken, refreshToken } =
+    (await verifyResponse.json()) as AuthTokenResponse;
+  if (!accessToken || !refreshToken) {
     throw new Error("Verification did not return an access token.");
   }
 
   window.localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+  window.localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
   return accessToken;
 }
 
 function clearAuthToken(): void {
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
 export function useAuth() {

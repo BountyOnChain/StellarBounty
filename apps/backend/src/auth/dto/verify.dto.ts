@@ -36,4 +36,10 @@ export class VerifyResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   accessToken!: string;
+
+  @ApiProperty({
+    description: 'Opaque refresh token used to rotate short-lived access tokens',
+    example: 'vU8gr9wXc0zO6jIv...',
+  })
+  refreshToken!: string;
 }

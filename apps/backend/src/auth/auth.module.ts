@@ -6,11 +6,13 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { createAuthThrottleOptions } from './auth-rate-limit.config';
+import { AuthSessionCleanupService } from './auth-session-cleanup.service';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { getJwtSecret } from './get-jwt-secret';
 import { Nonce } from '../entities/nonce.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
 
 @Module({
   imports: [
@@ -22,12 +24,12 @@ import { Nonce } from '../entities/nonce.entity';
     }),
     JwtModule.register({
       secret: getJwtSecret(),
-      signOptions: { expiresIn: '24h' },
+      signOptions: { expiresIn: '15m' },
     }),
-    TypeOrmModule.forFeature([Nonce]),
+    TypeOrmModule.forFeature([Nonce, RefreshToken]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, AuthSessionCleanupService, JwtStrategy, JwtAuthGuard],
   exports: [JwtAuthGuard],
 })
 export class AuthModule {}

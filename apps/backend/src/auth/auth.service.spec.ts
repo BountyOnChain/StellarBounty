@@ -1,17 +1,25 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as StellarSdk from '@stellar/stellar-sdk';
+import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
   let nonceRepository: any;
+  let refreshTokenRepository: any;
+  let refreshStore: Map<string, any>;
+
+  function hashRefreshToken(refreshToken: string): string {
+    return crypto.createHash('sha256').update(refreshToken).digest('hex');
+  }
 
   beforeEach(() => {
     jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as any;
 
     const mockStore = new Map<string, any>();
+    refreshStore = new Map<string, any>();
     nonceRepository = {
       findOne: jest.fn().mockImplementation(({ where }) => {
         return Promise.resolve(mockStore.get(where.address) || null);
@@ -41,7 +49,31 @@ describe('AuthService', () => {
       delete: jest.fn().mockReturnValue(nonceRepository.deleteBuilder),
     });
 
-    service = new AuthService(jwtService, nonceRepository);
+    refreshTokenRepository = {
+      create: jest.fn().mockImplementation((data) => ({
+        id: `refresh-${refreshStore.size + 1}`,
+        createdAt: new Date(),
+        ...data,
+      })),
+      save: jest.fn().mockImplementation((entity) => {
+        refreshStore.set(entity.tokenHash, entity);
+        return Promise.resolve(entity);
+      }),
+      findOne: jest.fn().mockImplementation(({ where }) => {
+        return Promise.resolve(refreshStore.get(where.tokenHash) || null);
+      }),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        delete: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 2 }),
+      }),
+    };
+
+    service = new AuthService(jwtService, nonceRepository, refreshTokenRepository);
   });
 
   describe('getChallenge', () => {
@@ -58,7 +90,7 @@ describe('AuthService', () => {
   });
 
   describe('verify', () => {
-    it('returns an accessToken on valid signature', async () => {
+    it('returns an accessToken and refreshToken on valid signature', async () => {
       const keypair = StellarSdk.Keypair.random();
       const address = keypair.publicKey();
 
@@ -68,7 +100,17 @@ describe('AuthService', () => {
 
       const result = await service.verify(address, signature, nonce);
       expect(result.accessToken).toBe('mock.jwt.token');
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: address });
+      expect(result.refreshToken).toEqual(expect.any(String));
+      expect(result.refreshToken.length).toBeGreaterThan(40);
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: address }, { expiresIn: '15m' });
+
+      const storedHash = hashRefreshToken(result.refreshToken);
+      expect(refreshStore.get(storedHash)).toMatchObject({
+        address,
+        tokenHash: storedHash,
+        revokedAt: null,
+      });
+      expect(refreshStore.has(result.refreshToken)).toBe(false);
     });
 
     it('throws UnauthorizedException for wrong nonce', async () => {
@@ -109,6 +151,73 @@ describe('AuthService', () => {
       await service.verify(address, sig, nonce);
       // Second call with same nonce should fail
       await expect(service.verify(address, sig, nonce)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('refresh', () => {
+    it('rotates refresh tokens and invalidates the previous token', async () => {
+      const keypair = StellarSdk.Keypair.random();
+      const address = keypair.publicKey();
+      const { nonce } = await service.getChallenge(address);
+      const signature = Buffer.from(keypair.sign(Buffer.from(nonce))).toString('base64');
+      const first = await service.verify(address, signature, nonce);
+
+      const second = await service.refresh(first.refreshToken);
+
+      expect(second.accessToken).toBe('mock.jwt.token');
+      expect(second.refreshToken).not.toBe(first.refreshToken);
+      expect(refreshStore.get(hashRefreshToken(first.refreshToken)).revokedAt).toBeInstanceOf(Date);
+      expect(refreshStore.get(hashRefreshToken(second.refreshToken))).toMatchObject({
+        address,
+        revokedAt: null,
+      });
+    });
+
+    it('rejects refresh token replay after rotation', async () => {
+      const keypair = StellarSdk.Keypair.random();
+      const address = keypair.publicKey();
+      const { nonce } = await service.getChallenge(address);
+      const signature = Buffer.from(keypair.sign(Buffer.from(nonce))).toString('base64');
+      const first = await service.verify(address, signature, nonce);
+
+      await service.refresh(first.refreshToken);
+
+      await expect(service.refresh(first.refreshToken)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects unknown refresh tokens', async () => {
+      await expect(service.refresh('missing-refresh-token')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('logout', () => {
+    it('revokes the current refresh token', async () => {
+      const keypair = StellarSdk.Keypair.random();
+      const address = keypair.publicKey();
+      const { nonce } = await service.getChallenge(address);
+      const signature = Buffer.from(keypair.sign(Buffer.from(nonce))).toString('base64');
+      const tokens = await service.verify(address, signature, nonce);
+
+      await expect(service.logout(tokens.refreshToken)).resolves.toEqual({ revoked: true });
+      expect(refreshStore.get(hashRefreshToken(tokens.refreshToken)).revokedAt).toBeInstanceOf(
+        Date,
+      );
+      await expect(service.refresh(tokens.refreshToken)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('is idempotent for missing tokens', async () => {
+      await expect(service.logout('missing-refresh-token')).resolves.toEqual({ revoked: false });
+    });
+  });
+
+  describe('revokeAll', () => {
+    it('marks active sessions for an address as revoked', async () => {
+      await expect(service.revokeAll('GABC')).resolves.toEqual({ revoked: 2 });
+      const builder = refreshTokenRepository.createQueryBuilder.mock.results[0].value;
+      expect(builder.update).toHaveBeenCalled();
+      expect(builder.set).toHaveBeenCalledWith({ revokedAt: expect.any(Date) });
+      expect(builder.where).toHaveBeenCalledWith('address = :address', { address: 'GABC' });
+      expect(builder.andWhere).toHaveBeenCalledWith('"revokedAt" IS NULL');
     });
   });
 });

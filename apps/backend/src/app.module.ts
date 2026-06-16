@@ -11,8 +11,10 @@ import { BountiesService } from './bounties.service';
 import { Bounty } from './entities/bounty.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
+import { AddRefreshTokensTable1747657400000 } from './migrations/1747657400000-AddRefreshTokensTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { MetricsModule } from './metrics/metrics.module';
@@ -34,6 +36,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
+        AUTH_SESSION_CLEANUP_ENABLED: Joi.boolean().default(true),
+        AUTH_SESSION_CLEANUP_INTERVAL_MS: Joi.number().integer().positive().default(3600000),
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
@@ -52,8 +56,12 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       useFactory: (config: ConfigService, metrics: MetricsService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [Bounty, Submission, Nonce],
-        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
+        entities: [Bounty, Submission, Nonce, RefreshToken],
+        migrations: [
+          InitSchema1747657200000,
+          AddNoncesTable1747657300000,
+          AddRefreshTokensTable1747657400000,
+        ],
         logger: new TypeOrmMetricsLogger(metrics),
         maxQueryExecutionTime: 250,
         synchronize: false,

@@ -5,15 +5,25 @@ import { Repository } from 'typeorm';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import * as crypto from 'crypto';
 import { Nonce } from '../entities/nonce.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
+
+type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
 
 @Injectable()
 export class AuthService {
   private readonly NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  private readonly ACCESS_TOKEN_EXPIRES_IN = '15m';
 
   constructor(
     private readonly jwtService: JwtService,
     @InjectRepository(Nonce)
     private readonly nonceRepository: Repository<Nonce>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
   async getChallenge(address: string): Promise<{ nonce: string }> {
@@ -34,7 +44,7 @@ export class AuthService {
     return { nonce };
   }
 
-  async verify(address: string, signature: string, nonce: string): Promise<{ accessToken: string }> {
+  async verify(address: string, signature: string, nonce: string): Promise<AuthTokens> {
     await this.pruneExpired();
     const entry = await this.nonceRepository.findOne({ where: { address } });
 
@@ -53,8 +63,41 @@ export class AuthService {
     }
 
     await this.nonceRepository.delete({ address });
-    const accessToken = this.jwtService.sign({ sub: address });
-    return { accessToken };
+    return this.issueTokenPair(address);
+  }
+
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    await this.pruneExpired();
+    const stored = await this.findActiveRefreshToken(refreshToken);
+    stored.revokedAt = new Date();
+    await this.refreshTokenRepository.save(stored);
+
+    return this.issueTokenPair(stored.address);
+  }
+
+  async logout(refreshToken: string): Promise<{ revoked: boolean }> {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const stored = await this.refreshTokenRepository.findOne({ where: { tokenHash } });
+
+    if (!stored || stored.revokedAt) {
+      return { revoked: false };
+    }
+
+    stored.revokedAt = new Date();
+    await this.refreshTokenRepository.save(stored);
+    return { revoked: true };
+  }
+
+  async revokeAll(address: string): Promise<{ revoked: number }> {
+    const result = await this.refreshTokenRepository
+      .createQueryBuilder()
+      .update(RefreshToken)
+      .set({ revokedAt: new Date() })
+      .where('address = :address', { address })
+      .andWhere('"revokedAt" IS NULL')
+      .execute();
+
+    return { revoked: result.affected ?? 0 };
   }
 
   private async pruneExpired(): Promise<void> {
@@ -65,5 +108,47 @@ export class AuthService {
       .from(Nonce)
       .where('expiresAt < :now', { now })
       .execute();
+
+    await this.refreshTokenRepository
+      .createQueryBuilder()
+      .delete()
+      .from(RefreshToken)
+      .where('"expiresAt" < :now', { now })
+      .execute();
+  }
+
+  private async issueTokenPair(address: string): Promise<AuthTokens> {
+    const refreshToken = crypto.randomBytes(48).toString('base64url');
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const expiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_MS);
+
+    const refreshTokenEntity = this.refreshTokenRepository.create({
+      address,
+      tokenHash,
+      expiresAt,
+      revokedAt: null,
+    });
+    await this.refreshTokenRepository.save(refreshTokenEntity);
+
+    const accessToken = this.jwtService.sign(
+      { sub: address },
+      { expiresIn: this.ACCESS_TOKEN_EXPIRES_IN },
+    );
+    return { accessToken, refreshToken };
+  }
+
+  private async findActiveRefreshToken(refreshToken: string): Promise<RefreshToken> {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const stored = await this.refreshTokenRepository.findOne({ where: { tokenHash } });
+
+    if (!stored || stored.revokedAt || Date.now() > stored.expiresAt.getTime()) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    return stored;
+  }
+
+  private hashRefreshToken(refreshToken: string): string {
+    return crypto.createHash('sha256').update(refreshToken).digest('hex');
   }
 }
