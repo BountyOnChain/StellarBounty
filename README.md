@@ -65,6 +65,7 @@ cargo test
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Secret for signing JWTs |
 | `STELLAR_NETWORK` | `testnet` or `mainnet` |
+| `MAX_BODY_SIZE` | Maximum JSON and URL-encoded API request body size, defaults to `1mb` |
 | `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
 
