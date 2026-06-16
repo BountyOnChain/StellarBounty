@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
+import { AuditService } from './audit/audit.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
@@ -10,6 +11,7 @@ type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let audit: { log: jest.Mock };
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -38,6 +40,9 @@ describe('BountiesService', () => {
       findOne: jest.fn(),
       remove: jest.fn(),
     };
+    audit = {
+      log: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -45,6 +50,10 @@ describe('BountiesService', () => {
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: AuditService,
+          useValue: audit,
         },
       ],
     }).compile();
@@ -69,6 +78,16 @@ describe('BountiesService', () => {
         }),
       );
       expect(repository.save).toHaveBeenCalled();
+      expect(audit.log).toHaveBeenCalledWith(
+        result.ownerAddress,
+        'bounty.create',
+        'bounty',
+        result.id,
+        expect.objectContaining({
+          rewardAmount: '10000000',
+          status: BountyStatus.OPEN,
+        }),
+      );
       expect(result.rewardAmount).toBe('10000000');
     });
 
@@ -139,6 +158,16 @@ describe('BountiesService', () => {
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);
+      expect(audit.log).toHaveBeenCalledWith(
+        existing.ownerAddress,
+        'bounty.update',
+        'bounty',
+        existing.id,
+        expect.objectContaining({
+          fields: ['title', 'rewardAmount', 'deadline'],
+          status: existing.status,
+        }),
+      );
     });
 
     it('preserves the existing deadline when update deadline is undefined', async () => {
@@ -161,6 +190,13 @@ describe('BountiesService', () => {
 
       await expect(service.remove('bounty-1')).resolves.toEqual({ deleted: true });
       expect(repository.remove).toHaveBeenCalledWith(bounty);
+      expect(audit.log).toHaveBeenCalledWith(
+        bounty.ownerAddress,
+        'bounty.delete',
+        'bounty',
+        bounty.id,
+        expect.objectContaining({ status: bounty.status }),
+      );
     });
 
     it('throws NotFoundException when removing a missing bounty', async () => {

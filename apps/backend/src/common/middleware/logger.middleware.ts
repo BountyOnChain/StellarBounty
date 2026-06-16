@@ -9,7 +9,12 @@ export class LoggerMiddleware implements NestMiddleware {
     const start = Date.now();
     res.on('finish', () => {
       const requestId = req.headers['x-request-id'] ?? '-';
-      this.logger.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms [${requestId}]`);
+      const message = `${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms [${requestId}]`;
+      if (req.method === 'GET') {
+        this.logger.debug(message);
+        return;
+      }
+      this.logger.log(message);
     });
     next();
   }
