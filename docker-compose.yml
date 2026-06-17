@@ -3,15 +3,31 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+      target: deps
+    command: npm run dev --workspace=apps/backend
     environment:
       DATABASE_URL: postgres://postgres:password@postgres:5432/stellar_bounty
       JWT_SECRET: local-development-secret
       STELLAR_NETWORK: testnet
+      STELLAR_RPC_URL: http://quickstart:8000
       CORS_ORIGIN: http://localhost:3000
+      NODE_ENV: development
+      LOG_LEVEL: debug
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      quickstart:
+        condition: service_started
     ports:
       - '4000:4000'
+    volumes:
+      - ./apps/backend:/app/apps/backend:delegated
+      - /app/apps/backend/node_modules
+      - /app/node_modules
+    develop:
+      watch:
+        - path: ./apps/backend/src
+          action: rebuild
 
   frontend:
     build:
@@ -20,10 +36,25 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:4000
         NEXT_PUBLIC_STELLAR_NETWORK: testnet
+    command: npm run dev --workspace=apps/frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_STELLAR_NETWORK: testnet
     depends_on:
       - backend
     ports:
       - '3000:3000'
+    volumes:
+      - ./apps/frontend:/app/apps/frontend:delegated
+      - /app/apps/frontend/node_modules
+      - /app/apps/frontend/.next
+      - /app/node_modules
+    develop:
+      watch:
+        - path: ./apps/frontend/app
+          action: rebuild
+        - path: ./apps/frontend/components
+          action: rebuild
 
   postgres:
     image: postgres:16-alpine
@@ -35,6 +66,20 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stellar_bounty"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  quickstart:
+    image: stellar/quickstart:latest
+    command: ["--testnet", "--enable-soroban-rpc"]
+    ports:
+      - '8000:8000'
+    volumes:
+      - quickstart_data:/var/lib/stellar
 
 volumes:
   postgres_data:
+  quickstart_data:
