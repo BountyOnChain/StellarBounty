@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { getJwtSecret } from './get-jwt-secret';
 import { Nonce } from '../entities/nonce.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
 
 @Module({
   imports: [
@@ -20,11 +21,17 @@ import { Nonce } from '../entities/nonce.entity';
       inject: [ConfigService],
       useFactory: createAuthThrottleOptions,
     }),
-    JwtModule.register({
-      secret: getJwtSecret(),
-      signOptions: { expiresIn: '24h' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') ?? getJwtSecret(),
+        signOptions: {
+          expiresIn: config.get<string>('JWT_ACCESS_EXPIRES_IN', '15m'),
+        },
+      }),
     }),
-    TypeOrmModule.forFeature([Nonce]),
+    TypeOrmModule.forFeature([Nonce, RefreshToken]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],

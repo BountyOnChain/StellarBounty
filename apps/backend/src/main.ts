@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -29,6 +30,7 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(compression());
+  app.use(cookieParser());
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.headers['x-request-id'] = req.headers['x-request-id'] ?? randomUUID();
     next();
