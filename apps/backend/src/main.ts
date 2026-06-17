@@ -23,6 +23,7 @@ async function bootstrap() {
     next();
   });
   app.enableCors(createCorsOptions(config));
+  app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe(createValidationPipeOptions()));
   app.useGlobalFilters(new HttpExceptionFilter());
   setupSwagger(app);
