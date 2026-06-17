@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Submission } from './submission.entity';
+import { stroopTransformer } from '../bounties/stroop.utils';
 
 export enum BountyStatus {
   OPEN = 'open',
@@ -26,8 +27,8 @@ export class Bounty {
   @Column('text')
   description!: string;
 
-  @Column('bigint')
-  rewardAmount!: string;
+  @Column('bigint', { transformer: stroopTransformer })
+  rewardAmount!: bigint;
 
   @Column({ type: 'timestamptz', nullable: true })
   deadline!: Date | null;
