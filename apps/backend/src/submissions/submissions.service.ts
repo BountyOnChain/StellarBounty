@@ -112,6 +112,24 @@ export class SubmissionsService {
         .setTimeout(30)
         .build();
 
+      // Simulate transaction before preparing — catches errors without spending gas
+      const simResult = await server.simulateTransaction(tx);
+      if (simResult.error) {
+        this.logger.warn(
+          `Stellar transaction simulation failed: bountyId=${bountyId}, contractId=${contractId}, error=${simResult.error}`,
+        );
+        throw new BadRequestException(
+          `Transaction simulation failed: ${simResult.error}. The contract call would not succeed.`,
+        );
+      }
+
+      // Log estimated resource fee for observability
+      if (simResult.result && simResult.result.transactionData) {
+        this.logger.log(
+          `Stellar tx simulation OK: bountyId=${bountyId}, estimatedFee=${simResult.result.transactionData.resourceFee ?? 'unknown'}`,
+        );
+      }
+
       const prepared = await server.prepareTransaction(tx);
       // The backend signs only if a server-side signing key is configured.
       const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
@@ -121,6 +139,7 @@ export class SubmissionsService {
         await server.sendTransaction(prepared);
       }
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `Stellar contract approval skipped after RPC failure: bountyId=${bountyId}, contractId=${contractId}, rpcUrl=${rpcUrl}, error=${message}`,
