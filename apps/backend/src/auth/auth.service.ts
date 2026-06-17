@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,10 +9,10 @@ import { Nonce } from '../entities/nonce.entity';
 
 @Injectable()
 export class AuthService {
-  private readonly NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     @InjectRepository(Nonce)
     private readonly nonceRepository: Repository<Nonce>,
   ) {}
@@ -19,7 +20,8 @@ export class AuthService {
   async getChallenge(address: string): Promise<{ nonce: string }> {
     await this.pruneExpired();
     const nonce = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + this.NONCE_TTL_MS);
+    const nonceTtlMs = this.configService.get<number>('AUTH_NONCE_TTL_MS', 300000);
+    const expiresAt = new Date(Date.now() + nonceTtlMs);
 
     // Upsert nonce
     let nonceEntity = await this.nonceRepository.findOne({ where: { address } });
