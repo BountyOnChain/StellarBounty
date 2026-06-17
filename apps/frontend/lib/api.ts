@@ -4,24 +4,13 @@ import { useCallback, useMemo, useState } from "react";
 import { signMessage } from "@stellar/freighter-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
 
-type AuthTokenResponse = {
-  accessToken: string;
-};
-
-async function getAccessToken(publicKey: string): Promise<string> {
-  const savedToken =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
-      : null;
-
-  if (savedToken) {
-    return savedToken;
-  }
-
+async function ensureAuthenticated(publicKey: string): Promise<void> {
+  // Check if we have a valid access token by making a test request
+  // The browser will automatically send httpOnly cookies
   const challengeResponse = await fetch(
-    `${API_URL}/auth/challenge?address=${encodeURIComponent(publicKey)}`
+    `${API_URL}/auth/challenge?address=${encodeURIComponent(publicKey)}`,
+    { credentials: "include" }
   );
   if (!challengeResponse.ok) {
     throw new Error("Failed to request wallet challenge.");
@@ -40,6 +29,7 @@ async function getAccessToken(publicKey: string): Promise<string> {
   const verifyResponse = await fetch(`${API_URL}/auth/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
       address: publicKey,
       signature: signed.signedMessage,
@@ -50,39 +40,53 @@ async function getAccessToken(publicKey: string): Promise<string> {
   if (!verifyResponse.ok) {
     throw new Error("Wallet verification failed.");
   }
-
-  const { accessToken } = (await verifyResponse.json()) as AuthTokenResponse;
-  if (!accessToken) {
-    throw new Error("Verification did not return an access token.");
-  }
-
-  window.localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
-  return accessToken;
 }
 
-function clearAuthToken(): void {
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+async function refreshAccessToken(): Promise<void> {
+  const response = await fetch(`${API_URL}/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("Session expired. Please reconnect your wallet.");
+  }
+}
+
+async function clearAuthCookies(): Promise<void> {
+  await fetch(`${API_URL}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
 }
 
 export function useAuth() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const getToken = useCallback(async (publicKey: string): Promise<string> => {
+  const authenticate = useCallback(async (publicKey: string): Promise<void> => {
     setIsAuthenticating(true);
     try {
-      return await getAccessToken(publicKey);
+      await ensureAuthenticated(publicKey);
     } finally {
       setIsAuthenticating(false);
     }
   }, []);
 
+  const refresh = useCallback(async (): Promise<void> => {
+    await refreshAccessToken();
+  }, []);
+
+  const logout = useCallback(async (): Promise<void> => {
+    await clearAuthCookies();
+  }, []);
+
   return useMemo(
     () => ({
-      getToken,
-      clearToken: clearAuthToken,
+      authenticate,
+      refresh,
+      logout,
       isAuthenticating,
       apiUrl: API_URL,
     }),
-    [getToken, isAuthenticating]
+    [authenticate, refresh, logout, isAuthenticating]
   );
 }

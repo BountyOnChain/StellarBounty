@@ -11,6 +11,7 @@ import { BountiesService } from './bounties.service';
 import { Bounty } from './entities/bounty.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
@@ -28,6 +29,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
+        JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
+        JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
         STELLAR_NETWORK: Joi.string().valid('testnet', 'mainnet').required(),
         CORS_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
         CORS_ORIGINS: Joi.string().optional(),
@@ -45,14 +48,14 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
     SubmissionsModule,
     HealthModule,
     MetricsModule,
-    TypeOrmModule.forFeature([Bounty, Nonce]),
+    TypeOrmModule.forFeature([Bounty, Nonce, RefreshToken]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule, MetricsModule],
       inject: [ConfigService, MetricsService],
       useFactory: (config: ConfigService, metrics: MetricsService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [Bounty, Submission, Nonce],
+        entities: [Bounty, Submission, Nonce, RefreshToken],
         migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
         logger: new TypeOrmMetricsLogger(metrics),
         maxQueryExecutionTime: 250,
