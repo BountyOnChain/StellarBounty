@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsEnum, Min } from 'class-validator';
+import { IsString, IsNumber, IsEnum, Min, IsOptional } from 'class-validator';
 
 export class HealthResponseDto {
   @ApiProperty({
@@ -47,4 +47,24 @@ export class HealthResponseDto {
   })
   @IsEnum(['connected', 'disconnected'])
   database!: string;
+
+  @ApiProperty({
+    description: 'Stellar RPC connectivity status',
+    example: 'connected',
+    enum: ['connected', 'disconnected', 'not_configured'],
+    required: false,
+  })
+  @IsEnum(['connected', 'disconnected', 'not_configured'])
+  @IsOptional()
+  stellarRpc?: string;
+
+  @ApiProperty({
+    description: 'Soroban contract reachability status',
+    example: 'reachable',
+    enum: ['reachable', 'unreachable', 'not_configured'],
+    required: false,
+  })
+  @IsEnum(['reachable', 'unreachable', 'not_configured'])
+  @IsOptional()
+  contract?: string;
 }
