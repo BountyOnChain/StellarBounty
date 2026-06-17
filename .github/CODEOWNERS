@@ -1,0 +1,50 @@
+# StellarBounty — Code Owners
+# This file defines who gets automatically requested for review
+# when specific files are changed in a pull request.
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# =============================================================================
+# Default: All files
+# =============================================================================
+*                               @BountyOnChain
+
+# =============================================================================
+# Smart Contracts (Soroban/Rust)
+# =============================================================================
+/apps/contracts/                @BountyOnChain
+*.rs                            @BountyOnChain
+Cargo.toml                      @BountyOnChain
+Cargo.lock                      @BountyOnChain
+
+# =============================================================================
+# Backend (NestJS/TypeScript)
+# =============================================================================
+/apps/backend/                  @BountyOnChain
+*.ts                            @BountyOnChain
+
+# =============================================================================
+# Frontend (Next.js/React)
+# =============================================================================
+/apps/frontend/                 @BountyOnChain
+*.tsx                           @BountyOnChain
+*.jsx                           @BountyOnChain
+*.css                           @BountyOnChain
+
+# =============================================================================
+# CI / Infrastructure
+# =============================================================================
+/.github/                       @BountyOnChain
+/.github/workflows/             @BountyOnChain
+Dockerfile*                     @BountyOnChain
+docker-compose.yml              @BountyOnChain
+.dockerignore                   @BountyOnChain
+
+# =============================================================================
+# Root Configuration
+# =============================================================================
+/.env.example                   @BountyOnChain
+/.gitignore                     @BountyOnChain
+/package.json                   @BountyOnChain
+/tsconfig*.json                 @BountyOnChain
+/nest-cli.json                  @BountyOnChain
+/README.md                      @BountyOnChain
