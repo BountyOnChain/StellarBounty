@@ -1,6 +1,20 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub enum ContractError {
+    NotInitialized = 1,
+    AlreadyInitialized = 2,
+    Unauthorized = 3,
+    NotOwner = 4,
+    NotContributor = 5,
+    NotArbitrator = 6,
+    InvalidStatus = 7,
+    InvalidWinner = 8,
+    InvalidAmount = 9,
+}
 
 #[contracttype]
 #[derive(Clone, PartialEq, Debug)]
@@ -19,32 +33,38 @@ pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
-    /// Initialize a bounty. Sets owner, amount, token address, arbitrator, and status to Created.
-    pub fn initialize(env: Env, owner: Address, amount: i128, token_address: Address, arbitrator: Address) {
+    /// Initialize a bounty. Sets owner, amount, token, arbitrator, and status to Created.
+    pub fn initialize(env: Env, owner: Address, amount: i128, token: Address, arbitrator: Address) {
         owner.require_auth();
-        assert!(amount > 0, "amount must be positive");
-        assert!(
-            !env.storage().instance().has(&symbol_short!("STATUS")),
-            "contract already initialized"
-        );
+        if amount <= 0 {
+            env.panic_with_error(ContractError::InvalidAmount);
+        }
+        if env.storage().instance().has(&symbol_short!("STATUS")) {
+            env.panic_with_error(ContractError::AlreadyInitialized);
+        }
         env.storage().instance().set(&symbol_short!("OWNER"), &owner);
         env.storage().instance().set(&symbol_short!("AMOUNT"), &amount);
-        env.storage().instance().set(&symbol_short!("TOKEN"), &token_address);
+        env.storage().instance().set(&symbol_short!("TOKEN"), &token);
         env.storage().instance().set(&symbol_short!("ARBITRATR"), &arbitrator);
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
     }
 
-    /// Fund the bounty. Transfers `amount` tokens from owner into the contract.
-    /// Transitions Created → Funded.
+    /// Fund the bounty. Transfers tokens from owner into the contract.
     pub fn fund(env: Env, owner: Address) {
         owner.require_auth();
         Self::assert_owner(&env, &owner);
-        Self::assert_status(&env, BountyStatus::Created, "fund requires Created status");
+        Self::assert_status(&env, BountyStatus::Created);
 
-        let amount: i128 = env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap();
-        let token_address: Address = env.storage().instance().get(&symbol_short!("TOKEN")).unwrap();
+        let amount: i128 = env.storage()
+            .instance()
+            .get(&symbol_short!("AMOUNT"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let token_address: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("TOKEN"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
         let token = token::Client::new(&env, &token_address);
         token.transfer_from(
             &env.current_contract_address(),
@@ -58,35 +78,44 @@ impl EscrowContract {
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
     }
 
-    /// Contributor starts work. Transitions Funded → InProgress.
+    /// Contributor starts work. Transitions Funded to InProgress.
     pub fn start_work(env: Env, contributor: Address) {
         contributor.require_auth();
-        Self::assert_status(&env, BountyStatus::Funded, "start_work requires Funded status");
+        Self::assert_status(&env, BountyStatus::Funded);
         env.storage().instance().set(&symbol_short!("CONTRIB"), &contributor);
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
     }
 
-    /// Contributor submits work. Transitions InProgress → UnderReview.
+    /// Contributor submits work. Transitions InProgress to UnderReview.
     pub fn submit(env: Env, contributor: Address) {
         contributor.require_auth();
         Self::assert_contributor(&env, &contributor);
-        Self::assert_status(&env, BountyStatus::InProgress, "submit requires InProgress status");
+        Self::assert_status(&env, BountyStatus::InProgress);
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
     }
 
-    /// Owner approves and releases funds to contributor. Transitions UnderReview → Completed.
+    /// Owner approves and releases funds to contributor.
     pub fn approve(env: Env, owner: Address) {
         owner.require_auth();
         Self::assert_owner(&env, &owner);
-        Self::assert_status(&env, BountyStatus::UnderReview, "approve requires UnderReview status");
+        Self::assert_status(&env, BountyStatus::UnderReview);
 
-        let amount: i128 = env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap();
-        let token_address: Address = env.storage().instance().get(&symbol_short!("TOKEN")).unwrap();
-        let contributor: Address = env.storage().instance().get(&symbol_short!("CONTRIB")).unwrap();
+        let amount: i128 = env.storage()
+            .instance()
+            .get(&symbol_short!("AMOUNT"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let token_address: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("TOKEN"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let contributor: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("CONTRIB"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
         let token = token::Client::new(&env, &token_address);
         token.transfer(&env.current_contract_address(), &contributor, &amount);
 
@@ -99,15 +128,23 @@ impl EscrowContract {
     pub fn cancel(env: Env, owner: Address) {
         owner.require_auth();
         Self::assert_owner(&env, &owner);
-        let status: BountyStatus = env.storage().instance().get(&symbol_short!("STATUS")).unwrap();
-        assert!(
-            status == BountyStatus::Created || status == BountyStatus::Funded,
-            "cancel only allowed from Created or Funded"
-        );
+        let status: BountyStatus = env.storage()
+            .instance()
+            .get(&symbol_short!("STATUS"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if status != BountyStatus::Created && status != BountyStatus::Funded {
+            env.panic_with_error(ContractError::InvalidStatus);
+        }
 
         if status == BountyStatus::Funded {
-            let amount: i128 = env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap();
-            let token_address: Address = env.storage().instance().get(&symbol_short!("TOKEN")).unwrap();
+            let amount: i128 = env.storage()
+                .instance()
+                .get(&symbol_short!("AMOUNT"))
+                .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+            let token_address: Address = env.storage()
+                .instance()
+                .get(&symbol_short!("TOKEN"))
+                .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
             let token = token::Client::new(&env, &token_address);
             token.transfer(&env.current_contract_address(), &owner, &amount);
         }
@@ -117,18 +154,22 @@ impl EscrowContract {
             .set(&symbol_short!("STATUS"), &BountyStatus::Cancelled);
     }
 
-    /// Raise a dispute. Callable by owner or contributor when status is UnderReview.
-    /// Transitions UnderReview → Disputed.
+    /// Raise a dispute. Callable by owner or contributor when UnderReview.
     pub fn dispute(env: Env, caller: Address) {
         caller.require_auth();
-        Self::assert_status(&env, BountyStatus::UnderReview, "dispute requires UnderReview status");
+        Self::assert_status(&env, BountyStatus::UnderReview);
 
-        let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
-        let contributor: Address = env.storage().instance().get(&symbol_short!("CONTRIB")).unwrap();
-        assert!(
-            caller == owner || caller == contributor,
-            "only owner or contributor can dispute"
-        );
+        let owner: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("OWNER"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let contributor: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("CONTRIB"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if caller != owner && caller != contributor {
+            env.panic_with_error(ContractError::Unauthorized);
+        }
 
         env.storage()
             .instance()
@@ -138,21 +179,31 @@ impl EscrowContract {
     }
 
     /// Arbitrator resolves the dispute by choosing a winner.
-    /// Pays out to `winner` and transitions Disputed → Completed.
     pub fn resolve(env: Env, arbitrator: Address, winner: Address) {
         arbitrator.require_auth();
         Self::assert_arbitrator(&env, &arbitrator);
-        Self::assert_status(&env, BountyStatus::Disputed, "resolve requires Disputed status");
+        Self::assert_status(&env, BountyStatus::Disputed);
 
-        let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
-        let contributor: Address = env.storage().instance().get(&symbol_short!("CONTRIB")).unwrap();
-        assert!(
-            winner == owner || winner == contributor,
-            "winner must be owner or contributor"
-        );
+        let owner: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("OWNER"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let contributor: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("CONTRIB"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if winner != owner && winner != contributor {
+            env.panic_with_error(ContractError::InvalidWinner);
+        }
 
-        let amount: i128 = env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap();
-        let token_address: Address = env.storage().instance().get(&symbol_short!("TOKEN")).unwrap();
+        let amount: i128 = env.storage()
+            .instance()
+            .get(&symbol_short!("AMOUNT"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        let token_address: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("TOKEN"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
         let token = token::Client::new(&env, &token_address);
         token.transfer(&env.current_contract_address(), &winner, &amount);
 
@@ -163,61 +214,99 @@ impl EscrowContract {
         env.events().publish((symbol_short!("resolve"), winner), ());
     }
 
+    // --- getters (with safe error handling) ---
+
     pub fn get_owner(env: Env) -> Address {
-        env.storage().instance().get(&symbol_short!("OWNER")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("OWNER"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
     pub fn get_amount(env: Env) -> i128 {
-        env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("AMOUNT"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
     pub fn get_status(env: Env) -> BountyStatus {
-        env.storage().instance().get(&symbol_short!("STATUS")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("STATUS"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
     pub fn get_contributor(env: Env) -> Address {
-        env.storage().instance().get(&symbol_short!("CONTRIB")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("CONTRIB"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
     pub fn get_token(env: Env) -> Address {
-        env.storage().instance().get(&symbol_short!("TOKEN")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("TOKEN"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
     pub fn get_arbitrator(env: Env) -> Address {
-        env.storage().instance().get(&symbol_short!("ARBITRATR")).unwrap()
+        env.storage()
+            .instance()
+            .get(&symbol_short!("ARBITRATR"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized))
     }
 
-    // --- helpers ---
+    // --- safe internal helpers using panic_with_error ---
 
     fn assert_owner(env: &Env, caller: &Address) {
-        let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
-        assert!(caller == &owner, "only owner can call this");
+        let owner: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("OWNER"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if caller != &owner {
+            env.panic_with_error(ContractError::NotOwner);
+        }
     }
 
     fn assert_contributor(env: &Env, caller: &Address) {
-        let contributor: Address = env.storage().instance().get(&symbol_short!("CONTRIB")).unwrap();
-        assert!(caller == &contributor, "only contributor can call this");
+        let contributor: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("CONTRIB"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if caller != &contributor {
+            env.panic_with_error(ContractError::NotContributor);
+        }
     }
 
     fn assert_arbitrator(env: &Env, caller: &Address) {
-        let arbitrator: Address = env.storage().instance().get(&symbol_short!("ARBITRATR")).unwrap();
-        assert!(caller == &arbitrator, "only arbitrator can call this");
+        let arbitrator: Address = env.storage()
+            .instance()
+            .get(&symbol_short!("ARBITRATR"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if caller != &arbitrator {
+            env.panic_with_error(ContractError::NotArbitrator);
+        }
     }
 
-    fn assert_status(env: &Env, expected: BountyStatus, msg: &'static str) {
-        let status: BountyStatus = env.storage().instance().get(&symbol_short!("STATUS")).unwrap();
-        assert!(status == expected, "{}", msg);
+    fn assert_status(env: &Env, expected: BountyStatus) {
+        let status: BountyStatus = env.storage()
+            .instance()
+            .get(&symbol_short!("STATUS"))
+            .unwrap_or_else(|| env.panic_with_error(ContractError::NotInitialized));
+        if status != expected {
+            env.panic_with_error(ContractError::InvalidStatus);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{
-        testutils::Address as _,
-        token::{Client as TokenClient, StellarAssetClient},
-        Address, Env,
-    };
+    use soroban_sdk::token::{StellarAssetClient, TokenClient};
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{Address, Env};
 
     fn setup() -> (
         Env,
@@ -229,6 +318,7 @@ mod tests {
         i128,
     ) {
         let env = Env::default();
+        env.budget().reset_unlimited();
         env.mock_all_auths();
 
         let token_admin = Address::generate(&env);
@@ -248,7 +338,15 @@ mod tests {
         let token_client = TokenClient::new(&env, &token_address);
         token_client.approve(&owner, &contract_id, &amount, &200);
 
-        (env, client, owner, token_address, contract_id, arbitrator, amount)
+        (
+            env,
+            client,
+            owner,
+            token_address,
+            contract_id,
+            arbitrator,
+            amount,
+        )
     }
 
     fn setup_under_review() -> (
@@ -291,21 +389,21 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "HostError: Error(Contract, #9)")]
     fn test_initialize_rejects_zero_amount() {
         let (_, client, owner, token_address, _, arbitrator, _) = setup();
         client.initialize(&owner, &0, &token_address, &arbitrator);
     }
 
     #[test]
-    #[should_panic(expected = "amount must be positive")]
+    #[should_panic(expected = "HostError: Error(Contract, #9)")]
     fn test_initialize_rejects_negative_amount() {
         let (_, client, owner, token_address, _, arbitrator, _) = setup();
         client.initialize(&owner, &-1, &token_address, &arbitrator);
     }
 
     #[test]
-    #[should_panic(expected = "contract already initialized")]
+    #[should_panic(expected = "HostError: Error(Contract, #2)")]
     fn test_reinitialize_after_deploy_panics_to_protect_upgrade_state() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -331,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "only owner can call this")]
+    #[should_panic(expected = "HostError: Error(Contract, #4)")]
     fn test_fund_by_non_owner_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -353,7 +451,8 @@ mod tests {
 
     #[test]
     fn test_approve_pays_contributor() {
-        let (env, client, owner, token_address, contract_id, _arbitrator, contributor, amount) = setup_under_review();
+        let (env, client, owner, token_address, contract_id, _arbitrator, contributor, amount) =
+            setup_under_review();
 
         let token = TokenClient::new(&env, &token_address);
         assert_eq!(token.balance(&contract_id), amount);
@@ -408,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "start_work requires Funded status")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_start_work_before_funding_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -429,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "only contributor can call this")]
+    #[should_panic(expected = "HostError: Error(Contract, #5)")]
     fn test_submit_by_non_contributor_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -457,7 +556,8 @@ mod tests {
 
     #[test]
     fn test_resolve_pays_contributor_and_completes() {
-        let (env, client, _, token_address, contract_id, arbitrator, contributor, amount) = setup_under_review();
+        let (env, client, _, token_address, contract_id, arbitrator, contributor, amount) =
+            setup_under_review();
         client.dispute(&contributor);
 
         let token = TokenClient::new(&env, &token_address);
@@ -472,7 +572,8 @@ mod tests {
 
     #[test]
     fn test_resolve_pays_owner_and_completes() {
-        let (env, client, owner, token_address, contract_id, arbitrator, contributor, amount) = setup_under_review();
+        let (env, client, owner, token_address, contract_id, arbitrator, contributor, amount) =
+            setup_under_review();
         client.dispute(&contributor);
 
         let token = TokenClient::new(&env, &token_address);
@@ -484,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "only owner or contributor can dispute")]
+    #[should_panic(expected = "HostError: Error(Contract, #3)")]
     fn test_dispute_by_stranger_panics() {
         let (env, client, _, _, _, _, _, _) = setup_under_review();
         let stranger = Address::generate(&env);
@@ -492,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "dispute requires UnderReview status")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_dispute_wrong_status_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -504,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "only arbitrator can call this")]
+    #[should_panic(expected = "HostError: Error(Contract, #6)")]
     fn test_resolve_by_non_arbitrator_panics() {
         let (env, client, _, _, _, _, contributor, _) = setup_under_review();
         client.dispute(&contributor);
@@ -513,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "winner must be owner or contributor")]
+    #[should_panic(expected = "HostError: Error(Contract, #8)")]
     fn test_resolve_with_invalid_winner_panics() {
         let (env, client, _, _, _, arbitrator, contributor, _) = setup_under_review();
         client.dispute(&contributor);
@@ -522,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "only owner can call this")]
+    #[should_panic(expected = "HostError: Error(Contract, #4)")]
     fn test_approve_unauthorized_panics() {
         let (env, client, _, _, _, _, _, _) = setup_under_review();
         let not_owner = Address::generate(&env);
@@ -530,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "approve requires UnderReview status")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_approve_before_submit_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -542,7 +643,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "cancel only allowed from Created or Funded")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_cancel_from_in_progress_panics() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -553,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "fund requires Created status")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_double_fund_panics() {
         let (_, client, owner, token_address, _, arbitrator, amount) = setup();
         client.initialize(&owner, &amount, &token_address, &arbitrator);
@@ -562,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "resolve requires Disputed status")]
+    #[should_panic(expected = "HostError: Error(Contract, #7)")]
     fn test_resolve_before_dispute_panics() {
         let (_, client, _, _, _, arbitrator, contributor, _) = setup_under_review();
         client.resolve(&arbitrator, &contributor);
