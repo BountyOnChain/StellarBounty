@@ -12,4 +12,10 @@ export const AppDataSource = new DataSource({
   entities: [Bounty, Submission, Nonce],
   migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
   synchronize: false,
+  extra: {
+    max: parseInt(process.env.DB_POOL_MAX || '10', 10),
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT_MS || '30000', 10),
+  },
+  retryAttempts: parseInt(process.env.DB_RETRY_ATTEMPTS || '5', 10),
+  retryDelay: parseInt(process.env.DB_RETRY_DELAY_MS || '3000', 10),
 });

@@ -57,6 +57,12 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         logger: new TypeOrmMetricsLogger(metrics),
         maxQueryExecutionTime: 250,
         synchronize: false,
+        retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', 5),
+        retryDelay: config.get<number>('DB_RETRY_DELAY_MS', 3000),
+        extra: {
+          max: config.get<number>('DB_POOL_MAX', 10),
+          connectionTimeoutMillis: config.get<number>('DB_CONNECTION_TIMEOUT_MS', 30000),
+        },
       }),
     }),
   ],
