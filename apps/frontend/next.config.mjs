@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
@@ -30,4 +31,13 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG || "",
+  project: process.env.SENTRY_PROJECT || "",
+  authToken: process.env.SENTRY_AUTH_TOKEN || "",
+  silent: !process.env.SENTRY_DSN,
+  widenClientFileUpload: true,
+  sourcemaps: {
+    disable: process.env.NODE_ENV === "development",
+  },
+});

@@ -39,6 +39,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
         PORT: Joi.number().default(4000),
+        SENTRY_DSN: Joi.string().optional().allow(''),
+        RELEASE: Joi.string().default('0.1.0'),
       }),
     }),
     AuthModule,

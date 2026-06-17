@@ -7,6 +7,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
+import { Scope } from '@sentry/types';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -24,10 +26,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : 'Internal server error';
 
     if (!isHttp) {
+      const errorObj = exception instanceof Error ? exception : new Error(String(exception));
       this.logger.error(
         `Unhandled exception on ${req.method} ${req.url}`,
-        exception instanceof Error ? exception.stack : String(exception),
+        errorObj.stack,
       );
+      // Report to Sentry
+      Sentry.withScope((scope: Scope) => {
+        scope.setTag('url', req.url);
+        scope.setTag('method', req.method);
+        scope.setContext('request', {
+          url: req.url,
+          method: req.method,
+        });
+        Sentry.captureException(errorObj);
+      });
     }
 
     res.status(statusCode).json({
