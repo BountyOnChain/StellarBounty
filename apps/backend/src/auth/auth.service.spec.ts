@@ -6,12 +6,12 @@ import { AuthService } from './auth.service';
 describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
-  let nonceRepository: any;
+  let nonceRepository: unknown;
 
   beforeEach(() => {
-    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as any;
+    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as unknown;
 
-    const mockStore = new Map<string, any>();
+    const mockStore = new Map<string, unknown>();
     nonceRepository = {
       findOne: jest.fn().mockImplementation(({ where }) => {
         return Promise.resolve(mockStore.get(where.address) || null);

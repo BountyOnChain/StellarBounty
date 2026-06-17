@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
 
-type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends object = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
