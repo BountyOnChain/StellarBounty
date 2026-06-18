@@ -86,7 +86,7 @@ describe('SubmissionsService', () => {
     mockServer.getAccount.mockReset().mockResolvedValue({ accountId: 'GOWNER' });
     mockServer.simulateTransaction.mockReset().mockResolvedValue({
       transactionData: { resourceFee: '100' },
-      result: { transactionData: { resourceFee: '100' } },
+      minResourceFee: '100',
     });
     mockServer.prepareTransaction.mockReset().mockResolvedValue(mockPreparedTransaction);
     mockServer.sendTransaction.mockReset().mockResolvedValue({ status: 'PENDING' });
