@@ -20,9 +20,15 @@ import { Nonce } from '../entities/nonce.entity';
       inject: [ConfigService],
       useFactory: createAuthThrottleOptions,
     }),
-    JwtModule.register({
-      secret: getJwtSecret(),
-      signOptions: { expiresIn: '24h' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: getJwtSecret(),
+        signOptions: {
+          expiresIn: config.get<string>('JWT_EXPIRY', '24h'),
+        },
+      }),
     }),
     TypeOrmModule.forFeature([Nonce]),
   ],
