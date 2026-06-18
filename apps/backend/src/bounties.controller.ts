@@ -14,8 +14,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 
-@ApiTags('bounties')
-@Controller('bounties')
+@ApiTags('v1: bounties')
+@Controller('api/v1/bounties')
 export class BountiesController {
   constructor(private readonly bountiesService: BountiesService) {}
 

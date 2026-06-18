@@ -3,8 +3,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { HealthResponseDto } from './dto/health.dto';
 
-@ApiTags('health')
-@Controller('health')
+@ApiTags('v1: health')
+@Controller('api/v1/health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
