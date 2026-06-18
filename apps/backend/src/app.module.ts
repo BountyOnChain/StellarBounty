@@ -63,7 +63,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
           max: config.get<number>('DB_POOL_MAX', 10),
           connectionTimeoutMillis: config.get<number>('DB_CONNECTION_TIMEOUT_MS', 30000),
         },
-      }),
+      } as import('typeorm').DataSourceOptions),
     }),
   ],
   controllers: [AppController, BountiesController],
