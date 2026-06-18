@@ -114,18 +114,19 @@ export class SubmissionsService {
 
       // Simulate transaction before preparing — catches errors without spending gas
       const simResult = await server.simulateTransaction(tx);
-      if (!simResult.successful) {
-        const errorDetails = simResult.error ?? 'unknown simulation error';
+      if ('error' in simResult) {
+        const errorDetails = (simResult as StellarSdk.rpc.Api.SimulateTransactionErrorResponse).error;
         this.logger.warn(
           `Stellar transaction simulation failed: bountyId=${bountyId}, contractId=${contractId}, error=${errorDetails}`,
         );
         throw new BadRequestException(
           `Transaction simulation failed: ${errorDetails}. The contract call would not succeed.`,
         );
-      } else if (simResult.result?.transactionData) {
+      }
+      if ('transactionData' in simResult) {
         // Log estimated resource fee for observability
         this.logger.log(
-          `Stellar tx simulation OK: bountyId=${bountyId}, estimatedFee=${simResult.result.transactionData.resourceFee ?? 'unknown'}`,
+          `Stellar tx simulation OK: bountyId=${bountyId}`,
         );
       }
 
