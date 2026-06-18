@@ -121,10 +121,8 @@ export class SubmissionsService {
         throw new BadRequestException(
           `Transaction simulation failed: ${simResult.error}. The contract call would not succeed.`,
         );
-      }
-
-      // Log estimated resource fee for observability
-      if (simResult.result && simResult.result.transactionData) {
+      } else if (simResult.result?.transactionData) {
+        // Log estimated resource fee for observability
         this.logger.log(
           `Stellar tx simulation OK: bountyId=${bountyId}, estimatedFee=${simResult.result.transactionData.resourceFee ?? 'unknown'}`,
         );
