@@ -37,6 +37,24 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: stellar_bounty
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/stellar_bounty
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -59,6 +77,9 @@ jobs:
 
       - name: Build
         run: npm run build --workspace=apps/backend
+
+      - name: Test migrations (up → down → up)
+        run: npm run migration:test --workspace=apps/backend
 
   contracts:
     name: Contracts

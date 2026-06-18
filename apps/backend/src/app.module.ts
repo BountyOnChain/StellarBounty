@@ -13,6 +13,7 @@ import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
+import { AddTagsColumn1747657400000 } from './migrations/1747657400000-AddTagsColumn';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { MetricsModule } from './metrics/metrics.module';
@@ -53,7 +54,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         entities: [Bounty, Submission, Nonce],
-        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
+        migrations: [
+          InitSchema1747657200000,
+          AddNoncesTable1747657300000,
+          AddTagsColumn1747657400000,
+        ],
         logger: new TypeOrmMetricsLogger(metrics),
         maxQueryExecutionTime: 250,
         synchronize: false,

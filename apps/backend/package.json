@@ -10,7 +10,8 @@
     "lint": "eslint \"src/**/*.ts\"",
     "migration:run": "typeorm migration:run -d dist/data-source.js",
     "migration:revert": "typeorm migration:revert -d dist/data-source.js",
-    "migration:check": "node dist/migrations/check-migration-schema.js"
+    "migration:check": "node dist/migrations/check-migration-schema.js",
+    "migration:test": "node dist/migrations/test-migration-roundtrip.js"
   },
   "jest": {
     "preset": "ts-jest",
