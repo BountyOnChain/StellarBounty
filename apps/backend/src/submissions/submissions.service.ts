@@ -12,6 +12,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { CreateSubmissionDto } from './submissions.dto';
+import { CircuitBreakerService } from '../common/circuit-breaker.service';
 
 @Injectable()
 export class SubmissionsService {
@@ -23,6 +24,7 @@ export class SubmissionsService {
     @InjectRepository(Bounty)
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
+    private readonly circuitBreaker: CircuitBreakerService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -106,7 +108,11 @@ export class SubmissionsService {
     for (const rpcUrl of rpcUrls) {
       try {
         const server = new StellarSdk.rpc.Server(rpcUrl);
-        const account = await server.getAccount(ownerAddress);
+        // Use circuit breaker to prevent cascading failures
+        const account = await this.circuitBreaker.execute(
+          `stellar-rpc:${rpcUrl}`,
+          () => server.getAccount(ownerAddress),
+        );
 
         const contract = new StellarSdk.Contract(contractId);
         const tx = new StellarSdk.TransactionBuilder(account, {
@@ -119,13 +125,19 @@ export class SubmissionsService {
           .setTimeout(30)
           .build();
 
-        const prepared = await server.prepareTransaction(tx);
+        const prepared = await this.circuitBreaker.execute(
+          `stellar-rpc:${rpcUrl}`,
+          () => server.prepareTransaction(tx),
+        );
         // The backend signs only if a server-side signing key is configured.
         const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
         if (signingSecret) {
           const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
           prepared.sign(signingKeypair);
-          await server.sendTransaction(prepared);
+          await this.circuitBreaker.execute(
+            `stellar-rpc:${rpcUrl}`,
+            () => server.sendTransaction(prepared),
+          );
         }
         // Success — log which RPC was used if we fell back from primary
         if (rpcUrl !== rpcUrls[0]) {

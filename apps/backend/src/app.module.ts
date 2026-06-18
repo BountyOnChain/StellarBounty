@@ -44,6 +44,9 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
+        CIRCUIT_BREAKER_FAILURE_THRESHOLD: Joi.number().integer().positive().default(3),
+        CIRCUIT_BREAKER_RESET_TIMEOUT_MS: Joi.number().integer().positive().default(30000),
+        CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS: Joi.number().integer().positive().default(1),
         PORT: Joi.number().default(4000),
         LOG_LEVEL: Joi.string()
           .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
