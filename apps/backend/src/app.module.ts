@@ -44,7 +44,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         CORS_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
         CORS_ORIGINS: Joi.string().optional(),
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
-        AUTH_NONCE_TTL_MS: Joi.number().integer().positive().default(300000),
+        NONCE_TTL_MS: Joi.number().integer().positive().default(300000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
         DB_POOL_MAX: Joi.number().integer().positive().default(DEFAULT_DB_POOL_MAX),

@@ -9,19 +9,22 @@ import { Nonce } from '../entities/nonce.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly nonceTtlMs: number;
 
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(Nonce)
     private readonly nonceRepository: Repository<Nonce>,
-  ) {}
+  ) {
+    this.nonceTtlMs =
+      this.configService.get<number>('NONCE_TTL_MS') ?? 5 * 60 * 1000;
+  }
 
   async getChallenge(address: string): Promise<{ nonce: string }> {
     await this.pruneExpired();
     const nonce = crypto.randomBytes(32).toString('hex');
-    const nonceTtlMs = this.configService.get<number>('AUTH_NONCE_TTL_MS', 300000);
-    const expiresAt = new Date(Date.now() + nonceTtlMs);
+    const expiresAt = new Date(Date.now() + this.nonceTtlMs);
 
     // Upsert nonce
     let nonceEntity = await this.nonceRepository.findOne({ where: { address } });

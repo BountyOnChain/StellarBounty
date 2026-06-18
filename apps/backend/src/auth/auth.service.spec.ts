@@ -42,7 +42,7 @@ describe('AuthService', () => {
       delete: jest.fn().mockReturnValue(nonceRepository.deleteBuilder),
     });
 
-    service = new AuthService(jwtService, configService, nonceRepository);
+service = new AuthService(jwtService, configService, nonceRepository);
   });
 
   describe('getChallenge', () => {
