@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -34,12 +35,22 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
+        RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
+        RATE_LIMIT_MAX: Joi.number().integer().positive().default(30),
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
         PORT: Joi.number().default(4000),
       }),
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ([{
+        ttl: config.get<number>('RATE_LIMIT_TTL_MS', 60000),
+        limit: config.get<number>('RATE_LIMIT_MAX', 30),
+      }]),
     }),
     AuthModule,
     SubmissionsModule,

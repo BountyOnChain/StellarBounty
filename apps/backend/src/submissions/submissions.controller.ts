@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -28,6 +29,7 @@ export class SubmissionsController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
   create(
     @Param('bountyId') bountyId: string,
@@ -63,6 +65,7 @@ export class SubmissionsController {
   @ApiForbiddenResponse({ description: 'Only the bounty owner can approve submissions.' })
   @ApiNotFoundResponse({ description: 'Bounty or submission not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Patch(':subId/approve')
   approve(
     @Param('bountyId') bountyId: string,
@@ -81,6 +84,7 @@ export class SubmissionsController {
   @ApiForbiddenResponse({ description: 'Only the bounty owner can reject submissions.' })
   @ApiNotFoundResponse({ description: 'Bounty or submission not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Patch(':subId/reject')
   reject(
     @Param('bountyId') bountyId: string,
