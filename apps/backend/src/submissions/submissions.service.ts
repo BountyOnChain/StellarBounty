@@ -114,12 +114,13 @@ export class SubmissionsService {
 
       // Simulate transaction before preparing — catches errors without spending gas
       const simResult = await server.simulateTransaction(tx);
-      if (simResult.error) {
+      if (!simResult.successful) {
+        const errorDetails = simResult.error ?? 'unknown simulation error';
         this.logger.warn(
-          `Stellar transaction simulation failed: bountyId=${bountyId}, contractId=${contractId}, error=${simResult.error}`,
+          `Stellar transaction simulation failed: bountyId=${bountyId}, contractId=${contractId}, error=${errorDetails}`,
         );
         throw new BadRequestException(
-          `Transaction simulation failed: ${simResult.error}. The contract call would not succeed.`,
+          `Transaction simulation failed: ${errorDetails}. The contract call would not succeed.`,
         );
       } else if (simResult.result?.transactionData) {
         // Log estimated resource fee for observability
