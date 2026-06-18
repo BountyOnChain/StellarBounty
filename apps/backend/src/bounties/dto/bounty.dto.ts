@@ -10,8 +10,8 @@ import {
   MinLength,
   MaxLength,
   ValidateBy,
-  Transform,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { BountyStatus } from '../../entities/bounty.entity';
 
 export const MAX_REWARD_AMOUNT = 1_000_000_000n;
