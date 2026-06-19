@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse,
   ApiBearerAuth,
@@ -7,12 +7,15 @@ import { ApiBadRequestResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
+import { PaginatedResponseDto } from './bounties/dto/paginated-response.dto';
+import { PaginationQueryDto } from './bounties/dto/pagination-query.dto';
 
 @ApiTags('v1: bounties')
 @Controller('api/v1/bounties')
@@ -31,12 +34,33 @@ export class BountiesController {
     return this.bountiesService.create(dto);
   }
 
-  @ApiOperation({ summary: 'List all bounties' })
-  @ApiOkResponse({ description: 'Bounties ordered newest first.', type: [BountyResponseDto] })
+  @ApiOperation({ summary: 'List all bounties (paginated)' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (1-indexed)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (max 100)', example: 20 })
+  @ApiOkResponse({
+    description: 'Paginated bounties ordered newest first.',
+    type: PaginatedResponseDto,
+  })
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  async findAll(@Query() pagination: PaginationQueryDto) {
+    const { page = 1, limit = 20 } = pagination;
+    const result = await this.bountiesService.findAll(page, limit);
+    return {
+      ...result,
+      data: result.data.map((bounty) => ({
+        id: bounty.id,
+        title: bounty.title,
+        description: bounty.description,
+        rewardAmount: bounty.rewardAmount,
+        deadline: bounty.deadline,
+        status: bounty.status,
+        ownerAddress: bounty.ownerAddress,
+        tags: bounty.tags,
+        createdAt: bounty.createdAt,
+        updatedAt: bounty.updatedAt,
+      })),
+    };
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })
