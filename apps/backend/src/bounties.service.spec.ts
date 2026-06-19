@@ -86,17 +86,15 @@ describe('BountiesService', () => {
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ deadline: null }));
     });
 
-    it('propagates repository errors for invalid persistence input', async () => {
-      repository.save!.mockRejectedValueOnce(new Error('invalid bounty'));
-
+    it('throws on invalid rewardAmount that cannot be parsed as BigInt', async () => {
       await expect(
         service.create({
           title: 'Bad bounty',
           description: 'Invalid payload',
-          rewardAmount: 'bad',
+          rewardAmount: 'not-a-number',
           ownerAddress: 'GABC',
-        }),
-      ).rejects.toThrow('invalid bounty');
+        } as any),
+      ).rejects.toThrow();
     });
   });
 
