@@ -6,17 +6,13 @@
  * existing e2e suite (apps/frontend/tests/e2e/bounty-flows.spec.ts).
  */
 
-import { act, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { useAuth } from "./api";
 
 jest.mock("@stellar/freighter-api", () => ({
   __esModule: true,
   signMessage: jest.fn(),
 }));
-
-import * as freighter from "@stellar/freighter-api";
-
-const mockedFreighter = freighter as jest.Mocked<typeof freighter>;
 
 declare global {
   interface Window {
