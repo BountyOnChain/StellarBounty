@@ -83,7 +83,7 @@ export default function CreateBountyPage() {
 
     try {
       const accessToken = await getToken(publicKey);
-      const response = await fetch(`${apiUrl}/bounties`, {
+      const response = await fetch(`${apiUrl}/api/v1/bounties`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

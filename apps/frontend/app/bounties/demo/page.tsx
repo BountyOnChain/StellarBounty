@@ -43,7 +43,7 @@ Build a real bounty listing page that fetches from the backend.
 
 ## Tech Notes
 
-- Use \`fetch(\`\${process.env.NEXT_PUBLIC_API_URL}/bounties\`)\`
+- Use \`fetch(\`\${process.env.NEXT_PUBLIC_API_URL}/api/v1/bounties\`)\`
 - Tailwind for styling
 - \`@/app/components/BountyCard.tsx\` for individual cards
 
