@@ -250,7 +250,7 @@ impl EscrowContract {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::Address as _,
+        testutils::{Address as _, Events},
         token::{Client as TokenClient, StellarAssetClient},
         Address, Env,
     };
