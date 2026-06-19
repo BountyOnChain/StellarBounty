@@ -37,7 +37,7 @@ impl EscrowContract {
 
         // Emit initialize event: (actor, new_status, amount)
         env.events()
-            .publish((symbol_short!("initialize"), owner), (BountyStatus::Created, amount));
+            .publish((symbol_short!("init_bnty"), owner), (BountyStatus::Created, amount));
     }
 
     /// Fund the bounty. Transfers `amount` tokens from owner into the contract.
@@ -77,7 +77,7 @@ impl EscrowContract {
 
         // Emit work_started event: (actor, new_status, contributor)
         env.events().publish(
-            (symbol_short!("work_started"), contributor),
+            (symbol_short!("wrk_start"), contributor),
             (BountyStatus::InProgress, contributor),
         );
     }
@@ -93,7 +93,7 @@ impl EscrowContract {
 
         // Emit work_submitted event: (actor, new_status, contributor)
         env.events().publish(
-            (symbol_short!("work_submitted"), contributor),
+            (symbol_short!("wrk_submit"), contributor),
             (BountyStatus::UnderReview, contributor),
         );
     }
