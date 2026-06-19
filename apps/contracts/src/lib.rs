@@ -252,7 +252,7 @@ mod tests {
     use soroban_sdk::{
         testutils::{Address as _, Events},
         token::{Client as TokenClient, StellarAssetClient},
-        Address, Env,
+        Address, Env, IntoVal, Val,
     };
 
     fn setup() -> (
@@ -545,8 +545,9 @@ mod tests {
         client.initialize(&owner, &amount, &token_address, &arbitrator);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::Created.into_val(&env), amount.into_val(&env)];
         assert!(
-            events.iter().any(|e| { e.1 == (BountyStatus::Created, amount) }),
+            events.iter().any(|e| { e.1 == expected }),
             "initialize event should emit Created status with amount"
         );
     }
@@ -558,8 +559,9 @@ mod tests {
         client.fund(&owner);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::Funded.into_val(&env), amount.into_val(&env)];
         assert!(
-            events.iter().any(|e| { e.1 == (BountyStatus::Funded, amount) }),
+            events.iter().any(|e| { e.1 == expected }),
             "fund event should emit Funded status with amount"
         );
     }
@@ -573,10 +575,11 @@ mod tests {
         client.start_work(&contributor);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::InProgress.into_val(&env), contributor.into_val(&env)];
         assert!(
             events
                 .iter()
-                .any(|e| { e.1 == (BountyStatus::InProgress, contributor) }),
+                .any(|e| { e.1 == expected }),
             "start_work event should emit InProgress status with contributor"
         );
     }
@@ -591,10 +594,11 @@ mod tests {
         client.submit(&contributor);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::UnderReview.into_val(&env), contributor.into_val(&env)];
         assert!(
             events
                 .iter()
-                .any(|e| { e.1 == (BountyStatus::UnderReview, contributor) }),
+                .any(|e| { e.1 == expected }),
             "submit event should emit UnderReview status with contributor"
         );
     }
@@ -605,10 +609,15 @@ mod tests {
         client.approve(&owner);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![
+            BountyStatus::Completed.into_val(&env),
+            contributor.into_val(&env),
+            amount.into_val(&env),
+        ];
         assert!(
             events
                 .iter()
-                .any(|e| { e.1 == (BountyStatus::Completed, contributor, amount) }),
+                .any(|e| { e.1 == expected }),
             "approve event should emit Completed status with contributor and amount"
         );
     }
@@ -621,8 +630,9 @@ mod tests {
         client.cancel(&owner);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::Cancelled.into_val(&env), amount.into_val(&env)];
         assert!(
-            events.iter().any(|e| { e.1 == (BountyStatus::Cancelled, amount) }),
+            events.iter().any(|e| { e.1 == expected }),
             "cancel event should emit Cancelled status with refund amount"
         );
     }
@@ -634,8 +644,9 @@ mod tests {
         client.cancel(&owner);
 
         let events = env.events().all();
+        let expected: Vec<Val> = vec![BountyStatus::Cancelled.into_val(&env), 0i128.into_val(&env)];
         assert!(
-            events.iter().any(|e| { e.1 == (BountyStatus::Cancelled, 0) }),
+            events.iter().any(|e| { e.1 == expected }),
             "cancel from Created should emit Cancelled with 0 refund"
         );
     }
