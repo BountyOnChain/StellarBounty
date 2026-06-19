@@ -36,10 +36,8 @@ impl EscrowContract {
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
 
         // Emit initialize event: (actor, new_status, amount)
-        env.events().publish(
-            (symbol_short!("initialize"), owner),
-            (BountyStatus::Created, amount),
-        );
+        env.events()
+            .publish((symbol_short!("initialize"), owner), (BountyStatus::Created, amount));
     }
 
     /// Fund the bounty. Transfers `amount` tokens from owner into the contract.
@@ -64,10 +62,8 @@ impl EscrowContract {
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
 
         // Emit funded event: (actor, new_status, amount)
-        env.events().publish(
-            (symbol_short!("funded"), owner),
-            (BountyStatus::Funded, amount),
-        );
+        env.events()
+            .publish((symbol_short!("funded"), owner), (BountyStatus::Funded, amount));
     }
 
     /// Contributor starts work. Transitions Funded → InProgress.
@@ -172,7 +168,8 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Disputed);
 
-        env.events().publish((symbol_short!("dispute"), caller), (BountyStatus::Disputed,));
+        env.events()
+            .publish((symbol_short!("dispute"), caller), (BountyStatus::Disputed,));
     }
 
     /// Arbitrator resolves the dispute by choosing a winner.
@@ -198,7 +195,8 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Completed);
 
-        env.events().publish((symbol_short!("resolve"), winner), (BountyStatus::Completed,));
+        env.events()
+            .publish((symbol_short!("resolve"), winner), (BountyStatus::Completed,));
     }
 
     pub fn get_owner(env: Env) -> Address {
@@ -547,9 +545,10 @@ mod tests {
         client.initialize(&owner, &amount, &token_address, &arbitrator);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::Created, amount)
-        }), "initialize event should emit Created status with amount");
+        assert!(
+            events.iter().any(|e| { e.1 == (BountyStatus::Created, amount) }),
+            "initialize event should emit Created status with amount"
+        );
     }
 
     #[test]
@@ -559,9 +558,10 @@ mod tests {
         client.fund(&owner);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::Funded, amount)
-        }), "fund event should emit Funded status with amount");
+        assert!(
+            events.iter().any(|e| { e.1 == (BountyStatus::Funded, amount) }),
+            "fund event should emit Funded status with amount"
+        );
     }
 
     #[test]
@@ -573,9 +573,12 @@ mod tests {
         client.start_work(&contributor);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::InProgress, contributor)
-        }), "start_work event should emit InProgress status with contributor");
+        assert!(
+            events
+                .iter()
+                .any(|e| { e.1 == (BountyStatus::InProgress, contributor) }),
+            "start_work event should emit InProgress status with contributor"
+        );
     }
 
     #[test]
@@ -588,9 +591,12 @@ mod tests {
         client.submit(&contributor);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::UnderReview, contributor)
-        }), "submit event should emit UnderReview status with contributor");
+        assert!(
+            events
+                .iter()
+                .any(|e| { e.1 == (BountyStatus::UnderReview, contributor) }),
+            "submit event should emit UnderReview status with contributor"
+        );
     }
 
     #[test]
@@ -599,9 +605,12 @@ mod tests {
         client.approve(&owner);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::Completed, contributor, amount)
-        }), "approve event should emit Completed status with contributor and amount");
+        assert!(
+            events
+                .iter()
+                .any(|e| { e.1 == (BountyStatus::Completed, contributor, amount) }),
+            "approve event should emit Completed status with contributor and amount"
+        );
     }
 
     #[test]
@@ -612,9 +621,10 @@ mod tests {
         client.cancel(&owner);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::Cancelled, amount)
-        }), "cancel event should emit Cancelled status with refund amount");
+        assert!(
+            events.iter().any(|e| { e.1 == (BountyStatus::Cancelled, amount) }),
+            "cancel event should emit Cancelled status with refund amount"
+        );
     }
 
     #[test]
@@ -624,8 +634,9 @@ mod tests {
         client.cancel(&owner);
 
         let events = env.events().all();
-        assert!(events.iter().any(|e| {
-            e.1 == (BountyStatus::Cancelled, 0)
-        }), "cancel from Created should emit Cancelled with 0 refund");
+        assert!(
+            events.iter().any(|e| { e.1 == (BountyStatus::Cancelled, 0) }),
+            "cancel from Created should emit Cancelled with 0 refund"
+        );
     }
 }
