@@ -3,6 +3,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
 
 const mockServer = {
@@ -59,7 +60,7 @@ describe('SubmissionsService contract error handling', () => {
     };
   }
 
-  it('approves the submission even when Stellar RPC account lookup fails', async () => {
+  it('does not approve the submission when Stellar RPC account lookup fails after retries', async () => {
     const bounty = createBounty();
     const submission = createSubmission();
     const submissionRepo = {
@@ -76,24 +77,31 @@ describe('SubmissionsService contract error handling', () => {
           SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_NETWORK: 'testnet',
           STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_RPC_RETRY_BASE_DELAY_MS: '0',
         };
         return values[key] ?? defaultValue;
       }),
     };
-    mockServer.getAccount.mockRejectedValueOnce(new Error('rpc unavailable'));
+    const metrics = {
+      recordStellarRpcFailure: jest.fn(),
+      recordStellarRpcRetry: jest.fn(),
+    };
+    mockServer.getAccount.mockRejectedValue(Object.assign(new Error('rpc unavailable'), { code: 'ECONNRESET' }));
 
     const service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      metrics as unknown as MetricsService,
     );
 
-    await expect(service.approve('bounty1', 'submission1', 'GOWNER')).resolves.toMatchObject({
-      status: SubmissionStatus.APPROVED,
-    });
+    await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow('rpc unavailable');
     expect(StellarSdk.rpc.Server).toHaveBeenCalledWith('https://rpc.example.com');
-    expect(bounty.status).toBe(BountyStatus.COMPLETED);
-    expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
-    expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+    expect(mockServer.getAccount).toHaveBeenCalledTimes(4);
+    expect(metrics.recordStellarRpcFailure).toHaveBeenCalledTimes(4);
+    expect(metrics.recordStellarRpcRetry).toHaveBeenCalledTimes(3);
+    expect(bounty.status).toBe(BountyStatus.OPEN);
+    expect(bountyRepo.save).not.toHaveBeenCalled();
+    expect(submissionRepo.save).not.toHaveBeenCalled();
   });
 });

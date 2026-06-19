@@ -8,6 +8,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
 
 const mockPreparedTransaction = { sign: jest.fn() };
@@ -49,6 +50,7 @@ describe('SubmissionsService', () => {
   let submissionRepo: MockRepository<Submission>;
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
+  let metrics: Pick<MetricsService, 'recordStellarRpcFailure' | 'recordStellarRpcRetry'>;
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
@@ -109,11 +111,16 @@ describe('SubmissionsService', () => {
     config = {
       get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     };
+    metrics = {
+      recordStellarRpcFailure: jest.fn(),
+      recordStellarRpcRetry: jest.fn(),
+    };
 
     service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      metrics as MetricsService,
     );
   });
 
@@ -284,6 +291,69 @@ describe('SubmissionsService', () => {
       expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
       expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
       expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it('retries retryable Stellar RPC failures before approving', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string | number> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_RPC_RETRY_BASE_DELAY_MS: 0,
+        };
+        return values[key] ?? defaultValue;
+      });
+      mockServer.getAccount
+        .mockRejectedValueOnce(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }))
+        .mockRejectedValueOnce({ status: 503 })
+        .mockResolvedValueOnce({ accountId: 'GOWNER' });
+
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(mockServer.getAccount).toHaveBeenCalledTimes(3);
+      expect(metrics.recordStellarRpcFailure).toHaveBeenCalledWith({
+        operation: 'getAccount',
+        retryable: true,
+      });
+      expect(metrics.recordStellarRpcRetry).toHaveBeenCalledTimes(2);
+      expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
+      expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+    });
+
+    it('does not retry non-retryable Stellar RPC errors', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string | number> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_RPC_RETRY_BASE_DELAY_MS: 0,
+        };
+        return values[key] ?? defaultValue;
+      });
+      mockServer.prepareTransaction.mockRejectedValueOnce({ status: 400 });
+
+      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toEqual({
+        status: 400,
+      });
+
+      expect(mockServer.prepareTransaction).toHaveBeenCalledTimes(1);
+      expect(metrics.recordStellarRpcFailure).toHaveBeenCalledWith({
+        operation: 'prepareTransaction',
+        retryable: false,
+      });
+      expect(metrics.recordStellarRpcRetry).not.toHaveBeenCalled();
+      expect(bountyRepo.save).not.toHaveBeenCalled();
+      expect(submissionRepo.save).not.toHaveBeenCalled();
     });
   });
 

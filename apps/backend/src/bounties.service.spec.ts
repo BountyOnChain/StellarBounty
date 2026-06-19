@@ -86,6 +86,21 @@ describe('BountiesService', () => {
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ deadline: null }));
     });
 
+    it('sanitizes descriptions before creating a bounty', async () => {
+      await service.create({
+        title: 'Build a Stellar integration',
+        description: 'Safe text <script>alert("xss")</script> [bad](javascript:alert(1))',
+        rewardAmount: '10000000',
+        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+      });
+
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Safe text  bad',
+        }),
+      );
+    });
+
     it('throws on invalid rewardAmount that cannot be parsed as BigInt', async () => {
       await expect(
         service.create({
@@ -151,6 +166,18 @@ describe('BountiesService', () => {
       const result = await service.update('bounty-1', { title: 'Updated title' });
 
       expect(result.deadline).toBe(existingDeadline);
+    });
+
+    it('sanitizes descriptions when updating a bounty', async () => {
+      const existing = createBounty();
+      repository.findOne!.mockResolvedValueOnce(existing);
+      repository.save!.mockImplementationOnce(async (input) => input);
+
+      const result = await service.update('bounty-1', {
+        description: '![x](data:image/svg+xml,<svg></svg>) Keep **markdown**',
+      });
+
+      expect(result.description).toBe('x Keep **markdown**');
     });
   });
 

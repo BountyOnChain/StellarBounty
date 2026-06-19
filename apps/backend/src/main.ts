@@ -11,6 +11,7 @@ import { getMaxBodySize } from './body-size.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JsonLoggerService, jsonLogger } from './common/json-logger.service';
 import { createCorsOptions } from './cors.config';
+import { createContentSecurityPolicy } from './csp.config';
 import { createGracefulShutdownHandler } from './graceful-shutdown';
 import { setupSwagger } from './swagger.setup';
 import { createValidationPipeOptions } from './validation-pipe.config';
@@ -29,7 +30,8 @@ async function bootstrap() {
   // Request body size limits — DoS protection (#158)
   app.use(json({ limit: maxBodySize }));
   app.use(urlencoded({ extended: true, limit: maxBodySize }));
-  app.use(helmet());
+
+  app.use(helmet({ contentSecurityPolicy: createContentSecurityPolicy(config) }));
   // HSTS: force HTTPS in production (1 year, includeSubDomains, preload)
   if (config.get<string>('NODE_ENV') === 'production') {
     app.use(

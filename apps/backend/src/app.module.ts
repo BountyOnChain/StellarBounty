@@ -23,6 +23,7 @@ import { Nonce } from './entities/nonce.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { CspReportController } from './csp-report.controller';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsService } from './metrics/metrics.service';
@@ -37,6 +38,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
+        JWT_ACCESS_EXPIRES_IN: Joi.string().pattern(/^\d+(\.\d+)?(ms|s|m|h|d|w|y)$|^\d+$/).default('24h'),
+        JWT_REFRESH_EXPIRES_IN: Joi.string().pattern(/^\d+(\.\d+)?(ms|s|m|h|d|w|y)$|^\d+$/).default('7d'),
         STELLAR_NETWORK: Joi.string().valid('testnet', 'mainnet').required(),
         STELLAR_RPC_URL: Joi.string().uri().optional(),
         STELLAR_RPC_URL_BACKUP: Joi.string().uri().optional(),
@@ -59,6 +62,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
+        STELLAR_RPC_RETRY_MAX_RETRIES: Joi.number().integer().min(0).default(3),
+        STELLAR_RPC_RETRY_BASE_DELAY_MS: Joi.number().integer().min(0).default(1000),
         PORT: Joi.number().default(4000),
         LOG_LEVEL: Joi.string()
           .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
@@ -96,7 +101,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       } as import('typeorm').DataSourceOptions),
     }),
   ],
-  controllers: [AppController, BountiesController],
+  controllers: [AppController, BountiesController, CspReportController],
   providers: [AppService, BountiesService, DeadlineAutomationService],
 })
 export class AppModule implements NestModule {
