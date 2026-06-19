@@ -70,9 +70,25 @@ cargo test
 
 ## Contributing
 
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) for development checks, changelog rules, and the release process.
+
 1. Browse [open issues](https://github.com/BountyOnChain/StellarBounty/issues) — issues tagged [`good first issue`](https://github.com/BountyOnChain/StellarBounty/issues?q=is%3Aopen+label%3A%22good+first+issue%22) are a great starting point.
 2. Fork the repo and create a branch: `git checkout -b feat/your-feature`
 3. Make your changes and open a pull request referencing the issue.
+
+## Database Backup & Restore
+
+Automated database backups run daily via GitHub Actions. See the [Operations Runbook](docs/operations.md) for detailed procedures.
+
+Quick reference:
+
+```bash
+# Create a backup
+DATABASE_URL="postgresql://user:pass@host:5432/stellar_bounty" ./scripts/backup-db.sh
+
+# Restore from latest backup
+DATABASE_URL="postgresql://user:pass@host:5432/stellar_bounty" ./scripts/restore-db.sh backups/latest.dump
+```
 
 ## License
 

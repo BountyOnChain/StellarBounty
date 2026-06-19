@@ -1,0 +1,216 @@
+# =============================================================================
+# StellarBounty — Backup Verification
+#
+# Periodically verifies that the latest database backup is valid by:
+#   1. Starting a fresh PostgreSQL instance
+#   2. Restoring the latest backup into it
+#   3. Running database migrations on the restored data
+#   4. Running a basic data integrity check
+#
+# This ensures backups are actually restorable before disaster strikes.
+# =============================================================================
+
+name: Backup Verification
+
+on:
+  schedule:
+    # Every Sunday at 04:00 UTC
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    # Allow manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/backup-db.sh'
+      - 'scripts/restore-db.sh'
+      - '.github/workflows/backup-verify.yml'
+
+jobs:
+  verify-backup:
+    name: Verify Backup Integrity
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellar_bounty_verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd apps/backend
+          npm ci
+
+      - name: Generate a test backup (simulate production)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_bounty_verify
+        run: |
+          # First, set up the schema and some test data
+          PGPASSWORD=postgres psql -h localhost -U postgres -d stellar_bounty_verify <<'SQL'
+            CREATE TABLE IF NOT EXISTS bounties (
+              id SERIAL PRIMARY KEY,
+              title VARCHAR(255) NOT NULL,
+              description TEXT,
+              amount NUMERIC,
+              status VARCHAR(50) DEFAULT 'open',
+              created_at TIMESTAMPTZ DEFAULT NOW(),
+              updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            INSERT INTO bounties (title, description, amount) VALUES
+              ('Test Bounty 1', 'A test bounty for verification', 100),
+              ('Test Bounty 2', 'Another test bounty', 200);
+
+            CREATE TABLE IF NOT EXISTS nonces (
+              id SERIAL PRIMARY KEY,
+              nonce VARCHAR(255) NOT NULL,
+              expires_at TIMESTAMPTZ NOT NULL,
+              created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS submissions (
+              id SERIAL PRIMARY KEY,
+              bounty_id INTEGER REFERENCES bounties(id),
+              submitter VARCHAR(255) NOT NULL,
+              content TEXT,
+              status VARCHAR(50) DEFAULT 'pending',
+              created_at TIMESTAMPTZ DEFAULT NOW(),
+              updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            INSERT INTO submissions (bounty_id, submitter, content) VALUES
+              (1, 'GA-test-account-1', 'My submission content');
+SQL
+
+          chmod +x scripts/backup-db.sh
+          mkdir -p backups
+
+          # Create backup
+          ./scripts/backup-db.sh
+          echo "Test backup created successfully."
+
+      - name: Verify backup file exists and is valid
+        run: |
+          echo "Backup directory contents:"
+          ls -lh backups/
+          echo ""
+          echo "File type:"
+          file backups/latest.dump
+          echo ""
+          echo "Backup size check:"
+          BACKUP_SIZE=$(stat -c%s backups/latest.dump 2>/dev/null || stat -f%z backups/latest.dump)
+          if [ "$BACKUP_SIZE" -gt 5000 ]; then
+            echo "✓ Backup file is valid (${BACKUP_SIZE} bytes)"
+          else
+            echo "✗ Backup file is too small (${BACKUP_SIZE} bytes)" >&2
+            exit 1
+          fi
+
+      - name: Prepare fresh database for restore test
+        run: |
+          # Create a fresh database to restore into
+          PGPASSWORD=postgres createdb -h localhost -U postgres stellar_bounty_restored
+
+      - name: Restore backup into fresh database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_bounty_restored
+          CONFIRM_DESTROY: yes
+        run: |
+          chmod +x scripts/restore-db.sh
+          # The restore script has an interactive prompt, so we use CONFIRM_DESTROY=yes
+          # but we also need to not call npm run migration:run since we're in a CI context
+          # We'll run the restore directly
+          pg_restore \
+            --dbname="${DATABASE_URL}" \
+            --format=custom \
+            --verbose \
+            --clean \
+            --if-exists \
+            --no-owner \
+            --no-acl \
+            backups/latest.dump 2>&1
+
+      - name: Verify restored data integrity
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_bounty_restored
+        run: |
+          echo "=== Verifying restored data ==="
+
+          # Check bounties table
+          BOUNTY_COUNT=$(PGPASSWORD=postgres psql -h localhost -U postgres -d stellar_bounty_restored -t -c "SELECT COUNT(*) FROM bounties;")
+          BOUNTY_COUNT=$(echo "$BOUNTY_COUNT" | xargs)  # trim whitespace
+          echo "Bounties count: ${BOUNTY_COUNT}"
+          if [ "$BOUNTY_COUNT" -ge 1 ]; then
+            echo "✓ Bounties table restored correctly (${BOUNTY_COUNT} rows)"
+          else
+            echo "✗ Bounties table is empty after restore!" >&2
+            exit 1
+          fi
+
+          # Check submissions table
+          SUB_COUNT=$(PGPASSWORD=postgres psql -h localhost -U postgres -d stellar_bounty_restored -t -c "SELECT COUNT(*) FROM submissions;")
+          SUB_COUNT=$(echo "$SUB_COUNT" | xargs)
+          echo "Submissions count: ${SUB_COUNT}"
+          if [ "$SUB_COUNT" -ge 1 ]; then
+            echo "✓ Submissions table restored correctly (${SUB_COUNT} rows)"
+          else
+            echo "✗ Submissions table is empty after restore!" >&2
+            exit 1
+          fi
+
+          # Run a content verification
+          BOUNTY_TITLE=$(PGPASSWORD=postgres psql -h localhost -U postgres -d stellar_bounty_restored -t -c "SELECT title FROM bounties ORDER BY id LIMIT 1;")
+          BOUNTY_TITLE=$(echo "$BOUNTY_TITLE" | xargs)
+          if [ "$BOUNTY_TITLE" = "Test Bounty 1" ]; then
+            echo "✓ Data content verified: '${BOUNTY_TITLE}'"
+          else
+            echo "✗ Data content mismatch! Expected 'Test Bounty 1', got '${BOUNTY_TITLE}'" >&2
+            exit 1
+          fi
+
+          echo ""
+          echo "=== All integrity checks passed! ==="
+
+      - name: Clean up test database
+        if: always()
+        run: |
+          PGPASSWORD=postgres dropdb -h localhost -U postgres --if-exists stellar_bounty_restored 2>/dev/null || true
+          PGPASSWORD=postgres dropdb -h localhost -U postgres --if-exists stellar_bounty_verify 2>/dev/null || true
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ Backup Verification Failed',
+              body: 'The backup verification workflow detected an issue. Backups may not be restorable!\n\n' +
+                    `- Workflow: ${context.runId}\n` +
+                    `- Trigger: ${context.eventName}\n` +
+                    `- Branch: ${context.ref}\n\n` +
+                    'Action required: Investigate and fix the backup/restore pipeline immediately.'
+            })

@@ -16,6 +16,11 @@ type DatabaseQueryMetric = {
   failed?: boolean;
 };
 
+type StellarRpcMetric = {
+  operation: string;
+  retryable?: boolean;
+};
+
 const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 
 @Injectable()
@@ -27,6 +32,8 @@ export class MetricsService {
   private readonly databaseQueryCounts = new Map<string, number>();
   private readonly databaseQueryErrors = new Map<string, number>();
   private readonly databaseQueryDurations: number[] = [];
+  private readonly stellarRpcFailures = new Map<string, number>();
+  private readonly stellarRpcRetries = new Map<string, number>();
   private activeWebSocketConnections = 0;
 
   recordHttpRequest(metric: RequestMetric): void {
@@ -59,6 +66,16 @@ export class MetricsService {
     this.activeWebSocketConnections = Math.max(0, Math.trunc(count));
   }
 
+  recordStellarRpcFailure(metric: StellarRpcMetric): void {
+    const key = this.stellarRpcKey(metric);
+    this.stellarRpcFailures.set(key, (this.stellarRpcFailures.get(key) ?? 0) + 1);
+  }
+
+  recordStellarRpcRetry(metric: StellarRpcMetric): void {
+    const key = this.stellarRpcKey(metric);
+    this.stellarRpcRetries.set(key, (this.stellarRpcRetries.get(key) ?? 0) + 1);
+  }
+
   incrementActiveWebSocketConnections(): void {
     this.activeWebSocketConnections += 1;
   }
@@ -81,6 +98,7 @@ export class MetricsService {
     this.appendCpuMetrics(lines);
     this.appendHttpMetrics(lines);
     this.appendDatabaseMetrics(lines);
+    this.appendStellarRpcMetrics(lines);
     this.appendWebSocketMetrics(lines);
 
     return `${lines.join('\n')}\n`;
@@ -182,11 +200,42 @@ export class MetricsService {
     );
   }
 
+  private appendStellarRpcMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_stellar_rpc_failures_total Stellar RPC call failures by operation and retryability.',
+      '# TYPE stellar_bounty_stellar_rpc_failures_total counter',
+    );
+
+    [...this.stellarRpcFailures.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, count]) => {
+        lines.push(`stellar_bounty_stellar_rpc_failures_total{${key}} ${count}`);
+      });
+
+    lines.push(
+      '# HELP stellar_bounty_stellar_rpc_retries_total Stellar RPC retries by operation and retryability.',
+      '# TYPE stellar_bounty_stellar_rpc_retries_total counter',
+    );
+
+    [...this.stellarRpcRetries.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, count]) => {
+        lines.push(`stellar_bounty_stellar_rpc_retries_total{${key}} ${count}`);
+      });
+  }
+
   private httpKey(metric: RequestMetricLabels): string {
     return [
       `method="${this.escapeLabel(metric.method)}"`,
       `route="${this.escapeLabel(metric.route)}"`,
       `status_code="${metric.statusCode}"`,
+    ].join(',');
+  }
+
+  private stellarRpcKey(metric: StellarRpcMetric): string {
+    return [
+      `operation="${this.escapeLabel(metric.operation)}"`,
+      `retryable="${metric.retryable === true ? 'true' : 'false'}"`,
     ].join(',');
   }
 

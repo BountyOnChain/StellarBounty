@@ -26,10 +26,10 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
 function getToastClasses(type: ToastType) {
   if (type === "success") {
-    return "border-emerald-400/40 bg-emerald-500/15 text-emerald-100";
+    return "border-emerald-500/40 bg-emerald-50 text-emerald-900 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-100";
   }
 
-  return "border-red-400/40 bg-red-500/15 text-red-100";
+  return "border-red-500/40 bg-red-50 text-red-900 dark:border-red-400/40 dark:bg-red-500/15 dark:text-red-100";
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -73,7 +73,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {messages.map((toast) => (
           <div
             key={toast.id}
-            className={`rounded-lg border px-4 py-3 text-sm shadow-xl shadow-slate-950/30 ${getToastClasses(
+            className={`rounded-lg border px-4 py-3 text-sm shadow-xl shadow-slate-300/50 dark:shadow-slate-950/30 ${getToastClasses(
               toast.type,
             )}`}
             role="status"

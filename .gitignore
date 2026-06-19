@@ -17,6 +17,9 @@ target/
 .env.local
 .env.*.local
 
+# Backups
+backups/
+
 # Misc
 .DS_Store
 *.log

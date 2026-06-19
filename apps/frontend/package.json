@@ -25,6 +25,9 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.15",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^15.0.7",
+    "@testing-library/user-event": "^14.5.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.14.2",
     "@types/react": "^18.3.3",
@@ -35,6 +38,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.35",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.38",
     "prettier": "^3.3.2",
     "tailwindcss": "^3.4.4",
@@ -43,13 +47,41 @@
   },
   "jest": {
     "preset": "ts-jest",
-    "testEnvironment": "node",
-    "testRegex": ".*\\.spec\\.ts$",
+    "testEnvironment": "jsdom",
+    "testRegex": ".*\\.spec\\.(ts|tsx)$",
     "testPathIgnorePatterns": [
-      "<rootDir>/tests/e2e/"
+      "<rootDir>/tests/e2e/",
+      "<rootDir>/.next/"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
-    }
+    },
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "jsx": "react-jsx",
+            "esModuleInterop": true,
+            "allowSyntheticDefaultImports": true,
+            "module": "commonjs",
+            "target": "ES2020",
+            "lib": [
+              "ES2020",
+              "DOM",
+              "DOM.Iterable"
+            ],
+            "strict": true,
+            "skipLibCheck": true
+          }
+        }
+      ]
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.ts"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-markdown|remark-gfm|mdast-util-.*|micromark.*|unified|bail|trough|remark-.*|rehype-.*|vfile.*|hast-.*|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities|character-reference-invalid|is-decimal|is-hexadecimal|is-alphanumerical|is-alphabetical|trim-lines|devlop|estree-util-is-identifier-name|@types/.*|unist-.*|@ungap/.*|html-void-elements|web-namespaces|zwitch|longest-streak|ccount)/)"
+    ]
   }
 }

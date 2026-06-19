@@ -19,15 +19,16 @@ describe('BountiesService', () => {
       id: 'bounty-1',
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration with tests.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: new Date('2026-12-31T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
       submissions: [],
       createdAt,
       updatedAt,
+      deletedAt: null,
       ...overrides,
-    };
+    } as Bounty;
   }
 
   beforeEach(async () => {
@@ -36,6 +37,8 @@ describe('BountiesService', () => {
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
       findOne: jest.fn(),
+      softRemove: jest.fn(async (input) => input),
+      restore: jest.fn(async (id) => id),
       remove: jest.fn(),
     };
 
@@ -57,43 +60,56 @@ describe('BountiesService', () => {
       const result = await service.create({
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
-        rewardAmount: '10000000',
+        rewardAmount: 10000000n,
         ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
         deadline: '2026-12-31T00:00:00.000Z',
       });
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          rewardAmount: '10000000',
+          rewardAmount: 10000000n,
           deadline: new Date('2026-12-31T00:00:00.000Z'),
         }),
       );
       expect(repository.save).toHaveBeenCalled();
-      expect(result.rewardAmount).toBe('10000000');
+      expect(result.rewardAmount).toBe(10000000n);
     });
 
     it('stores a null deadline when the DTO omits one', async () => {
       await service.create({
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
-        rewardAmount: '10000000',
+        rewardAmount: 10000000n,
         ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
       });
 
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ deadline: null }));
     });
 
-    it('propagates repository errors for invalid persistence input', async () => {
-      repository.save!.mockRejectedValueOnce(new Error('invalid bounty'));
+    it('sanitizes descriptions before creating a bounty', async () => {
+      await service.create({
+        title: 'Build a Stellar integration',
+        description: 'Safe text <script>alert("xss")</script> [bad](javascript:alert(1))',
+        rewardAmount: '10000000',
+        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+      });
 
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Safe text  bad',
+        }),
+      );
+    });
+
+    it('throws on invalid rewardAmount that cannot be parsed as BigInt', async () => {
       await expect(
         service.create({
           title: 'Bad bounty',
           description: 'Invalid payload',
-          rewardAmount: 'bad',
+          rewardAmount: 'not-a-number',
           ownerAddress: 'GABC',
-        }),
-      ).rejects.toThrow('invalid bounty');
+        } as any),
+      ).rejects.toThrow();
     });
   });
 
@@ -129,13 +145,13 @@ describe('BountiesService', () => {
 
       const result = await service.update('bounty-1', {
         title: 'Updated title',
-        rewardAmount: '25000000',
+        rewardAmount: 25000000n,
         deadline: '2027-01-15T00:00:00.000Z',
       });
 
       expect(result).toMatchObject({
         title: 'Updated title',
-        rewardAmount: '25000000',
+        rewardAmount: 25000000n,
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);
@@ -151,23 +167,65 @@ describe('BountiesService', () => {
 
       expect(result.deadline).toBe(existingDeadline);
     });
+
+    it('sanitizes descriptions when updating a bounty', async () => {
+      const existing = createBounty();
+      repository.findOne!.mockResolvedValueOnce(existing);
+      repository.save!.mockImplementationOnce(async (input) => input);
+
+      const result = await service.update('bounty-1', {
+        description: '![x](data:image/svg+xml,<svg></svg>) Keep **markdown**',
+      });
+
+      expect(result.description).toBe('x Keep **markdown**');
+    });
   });
 
   describe('remove', () => {
-    it('removes an existing bounty', async () => {
+    it('soft-deletes an existing bounty', async () => {
       const bounty = createBounty();
       repository.findOne!.mockResolvedValueOnce(bounty);
-      repository.remove!.mockResolvedValueOnce(bounty);
+      repository.softRemove!.mockResolvedValueOnce(bounty);
 
       await expect(service.remove('bounty-1')).resolves.toEqual({ deleted: true });
-      expect(repository.remove).toHaveBeenCalledWith(bounty);
+      expect(repository.softRemove).toHaveBeenCalledWith(bounty);
+      expect(repository.remove).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when removing a missing bounty', async () => {
       repository.findOne!.mockResolvedValueOnce(null);
 
       await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
-      expect(repository.remove).not.toHaveBeenCalled();
+      expect(repository.softRemove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restore', () => {
+    it('restores a soft-deleted bounty', async () => {
+      const deleted = createBounty({ deletedAt: new Date() });
+      const restored = createBounty({ deletedAt: null });
+      repository.findOne!
+        .mockResolvedValueOnce(deleted)
+        .mockResolvedValueOnce(restored);
+      repository.restore!.mockResolvedValueOnce({ affected: 1 } as any);
+
+      await expect(service.restore('bounty-1')).resolves.toBe(restored);
+      expect(repository.restore).toHaveBeenCalledWith('bounty-1');
+    });
+
+    it('returns the bounty unchanged when it is not soft-deleted', async () => {
+      const existing = createBounty({ deletedAt: null });
+      repository.findOne!.mockResolvedValueOnce(existing);
+
+      await expect(service.restore('bounty-1')).resolves.toBe(existing);
+      expect(repository.restore).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when restoring a missing bounty', async () => {
+      repository.findOne!.mockResolvedValueOnce(null);
+
+      await expect(service.restore('missing')).rejects.toThrow(NotFoundException);
+      expect(repository.restore).not.toHaveBeenCalled();
     });
   });
 });
