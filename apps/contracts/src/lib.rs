@@ -77,7 +77,7 @@ impl EscrowContract {
 
         // Emit work_started event: (actor, new_status, contributor)
         env.events().publish(
-            (symbol_short!("wrk_start"), contributor),
+            (symbol_short!("wrk_start"), contributor.clone()),
             (BountyStatus::InProgress, contributor),
         );
     }
@@ -93,7 +93,7 @@ impl EscrowContract {
 
         // Emit work_submitted event: (actor, new_status, contributor)
         env.events().publish(
-            (symbol_short!("wrk_submit"), contributor),
+            (symbol_short!("wrk_submt"), contributor.clone()),
             (BountyStatus::UnderReview, contributor),
         );
     }
