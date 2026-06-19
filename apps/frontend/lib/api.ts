@@ -21,7 +21,7 @@ async function getAccessToken(publicKey: string): Promise<string> {
   }
 
   const challengeResponse = await fetch(
-    `${API_URL}/auth/challenge?address=${encodeURIComponent(publicKey)}`
+    `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`
   );
   if (!challengeResponse.ok) {
     throw new Error("Failed to request wallet challenge.");
@@ -37,7 +37,7 @@ async function getAccessToken(publicKey: string): Promise<string> {
     throw new Error(signed.error?.message || "Wallet signature was cancelled.");
   }
 
-  const verifyResponse = await fetch(`${API_URL}/auth/verify`, {
+  const verifyResponse = await fetch(`${API_URL}/api/v1/auth/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

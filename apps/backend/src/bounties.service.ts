@@ -42,7 +42,23 @@ export class BountiesService {
 
   async remove(id: string) {
     const bounty = await this.findOne(id);
-    await this.bounties.remove(bounty);
+    await this.bounties.softRemove(bounty);
     return { deleted: true };
+  }
+
+  async restore(id: string) {
+    // softRemove sets deletedAt, restore unsets it
+    const bounty = await this.bounties.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+    if (!bounty) {
+      throw new NotFoundException('Bounty not found');
+    }
+    if (bounty.deletedAt === null) {
+      return bounty;
+    }
+    await this.bounties.restore(id);
+    return this.findOne(id);
   }
 }

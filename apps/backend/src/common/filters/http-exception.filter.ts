@@ -4,14 +4,12 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { jsonLogger } from '../json-logger.service';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(HttpExceptionFilter.name);
-
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
@@ -24,9 +22,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : 'Internal server error';
 
     if (!isHttp) {
-      this.logger.error(
+      jsonLogger.mergeContext({ method: req.method, path: req.originalUrl ?? req.url });
+      jsonLogger.error(
         `Unhandled exception on ${req.method} ${req.url}`,
         exception instanceof Error ? exception.stack : String(exception),
+        HttpExceptionFilter.name,
       );
     }
 

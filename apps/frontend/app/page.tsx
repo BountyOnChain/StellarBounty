@@ -46,7 +46,7 @@ async function getBounties(): Promise<BountyCardData[]> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
-    const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate } });
+    const response = await fetch(`${apiUrl}/api/v1/bounties`, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return [];

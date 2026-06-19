@@ -49,7 +49,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
     try {
       const accessToken = await getToken(publicKey as string);
-      const response = await fetch(`${apiUrl}/bounties/${bounty.id}/submissions`, {
+      const response = await fetch(`${apiUrl}/api/v1/bounties/${bounty.id}/submissions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

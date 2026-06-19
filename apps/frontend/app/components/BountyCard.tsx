@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatRewardXLM } from "@/lib/stellar-amount";
 
 export type BountyCardData = {
   id: string | number;
@@ -17,7 +18,13 @@ function formatReward(reward: BountyCardData["reward"]) {
     return "Reward TBD";
   }
 
-  return typeof reward === "number" ? `${reward.toLocaleString()} XLM` : reward;
+  // Backend sends reward as a stroop amount (string or number).
+  // Convert to a human-readable XLM value.
+  if (typeof reward === "number" || typeof reward === "string") {
+    return formatRewardXLM(reward);
+  }
+
+  return "Reward TBD";
 }
 
 function formatDeadline(deadline: BountyCardData["deadline"]) {

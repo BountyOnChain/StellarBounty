@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -37,6 +38,9 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         STELLAR_NETWORK: Joi.string().valid('testnet', 'mainnet').required(),
+        STELLAR_RPC_URL: Joi.string().uri().optional(),
+        STELLAR_RPC_URL_BACKUP: Joi.string().uri().optional(),
+        STELLAR_SIGNING_SECRET: Joi.string().optional(),
         CORS_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
         CORS_ORIGINS: Joi.string().optional(),
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
@@ -45,12 +49,28 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         DB_POOL_MAX: Joi.number().integer().positive().default(DEFAULT_DB_POOL_MAX),
         DB_POOL_IDLE_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_IDLE_TIMEOUT_MS),
         DB_POOL_CONNECT_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_CONNECT_TIMEOUT_MS),
+        DB_RETRY_ATTEMPTS: Joi.number().integer().positive().default(DEFAULT_DB_RETRY_ATTEMPTS),
+        DB_RETRY_DELAY_MS: Joi.number().integer().positive().default(DEFAULT_DB_RETRY_DELAY_MS),
+        RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
+        RATE_LIMIT_MAX: Joi.number().integer().positive().default(30),
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
         PORT: Joi.number().default(4000),
+        LOG_LEVEL: Joi.string()
+          .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
+          .default('log'),
+        SERVICE_NAME: Joi.string().default('stellar-bounty-backend'),
       }),
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ([{
+        ttl: config.get<number>('RATE_LIMIT_TTL_MS', 60000),
+        limit: config.get<number>('RATE_LIMIT_MAX', 30),
+      }]),
     }),
     AuthModule,
     SubmissionsModule,
@@ -67,11 +87,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
         logger: new TypeOrmMetricsLogger(metrics),
         extra: createDbPoolExtra(config),
-        retryAttempts: DEFAULT_DB_RETRY_ATTEMPTS,
-        retryDelay: DEFAULT_DB_RETRY_DELAY_MS,
+        retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', DEFAULT_DB_RETRY_ATTEMPTS),
+        retryDelay: config.get<number>('DB_RETRY_DELAY_MS', DEFAULT_DB_RETRY_DELAY_MS),
         maxQueryExecutionTime: 250,
         synchronize: false,
-      }),
+      } as import('typeorm').DataSourceOptions),
     }),
   ],
   controllers: [AppController, BountiesController],

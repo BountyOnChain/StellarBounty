@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
     Promise.all([
       fetch(`${API_URL}/submissions?contributor=${publicKey}`).then((r) => r.json()),
-      fetch(`${API_URL}/bounties?owner=${publicKey}`).then((r) => r.json()),
+      fetch(`${API_URL}/api/v1/bounties?owner=${publicKey}`).then((r) => r.json()),
     ])
       .then(([subs, bounts]) => {
         setSubmissions(subs);
