@@ -99,6 +99,10 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
+        env.events().publish(
+            (symbol_short!("init"), owner),
+            (amount, token_address, arbitrator),
+        );
         Ok(())
     }
 
@@ -122,6 +126,10 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
+        env.events().publish(
+            (symbol_short!("fund"), owner),
+            (amount,),
+        );
         Ok(())
     }
 
@@ -133,6 +141,10 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
+        env.events().publish(
+            (symbol_short!("startwork"), contributor),
+            (),
+        );
         Ok(())
     }
 
@@ -144,6 +156,10 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
+        env.events().publish(
+            (symbol_short!("submit"), contributor),
+            (),
+        );
         Ok(())
     }
 
@@ -177,6 +193,10 @@ impl EscrowContract {
         Self::clear_pending_operation(&env);
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("approve")), ());
+        env.events().publish(
+            (symbol_short!("approve"), owner),
+            (amount, contributor),
+        );
         Ok(())
     }
 
@@ -211,6 +231,16 @@ impl EscrowContract {
             let owner = Self::read_owner(&env)?;
             let token = token::Client::new(&env, &token_address);
             token.transfer(&env.current_contract_address(), &owner, &amount);
+
+            env.events().publish(
+                (symbol_short!("cancel"), owner),
+                (Some(amount),),
+            );
+        } else {
+            env.events().publish(
+                (symbol_short!("cancel"), owner),
+                (Option::<i128>::None,),
+            );
         }
 
         env.storage()
@@ -458,7 +488,7 @@ impl EscrowContract {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, Ledger},
+        testutils::{Address as _, Events, Ledger},
         token::{Client as TokenClient, StellarAssetClient},
         Address, Env,
     };
@@ -912,6 +942,74 @@ mod tests {
         assert_eq!(
             client.try_resolve(&arbitrator, &contributor),
             Err(Ok(ContractError::InvalidStatus))
+        );
+    }
+
+    // --- event emission tests ---
+    // Note: env.events().all() includes both contract events and system events.
+    // We verify the delta between before and after a state change.
+
+    #[test]
+    fn test_initialize_emits_event() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        let events_before = env.events().all().len();
+        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        let events_after = env.events().all().len();
+        assert!(
+            events_after > events_before,
+            "expected new events after initialize (before={}, after={})",
+            events_before,
+            events_after
+        );
+    }
+
+    #[test]
+    fn test_fund_emits_event() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        let events_before = env.events().all().len();
+        client.fund(&owner);
+        let events_after = env.events().all().len();
+        assert!(
+            events_after > events_before,
+            "expected new events after fund (before={}, after={})",
+            events_before,
+            events_after
+        );
+    }
+
+    #[test]
+    fn test_lifecycle_emits_events() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.fund(&owner);
+        let events_before = env.events().all().len();
+        let contributor = Address::generate(&env);
+        client.start_work(&contributor);
+        client.submit(&contributor);
+        let events_after = env.events().all().len();
+        // start_work + submit should add events
+        assert!(
+            events_after > events_before,
+            "expected new events after start_work + submit (before={}, after={})",
+            events_before,
+            events_after
+        );
+    }
+
+    #[test]
+    fn test_cancel_emits_event() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.fund(&owner);
+        let events_before = env.events().all().len();
+        client.cancel(&owner);
+        let events_after = env.events().all().len();
+        assert!(
+            events_after > events_before,
+            "expected new events after cancel (before={}, after={})",
+            events_before,
+            events_after
         );
     }
 }
