@@ -41,7 +41,13 @@ describe('AuthService', () => {
       delete: jest.fn().mockReturnValue(nonceRepository.deleteBuilder),
     });
 
-    service = new AuthService(jwtService, nonceRepository);
+    const refreshTokenRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation((data) => data),
+      save: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new AuthService(jwtService, nonceRepository, refreshTokenRepo as any);
   });
 
   describe('getChallenge', () => {

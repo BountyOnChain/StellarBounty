@@ -24,7 +24,7 @@ function truncateAddress(address: string) {
 export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const { publicKey } = useWallet();
   const toast = useToast();
-  const { getToken, clearToken, apiUrl } = useAuth();
+  const { logout, apiUrl } = useAuth();
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,18 +48,17 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     setIsSubmitting(true);
 
     try {
-      const accessToken = await getToken(publicKey as string);
       const response = await fetch(`${apiUrl}/api/v1/bounties/${bounty.id}/submissions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
         },
+        credentials: "include",
         body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
       });
 
       if (!response.ok) {
-        if (response.status === 401) clearToken();
+        if (response.status === 401) await logout();
         throw new Error("Submission failed. Please try again.");
       }
 
