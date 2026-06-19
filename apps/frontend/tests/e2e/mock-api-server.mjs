@@ -110,24 +110,34 @@ const server = http.createServer(async (request, response) => {
   }
 
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
+  // The real backend applies a global prefix of "api/v1" via
+  // `app.setGlobalPrefix('api/v1')` (see apps/backend/src/main.ts), so all
+  // routes the frontend calls land under `/api/v1/...`. Strip that prefix
+  // here so this mock mirrors the same routing shape used in production and
+  // existing route matchers (`/bounties`, `/submissions`, etc.) still apply.
+  // `(?=\/|$)` anchors the strip to a segment boundary so that hypothetical
+  // paths like `/api/v10` or `/api/v1bounties` (no slash) aren't accidentally
+  // rewritten; NestJS's `setGlobalPrefix('api/v1')` also only mounts at the
+  // segment boundary.
+  const pathname = url.pathname.replace(/^\/api\/v1(?=\/|$)/, "") || "/";
 
-  if (url.pathname === "/health") {
+  if (pathname === "/health") {
     sendJson(response, 200, { ok: true });
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/__reset") {
+  if (request.method === "POST" && pathname === "/__reset") {
     resetState();
     sendJson(response, 200, { ok: true });
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/bounties") {
+  if (request.method === "GET" && pathname === "/bounties") {
     sendJson(response, 200, visibleBounties(url.searchParams));
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/bounties") {
+  if (request.method === "POST" && pathname === "/bounties") {
     const body = await readJson(request);
     const bounty = {
       id: `bounty-${nextBountyId++}`,
@@ -145,14 +155,14 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const bountyMatch = url.pathname.match(/^\/bounties\/([^/]+)$/);
+  const bountyMatch = pathname.match(/^\/bounties\/([^/]+)$/);
   if (request.method === "GET" && bountyMatch) {
     const bounty = bounties.find((item) => item.id === decodeURIComponent(bountyMatch[1]));
     sendJson(response, bounty ? 200 : 404, bounty ?? { message: "Bounty not found" });
     return;
   }
 
-  const createSubmissionMatch = url.pathname.match(/^\/bounties\/([^/]+)\/submissions$/);
+  const createSubmissionMatch = pathname.match(/^\/bounties\/([^/]+)\/submissions$/);
   if (request.method === "POST" && createSubmissionMatch) {
     const bountyId = decodeURIComponent(createSubmissionMatch[1]);
     const bounty = bounties.find((item) => item.id === bountyId);
@@ -184,7 +194,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const approveMatch = url.pathname.match(/^\/bounties\/([^/]+)\/submissions\/([^/]+)\/approve$/);
+  const approveMatch = pathname.match(/^\/bounties\/([^/]+)\/submissions\/([^/]+)\/approve$/);
   if (request.method === "PATCH" && approveMatch) {
     const bountyId = decodeURIComponent(approveMatch[1]);
     const submissionId = decodeURIComponent(approveMatch[2]);
@@ -204,7 +214,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/submissions") {
+  if (request.method === "GET" && pathname === "/submissions") {
     const contributor = url.searchParams.get("contributor");
     sendJson(
       response,

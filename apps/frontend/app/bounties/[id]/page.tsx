@@ -42,7 +42,7 @@ function normalizeBounty(bounty: ApiBounty): Bounty | null {
 
 async function getBounty(id: string): Promise<Bounty | null> {
   try {
-    const response = await fetch(`${API_URL}/bounties/${encodeURIComponent(id)}`, { next: { revalidate: 60 } });
+    const response = await fetch(`${API_URL}/api/v1/bounties/${encodeURIComponent(id)}`, { next: { revalidate: 60 } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return null;
@@ -97,7 +97,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 export async function generateStaticParams() {
   try {
-    const response = await fetch(`${API_URL}/bounties`, { next: { revalidate: 60 } });
+    const response = await fetch(`${API_URL}/api/v1/bounties`, { next: { revalidate: 60 } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return [];

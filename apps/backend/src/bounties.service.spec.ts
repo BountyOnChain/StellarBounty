@@ -26,8 +26,9 @@ describe('BountiesService', () => {
       submissions: [],
       createdAt,
       updatedAt,
+      deletedAt: null,
       ...overrides,
-    };
+    } as Bounty;
   }
 
   beforeEach(async () => {
@@ -36,6 +37,8 @@ describe('BountiesService', () => {
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
       findOne: jest.fn(),
+      softRemove: jest.fn(async (input) => input),
+      restore: jest.fn(async (id) => id),
       remove: jest.fn(),
     };
 
@@ -154,20 +157,50 @@ describe('BountiesService', () => {
   });
 
   describe('remove', () => {
-    it('removes an existing bounty', async () => {
+    it('soft-deletes an existing bounty', async () => {
       const bounty = createBounty();
       repository.findOne!.mockResolvedValueOnce(bounty);
-      repository.remove!.mockResolvedValueOnce(bounty);
+      repository.softRemove!.mockResolvedValueOnce(bounty);
 
       await expect(service.remove('bounty-1')).resolves.toEqual({ deleted: true });
-      expect(repository.remove).toHaveBeenCalledWith(bounty);
+      expect(repository.softRemove).toHaveBeenCalledWith(bounty);
+      expect(repository.remove).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when removing a missing bounty', async () => {
       repository.findOne!.mockResolvedValueOnce(null);
 
       await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
-      expect(repository.remove).not.toHaveBeenCalled();
+      expect(repository.softRemove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restore', () => {
+    it('restores a soft-deleted bounty', async () => {
+      const deleted = createBounty({ deletedAt: new Date() });
+      const restored = createBounty({ deletedAt: null });
+      repository.findOne!
+        .mockResolvedValueOnce(deleted)
+        .mockResolvedValueOnce(restored);
+      repository.restore!.mockResolvedValueOnce({ affected: 1 } as any);
+
+      await expect(service.restore('bounty-1')).resolves.toBe(restored);
+      expect(repository.restore).toHaveBeenCalledWith('bounty-1');
+    });
+
+    it('returns the bounty unchanged when it is not soft-deleted', async () => {
+      const existing = createBounty({ deletedAt: null });
+      repository.findOne!.mockResolvedValueOnce(existing);
+
+      await expect(service.restore('bounty-1')).resolves.toBe(existing);
+      expect(repository.restore).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when restoring a missing bounty', async () => {
+      repository.findOne!.mockResolvedValueOnce(null);
+
+      await expect(service.restore('missing')).rejects.toThrow(NotFoundException);
+      expect(repository.restore).not.toHaveBeenCalled();
     });
   });
 });
