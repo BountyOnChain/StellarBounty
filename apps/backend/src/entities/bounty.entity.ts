@@ -1,6 +1,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -46,4 +47,7 @@ export class Bounty {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt!: Date | null;
 }

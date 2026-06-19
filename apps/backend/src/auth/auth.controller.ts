@@ -25,8 +25,8 @@ type AuthenticatedRequest = Request & {
   };
 };
 
-@ApiTags('auth')
-@Controller('auth')
+@ApiTags('v1: auth')
+@Controller('api/v1/auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

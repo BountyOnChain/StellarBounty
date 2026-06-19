@@ -11,9 +11,27 @@ import {
   MaxLength,
   ValidateBy,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { BountyStatus } from '../../entities/bounty.entity';
 
 export const MAX_REWARD_AMOUNT = 1_000_000_000n;
+
+/** Strip HTML tags and normalize whitespace to prevent stored XSS */
+function SanitizeString() {
+  return Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') return value;
+    return value
+      .replace(/<[^>]*>/g, '')           // strip HTML tags
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/')
+      .replace(/\s+/g, ' ')              // normalize whitespace
+      .trim();
+  });
+}
 
 function IsRewardAmount() {
   return ValidateBy({
@@ -76,6 +94,7 @@ export class CreateBountyDto {
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(200)
+  @SanitizeString()
   title!: string;
 
   @ApiProperty({
@@ -86,6 +105,7 @@ export class CreateBountyDto {
   @IsNotEmpty()
   @MinLength(10)
   @MaxLength(5000)
+  @SanitizeString()
   description!: string;
 
   @ApiProperty({
@@ -132,6 +152,7 @@ export class UpdateBountyDto {
   @IsString()
   @MinLength(3)
   @MaxLength(200)
+  @SanitizeString()
   title?: string;
 
   @ApiPropertyOptional({ description: 'Updated description' })
@@ -139,6 +160,7 @@ export class UpdateBountyDto {
   @IsString()
   @MinLength(10)
   @MaxLength(5000)
+  @SanitizeString()
   description?: string;
 
   @ApiPropertyOptional({ description: 'Updated reward amount in XLM' })
