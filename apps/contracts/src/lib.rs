@@ -99,10 +99,8 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
-        env.events().publish(
-            (symbol_short!("init"), owner),
-            (amount, token_address, arbitrator),
-        );
+        env.events()
+            .publish((symbol_short!("init"), owner), (amount, token_address, arbitrator));
         Ok(())
     }
 
@@ -126,10 +124,7 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
-        env.events().publish(
-            (symbol_short!("fund"), owner),
-            (amount,),
-        );
+        env.events().publish((symbol_short!("fund"), owner), (amount,));
         Ok(())
     }
 
@@ -141,10 +136,7 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
-        env.events().publish(
-            (symbol_short!("startwork"), contributor),
-            (),
-        );
+        env.events().publish((symbol_short!("startwork"), contributor), ());
         Ok(())
     }
 
@@ -156,10 +148,7 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
-        env.events().publish(
-            (symbol_short!("submit"), contributor),
-            (),
-        );
+        env.events().publish((symbol_short!("submit"), contributor), ());
         Ok(())
     }
 
@@ -193,10 +182,7 @@ impl EscrowContract {
         Self::clear_pending_operation(&env);
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("approve")), ());
-        env.events().publish(
-            (symbol_short!("approve"), owner),
-            (amount, contributor),
-        );
+        env.events().publish((symbol_short!("approve"), owner), (amount, contributor));
         Ok(())
     }
 
@@ -232,15 +218,10 @@ impl EscrowContract {
             let token = token::Client::new(&env, &token_address);
             token.transfer(&env.current_contract_address(), &owner, &amount);
 
-            env.events().publish(
-                (symbol_short!("cancel"), owner),
-                (Some(amount),),
-            );
+            env.events().publish((symbol_short!("cancel"), owner), (Some(amount),));
         } else {
-            env.events().publish(
-                (symbol_short!("cancel"), owner),
-                (Option::<i128>::None,),
-            );
+            env.events()
+                .publish((symbol_short!("cancel"), owner), (Option::<i128>::None,));
         }
 
         env.storage()
