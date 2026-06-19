@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useFetch } from "../../lib/use-fetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -33,28 +34,27 @@ function EmptyState({ message }: { message: string }) {
 export default function DashboardPage() {
   const { publicKey, connect } = useWallet();
   const [activeTab, setActiveTab] = useState<"submissions" | "bounties">("submissions");
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [bounties, setBounties] = useState<Bounty[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!publicKey) return;
+  const {
+    data: submissions,
+    loading: subsLoading,
+    error: subsError,
+  } = useFetch<Submission[]>(
+    publicKey ? `${API_URL}/submissions?contributor=${publicKey}` : "",
+    { enabled: !!publicKey }
+  );
 
-    setLoading(true);
-    setError(null);
+  const {
+    data: bounties,
+    loading: bountiesLoading,
+    error: bountiesError,
+  } = useFetch<Bounty[]>(
+    publicKey ? `${API_URL}/bounties?owner=${publicKey}` : "",
+    { enabled: !!publicKey }
+  );
 
-    Promise.all([
-      fetch(`${API_URL}/submissions?contributor=${publicKey}`).then((r) => r.json()),
-      fetch(`${API_URL}/bounties?owner=${publicKey}`).then((r) => r.json()),
-    ])
-      .then(([subs, bounts]) => {
-        setSubmissions(subs);
-        setBounties(bounts);
-      })
-      .catch(() => setError("Failed to load dashboard data."))
-      .finally(() => setLoading(false));
-  }, [publicKey]);
+  const loading = subsLoading || bountiesLoading;
+  const error = subsError || bountiesError;
 
   if (!publicKey) {
     return (
@@ -100,7 +100,7 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : activeTab === "submissions" ? (
-        submissions.length === 0 ? (
+        !submissions || submissions.length === 0 ? (
           <EmptyState message="You haven't submitted to any bounties yet." />
         ) : (
           <div className="overflow-x-auto">
@@ -128,7 +128,7 @@ export default function DashboardPage() {
             </table>
           </div>
         )
-      ) : bounties.length === 0 ? (
+      ) : !bounties || bounties.length === 0 ? (
         <EmptyState message="You haven't created any bounties yet." />
       ) : (
         <div className="overflow-x-auto">

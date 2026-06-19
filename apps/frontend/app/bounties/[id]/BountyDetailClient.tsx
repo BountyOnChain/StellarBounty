@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
@@ -28,6 +28,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitAbortRef = useRef<AbortController | null>(null);
 
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
@@ -37,6 +38,11 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     return null;
   }, [isOpen, publicKey]);
 
+  // Abort any in-flight submission on unmount or new submission
+  useCallback(() => {
+    submitAbortRef.current?.abort();
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -44,6 +50,11 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       toast.error(disabledReason || "Submission is disabled.");
       return;
     }
+
+    // Abort previous in-flight submission
+    submitAbortRef.current?.abort();
+    const controller = new AbortController();
+    submitAbortRef.current = controller;
 
     setIsSubmitting(true);
 
@@ -56,6 +67,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -67,9 +79,12 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       setNotes("");
       toast.success("Work submitted successfully.");
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
     } finally {
-      setIsSubmitting(false);
+      if (submitAbortRef.current === controller) {
+        setIsSubmitting(false);
+      }
     }
   }
 
