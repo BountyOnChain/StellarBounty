@@ -43,7 +43,7 @@ export default function CreateBountyPage() {
   const router = useRouter();
   const { publicKey } = useWallet();
   const toast = useToast();
-  const { getToken, clearToken, apiUrl } = useAuth();
+  const { authenticate, logout, apiUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -82,13 +82,13 @@ export default function CreateBountyPage() {
     setSubmitError(null);
 
     try {
-      const accessToken = await getToken(publicKey);
+      await authenticate(publicKey);
       const response = await fetch(`${apiUrl}/api/v1/bounties`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
         },
+        credentials: "include",
         body: JSON.stringify({
           title: values.title.trim(),
           description: values.description.trim(),
@@ -123,7 +123,7 @@ export default function CreateBountyPage() {
           return;
         }
 
-        if (response.status === 401) clearToken();
+        if (response.status === 401) await logout();
 
         throw new Error(message || "Unable to create bounty.");
       }
