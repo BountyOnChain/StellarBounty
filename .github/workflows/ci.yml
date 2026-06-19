@@ -97,3 +97,32 @@ jobs:
 
       - name: Build Soroban contract WASM
         run: cargo build --target wasm32-unknown-unknown --release
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/frontend
+
+      - name: Run E2E tests
+        run: node tests/e2e/run-e2e.mjs
+        working-directory: apps/frontend
+        env:
+          E2E_API_PORT: 4100
+          E2E_FRONTEND_PORT: 3100

@@ -191,6 +191,16 @@ export class SubmissionsService {
     };
   }
 
+  private resolveRpcUrls(network: string): string[] {
+    const primary =
+      this.config.get<string>('STELLAR_RPC_URL') ??
+      (network === 'mainnet'
+        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
+        : 'https://soroban-testnet.stellar.org');
+    const backup = this.config.get<string>('STELLAR_RPC_URL_BACKUP');
+    return backup ? [primary, backup] : [primary];
+  }
+
   private async callContractApprove(bountyId: string, ownerAddress: string): Promise<void> {
     const contractId =
       this.config.get<string>(`SOROBAN_CONTRACT_${bountyId.toUpperCase()}`) ??
@@ -198,63 +208,73 @@ export class SubmissionsService {
     if (!contractId) return; // no contract configured — skip (dev/test mode)
 
     const network = this.config.get<string>('STELLAR_NETWORK', 'testnet');
-    const rpcUrl =
-      this.config.get<string>('STELLAR_RPC_URL') ??
-      (network === 'mainnet'
-        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
-        : 'https://soroban-testnet.stellar.org');
-
-    const server = new StellarSdk.rpc.Server(rpcUrl);
+    const rpcUrls = this.resolveRpcUrls(network);
     const networkPassphrase =
       network === 'mainnet' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
 
-    try {
-      const account = await server.getAccount(ownerAddress);
-      const maxFee = this.getConfiguredMaxFee();
-      const feeEstimate = await this.estimateStellarInclusionFee(server, maxFee);
+    const maxFee = this.getConfiguredMaxFee();
+    let lastError: string | undefined;
 
-      const contract = new StellarSdk.Contract(contractId);
-      const tx = new StellarSdk.TransactionBuilder(account, {
-        fee: feeEstimate.inclusionFeeStroops,
-        networkPassphrase,
-      })
-        .addOperation(
-          contract.call('approve', StellarSdk.nativeToScVal(ownerAddress, { type: 'address' })),
-        )
-        .setTimeout(30)
-        .build();
-
-      let transactionToSubmit = tx;
-      let simulatedResourceFee = 'unavailable';
-
+    for (const rpcUrl of rpcUrls) {
       try {
-        const prepared = await server.prepareTransaction(tx);
-        const capped = this.capPreparedTransactionFee(prepared, feeEstimate, networkPassphrase);
-        transactionToSubmit = capped.transaction;
-        simulatedResourceFee = capped.simulatedResourceFeeStroops;
+        const server = new StellarSdk.rpc.Server(rpcUrl);
+        const account = await server.getAccount(ownerAddress);
+        const feeEstimate = await this.estimateStellarInclusionFee(server, maxFee);
+
+        const contract = new StellarSdk.Contract(contractId);
+        const tx = new StellarSdk.TransactionBuilder(account, {
+          fee: feeEstimate.inclusionFeeStroops,
+          networkPassphrase,
+        })
+          .addOperation(
+            contract.call('approve', StellarSdk.nativeToScVal(ownerAddress, { type: 'address' })),
+          )
+          .setTimeout(30)
+          .build();
+
+        let transactionToSubmit = tx;
+        let simulatedResourceFee = 'unavailable';
+
+        try {
+          const prepared = await server.prepareTransaction(tx);
+          const capped = this.capPreparedTransactionFee(prepared, feeEstimate, networkPassphrase);
+          transactionToSubmit = capped.transaction;
+          simulatedResourceFee = capped.simulatedResourceFeeStroops;
+        } catch (error) {
+          this.logger.warn(
+            `Stellar transaction simulation failed; proceeding with p95 inclusion fee only: ${this.getErrorMessage(error)}`,
+          );
+        }
+
+        this.logger.log(
+          `Using Stellar fee: ${transactionToSubmit.fee} stroops (p95=${feeEstimate.p95FeeStroops}, simulated=${simulatedResourceFee}, max=${maxFee.toString()}, source=${feeEstimate.source}, rpcUrl=${rpcUrl})`,
+        );
+
+        // The backend signs only if a server-side signing key is configured.
+        const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
+        if (signingSecret) {
+          const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
+          transactionToSubmit.sign(signingKeypair);
+          await server.sendTransaction(transactionToSubmit);
+        }
+        // Success — log which RPC was used if we fell back from primary
+        if (rpcUrl !== rpcUrls[0]) {
+          this.logger.log(
+            `Stellar RPC failover: primary failed, backup succeeded. bountyId=${bountyId}, backupRpcUrl=${rpcUrl}`,
+          );
+        }
+        return; // success — stop trying
       } catch (error) {
+        lastError = this.getErrorMessage(error);
         this.logger.warn(
-          `Stellar transaction simulation failed; proceeding with p95 inclusion fee only: ${this.getErrorMessage(error)}`,
+          `Stellar RPC attempt failed: bountyId=${bountyId}, rpcUrl=${rpcUrl}, error=${lastError}`,
         );
       }
-
-      this.logger.log(
-        `Using Stellar fee: ${transactionToSubmit.fee} stroops (p95=${feeEstimate.p95FeeStroops}, simulated=${simulatedResourceFee}, max=${maxFee.toString()}, source=${feeEstimate.source})`,
-      );
-
-      // The backend signs only if a server-side signing key is configured.
-      const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
-      if (signingSecret) {
-        const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
-        transactionToSubmit.sign(signingKeypair);
-        await server.sendTransaction(transactionToSubmit);
-      }
-    } catch (error) {
-      const message = this.getErrorMessage(error);
-      this.logger.warn(
-        `Stellar contract approval skipped after RPC failure: bountyId=${bountyId}, contractId=${contractId}, rpcUrl=${rpcUrl}, error=${message}`,
-      );
     }
+    // All RPC URLs exhausted
+    this.logger.warn(
+      `Stellar contract approval skipped after all RPC endpoints failed: bountyId=${bountyId}, contractId=${contractId}, rpcUrls=${rpcUrls.join(',')}, lastError=${lastError}`,
+    );
     // If no signing secret, the transaction is prepared but not submitted —
     // the client is expected to sign and submit it separately.
   }
