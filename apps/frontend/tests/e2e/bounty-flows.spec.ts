@@ -3,16 +3,21 @@ import { expect, test, type Page } from "@playwright/test";
 const ownerAddress = "GOWNERTESTWALLET000000000000000000000000000000000000000000";
 const contributorAddress = "GCONTRIBUTORTESTWALLET000000000000000000000000000000000";
 
+function createJwt(publicKey: string) {
+  const payload = Buffer.from(JSON.stringify({ sub: publicKey })).toString("base64url");
+  return `header.${payload}.signature`;
+}
+
 async function seedWallet(page: Page, address = ownerAddress) {
   await page.addInitScript(
-    ({ walletAddress }) => {
+    ({ authToken, walletAddress }) => {
       window.localStorage.setItem(
         "stellar-bounty.wallet",
         JSON.stringify({ publicKey: walletAddress, freighterNetwork: "TESTNET" }),
       );
-      window.localStorage.setItem("stellar-bounty.auth-token", "e2e-token");
+      window.localStorage.setItem("stellar-bounty.auth-token", authToken);
     },
-    { walletAddress: address },
+    { authToken: createJwt(address), walletAddress: address },
   );
 }
 

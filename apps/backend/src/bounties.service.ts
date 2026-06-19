@@ -14,6 +14,7 @@ export class BountiesService {
   async create(dto: CreateBountyDto) {
     const bounty = this.bounties.create({
       ...dto,
+      rewardAmount: BigInt(dto.rewardAmount),
       deadline: dto.deadline ? new Date(dto.deadline) : null,
     });
     return this.bounties.save(bounty);
@@ -35,6 +36,7 @@ export class BountiesService {
     const bounty = await this.findOne(id);
     Object.assign(bounty, {
       ...dto,
+      rewardAmount: dto.rewardAmount !== undefined ? BigInt(dto.rewardAmount) : bounty.rewardAmount,
       deadline: dto.deadline === undefined ? bounty.deadline : new Date(dto.deadline),
     });
     return this.bounties.save(bounty);

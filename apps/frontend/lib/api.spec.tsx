@@ -24,6 +24,11 @@ const mockedFreighter = freighter as jest.Mocked<typeof freighter>;
 
 const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
 
+function createJwt(sub: string): string {
+  const payload = Buffer.from(JSON.stringify({ sub })).toString("base64url");
+  return `header.${payload}.signature`;
+}
+
 declare global {
   interface Window {
     __lastToken?: string | null;
@@ -65,7 +70,8 @@ describe("useAuth — saved-token path (no fetch)", () => {
   });
 
   it("returns a saved token from localStorage without signing or fetching", async () => {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, "saved.jwt.value");
+    const savedToken = createJwt("GABC");
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, savedToken);
     const { getByText } = render(<AuthProbe />);
 
     await act(async () => {
@@ -73,7 +79,7 @@ describe("useAuth — saved-token path (no fetch)", () => {
     });
 
     expect(mockedFreighter.signMessage).not.toHaveBeenCalled();
-    expect(window.__lastToken).toBe("saved.jwt.value");
+    expect(window.__lastToken).toBe(savedToken);
     expect(window.__lastError).toBeNull();
   });
 

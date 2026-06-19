@@ -80,51 +80,51 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
     | "cancelled";
 
   return (
-    <main className="min-h-[calc(100vh-73px)] overflow-x-hidden bg-slate-950 px-3 py-6 text-slate-100 sm:px-4 sm:py-10">
+    <main className="min-h-[calc(100vh-73px)] overflow-x-hidden bg-slate-50 px-3 py-6 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-4 sm:py-10">
       <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
-        <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
+        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-slate-950/40 sm:p-6">
           <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <StatusBadge status={statusKey} />
-            <span className="break-words text-sm text-slate-400">Reward: {bounty.reward}</span>
-            <span className="break-words text-sm text-slate-400">Deadline: {bounty.deadline}</span>
+            <span className="break-words text-sm text-slate-600 dark:text-slate-400">Reward: {bounty.reward}</span>
+            <span className="break-words text-sm text-slate-600 dark:text-slate-400">Deadline: {bounty.deadline}</span>
           </div>
 
-          <h1 className="break-words text-2xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="break-words text-2xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
             {bounty.title}
           </h1>
-          <p className="mt-5 whitespace-pre-line break-words text-base leading-7 text-slate-300">
+          <p className="mt-5 whitespace-pre-line break-words text-base leading-7 text-slate-700 dark:text-slate-300">
             {bounty.description}
           </p>
 
           <dl className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
               <dt className="text-xs uppercase tracking-wide text-slate-500">Owner</dt>
-              <dd className="mt-2 break-all font-mono text-sm text-slate-200">
+              <dd className="mt-2 break-all font-mono text-sm text-slate-700 dark:text-slate-200">
                 {truncateAddress(bounty.ownerAddress)}
               </dd>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
               <dt className="text-xs uppercase tracking-wide text-slate-500">Reward</dt>
-              <dd className="mt-2 break-words text-sm font-semibold text-slate-200">{bounty.reward}</dd>
+              <dd className="mt-2 break-words text-sm font-semibold text-slate-700 dark:text-slate-200">{bounty.reward}</dd>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
               <dt className="text-xs uppercase tracking-wide text-slate-500">Status</dt>
-              <dd className="mt-2 text-sm font-semibold capitalize text-slate-200">
+              <dd className="mt-2 text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
                 {bounty.status}
               </dd>
             </div>
           </dl>
         </section>
 
-        <aside className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
-          <h2 className="text-xl font-semibold text-white">Submit work</h2>
-          <p className="mt-2 text-sm text-slate-400">
+        <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-slate-950/40 sm:p-6">
+          <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Submit work</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Share a PR, demo, or document link with implementation notes.
           </p>
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-300">Work link</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Work link</span>
               <input
                 required
                 type="url"
@@ -132,12 +132,12 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
                 onChange={(e) => setWorkLink(e.target.value)}
                 disabled={!canSubmit || isSubmitting}
                 placeholder="https://github.com/..."
-                className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-300">Notes</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
               <textarea
                 required
                 value={notes}
@@ -145,11 +145,11 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
                 disabled={!canSubmit || isSubmitting}
                 rows={5}
                 placeholder="Summarize the work and verification steps."
-                className="mt-2 min-h-32 w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 min-h-32 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               />
             </label>
 
-            {disabledReason && <p className="text-sm text-amber-300">{disabledReason}</p>}
+            {disabledReason && <p className="text-sm text-amber-700 dark:text-amber-300">{disabledReason}</p>}
 
             <button
               type="submit"

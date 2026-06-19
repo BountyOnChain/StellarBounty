@@ -13,6 +13,7 @@ import { SubmissionsService } from './submissions.service';
 const mockPreparedTransaction = { sign: jest.fn() };
 const mockServer = {
   getAccount: jest.fn(),
+  simulateTransaction: jest.fn(),
   prepareTransaction: jest.fn(),
   sendTransaction: jest.fn(),
 };
@@ -54,7 +55,7 @@ describe('SubmissionsService', () => {
       id: 'bounty1',
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: null,
       status: BountyStatus.OPEN,
       ownerAddress: 'GOWNER',
@@ -83,6 +84,10 @@ describe('SubmissionsService', () => {
   beforeEach(() => {
     mockPreparedTransaction.sign.mockClear();
     mockServer.getAccount.mockReset().mockResolvedValue({ accountId: 'GOWNER' });
+    mockServer.simulateTransaction.mockReset().mockResolvedValue({
+      transactionData: { resourceFee: '100' },
+      minResourceFee: '100',
+    });
     mockServer.prepareTransaction.mockReset().mockResolvedValue(mockPreparedTransaction);
     mockServer.sendTransaction.mockReset().mockResolvedValue({ status: 'PENDING' });
     mockContractCall.mockReset().mockReturnValue('approve-operation');
@@ -206,7 +211,7 @@ describe('SubmissionsService', () => {
       );
     });
 
-    it('prepares, signs, and submits the Stellar contract transaction when configured', async () => {
+    it('simulates transaction before preparing when contract is configured', async () => {
       const bounty = createBounty();
       const submission = createSubmission();
       bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
@@ -225,18 +230,60 @@ describe('SubmissionsService', () => {
 
       await service.approve('bounty1', 'submission1', 'GOWNER');
 
-      expect(StellarSdk.rpc.Server).toHaveBeenCalledWith('https://rpc.example.com');
-      expect(StellarSdk.Contract).toHaveBeenCalledWith('contract-id');
-      expect(StellarSdk.nativeToScVal).toHaveBeenCalledWith('GOWNER', { type: 'address' });
-      expect(StellarSdk.TransactionBuilder).toHaveBeenCalledWith(
-        { accountId: 'GOWNER' },
-        { fee: StellarSdk.BASE_FEE, networkPassphrase: StellarSdk.Networks.PUBLIC },
-      );
-      expect(mockTransactionBuilder.addOperation).toHaveBeenCalledWith('approve-operation');
+      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
       expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
-      expect(StellarSdk.Keypair.fromSecret).toHaveBeenCalledWith('secret');
-      expect(mockPreparedTransaction.sign).toHaveBeenCalledWith(mockSigningKeypair);
       expect(mockServer.sendTransaction).toHaveBeenCalledWith(mockPreparedTransaction);
+    });
+
+    it('throws BadRequestException when simulation fails', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      mockServer.simulateTransaction.mockResolvedValueOnce({
+        error: 'Contract error: bounty not open',
+      });
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_NETWORK: 'mainnet',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_SIGNING_SECRET: 'secret',
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
+      expect(mockServer.prepareTransaction).not.toHaveBeenCalled();
+      expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it('does not send transaction when simulation succeeds but no signing secret', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+          STELLAR_NETWORK: 'mainnet',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
+      expect(mockServer.prepareTransaction).toHaveBeenCalledWith('built-transaction');
+      expect(mockServer.sendTransaction).not.toHaveBeenCalled();
     });
   });
 

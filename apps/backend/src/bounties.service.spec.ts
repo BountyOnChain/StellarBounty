@@ -19,7 +19,7 @@ describe('BountiesService', () => {
       id: 'bounty-1',
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration with tests.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: new Date('2026-12-31T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
@@ -60,43 +60,41 @@ describe('BountiesService', () => {
       const result = await service.create({
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
-        rewardAmount: '10000000',
+        rewardAmount: 10000000n,
         ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
         deadline: '2026-12-31T00:00:00.000Z',
       });
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          rewardAmount: '10000000',
+          rewardAmount: 10000000n,
           deadline: new Date('2026-12-31T00:00:00.000Z'),
         }),
       );
       expect(repository.save).toHaveBeenCalled();
-      expect(result.rewardAmount).toBe('10000000');
+      expect(result.rewardAmount).toBe(10000000n);
     });
 
     it('stores a null deadline when the DTO omits one', async () => {
       await service.create({
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
-        rewardAmount: '10000000',
+        rewardAmount: 10000000n,
         ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
       });
 
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ deadline: null }));
     });
 
-    it('propagates repository errors for invalid persistence input', async () => {
-      repository.save!.mockRejectedValueOnce(new Error('invalid bounty'));
-
+    it('throws on invalid rewardAmount that cannot be parsed as BigInt', async () => {
       await expect(
         service.create({
           title: 'Bad bounty',
           description: 'Invalid payload',
-          rewardAmount: 'bad',
+          rewardAmount: 'not-a-number',
           ownerAddress: 'GABC',
-        }),
-      ).rejects.toThrow('invalid bounty');
+        } as any),
+      ).rejects.toThrow();
     });
   });
 
@@ -132,13 +130,13 @@ describe('BountiesService', () => {
 
       const result = await service.update('bounty-1', {
         title: 'Updated title',
-        rewardAmount: '25000000',
+        rewardAmount: 25000000n,
         deadline: '2027-01-15T00:00:00.000Z',
       });
 
       expect(result).toMatchObject({
         title: 'Updated title',
-        rewardAmount: '25000000',
+        rewardAmount: 25000000n,
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);

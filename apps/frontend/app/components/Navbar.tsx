@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { ThemeToggle } from "../../components/ThemeToggle";
 
 const NAV_LINKS = [
     { label: "Bounties", href: "/bounties" },
@@ -42,8 +43,8 @@ export default function Navbar() {
           fixed top-0 inset-x-0 z-40 h-16
           transition-all duration-300
           ${scrolled
-                        ? "bg-slate-950/90 backdrop-blur-md border-b border-slate-800 shadow-lg shadow-black/30"
-                        : "bg-slate-950/70 backdrop-blur-sm border-b border-slate-800"
+                        ? "border-b border-slate-200 bg-white/90 shadow-lg shadow-slate-200/70 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-black/30"
+                        : "border-b border-slate-200 bg-white/80 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/70"
                     }
         `}
             >
@@ -53,7 +54,7 @@ export default function Navbar() {
                 >
                     <Link
                         href="/"
-                        className="inline-flex min-h-11 items-center rounded-md px-1 text-base font-semibold tracking-normal text-slate-50 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:text-lg"
+                        className="inline-flex min-h-11 items-center rounded-md px-1 text-base font-semibold tracking-normal text-slate-900 transition-colors hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-50 dark:hover:text-white sm:text-lg"
                     >
                         StellarBounty
                     </Link>
@@ -67,15 +68,15 @@ export default function Navbar() {
                     relative flex min-h-11 items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-150
                     focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                     ${isActive(href)
-                                            ? "text-slate-50 bg-slate-800"
-                                            : "text-slate-400 hover:text-slate-50 hover:bg-slate-800/60"
+                                            ? "bg-slate-200 text-slate-950 dark:bg-slate-800 dark:text-slate-50"
+                                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-50"
                                         }
                   `}
                                     aria-current={isActive(href) ? "page" : undefined}
                                 >
                                     {label}
                                     {isActive(href) && (
-                                        <span className="absolute bottom-0.5 left-4 right-4 h-[2px] rounded-full bg-indigo-500" />
+                                        <span className="absolute bottom-0.5 left-4 right-4 h-[2px] rounded-full bg-indigo-600 dark:bg-indigo-500" />
                                     )}
                                 </Link>
                             </li>
@@ -83,13 +84,15 @@ export default function Navbar() {
                     </ul>
 
                     <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                        <ThemeToggle />
+
                         <div className="hidden md:block">
                             <ConnectWalletButton />
                         </div>
 
                         <button
                             onClick={() => setDrawerOpen((v) => !v)}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 md:hidden"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50 md:hidden"
                             aria-label={drawerOpen ? "Close menu" : "Open menu"}
                             aria-expanded={drawerOpen}
                             aria-controls="mobile-drawer"
@@ -122,8 +125,8 @@ export default function Navbar() {
                 aria-modal="true"
                 aria-label="Mobile navigation"
                 className={`
-          fixed top-16 right-0 bottom-0 z-40 w-[min(18rem,100vw)]
-          bg-slate-900 border-l border-slate-800
+          fixed top-16 right-0 bottom-0 z-40 w-[min(18rem,100vw)] md:hidden
+          border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900
           transform transition-transform duration-300 ease-in-out
           ${drawerOpen ? "translate-x-0 md:hidden" : "hidden translate-x-full"}
         `}
@@ -139,15 +142,15 @@ export default function Navbar() {
                       flex min-h-11 items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                       ${isActive(href)
-                                                ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
-                                                : "text-slate-400 hover:text-slate-50 hover:bg-slate-800"
+                                                ? "border border-indigo-500/30 bg-indigo-50 text-indigo-700 dark:bg-indigo-600/20 dark:text-indigo-400"
+                                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50"
                                             }
                     `}
                                         aria-current={isActive(href) ? "page" : undefined}
                                         onClick={() => setDrawerOpen(false)}
                                     >
                                         {isActive(href) && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                                         )}
                                         {label}
                                     </Link>
@@ -156,7 +159,7 @@ export default function Navbar() {
                         </ul>
                     </nav>
 
-                    <div className="my-2 border-t border-slate-800" />
+                    <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
 
                     <ConnectWalletButton />
                 </div>

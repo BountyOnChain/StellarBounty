@@ -35,7 +35,7 @@ describe('SubmissionsService contract error handling', () => {
       id: 'bounty1',
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: null,
       status: BountyStatus.OPEN,
       ownerAddress: 'GOWNER',

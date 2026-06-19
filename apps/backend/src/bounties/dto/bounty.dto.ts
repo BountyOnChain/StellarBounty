@@ -33,17 +33,32 @@ function SanitizeString() {
   });
 }
 
+/** Transform string/number input to bigint for internal use */
+function ToStroopBigInt() {
+  return Transform(({ value }: { value: unknown }) => {
+    if (typeof value === 'bigint') return value;
+    if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0) return BigInt(value);
+    return value;
+  });
+}
+
 function IsRewardAmount() {
   return ValidateBy({
     name: 'isRewardAmount',
     validator: {
       validate(value: unknown) {
-        if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+        try {
+          const str = typeof value === 'bigint' ? value.toString() : value;
+          if (typeof str !== 'string' || !/^\d+$/.test(str)) {
+            return false;
+          }
+
+          const amount = BigInt(str);
+          return amount > 0n && amount <= MAX_REWARD_AMOUNT;
+        } catch {
           return false;
         }
-
-        const amount = BigInt(value);
-        return amount > 0n && amount <= MAX_REWARD_AMOUNT;
       },
       defaultMessage() {
         return `rewardAmount must be a whole number between 1 and ${MAX_REWARD_AMOUNT.toString()}`;
@@ -112,10 +127,10 @@ export class CreateBountyDto {
     description: 'Reward amount in XLM (in stroops)',
     example: '10000000',
   })
-  @IsString()
   @IsNotEmpty()
+  @ToStroopBigInt()
   @IsRewardAmount()
-  rewardAmount!: string;
+  rewardAmount!: string | bigint;
 
   @ApiProperty({
     description: 'Stellar wallet address of the bounty owner',
@@ -165,9 +180,9 @@ export class UpdateBountyDto {
 
   @ApiPropertyOptional({ description: 'Updated reward amount in XLM' })
   @IsOptional()
-  @IsString()
+  @ToStroopBigInt()
   @IsRewardAmount()
-  rewardAmount?: string;
+  rewardAmount?: string | bigint;
 
   @ApiPropertyOptional({ description: 'Bounty owner wallet address' })
   @IsOptional()

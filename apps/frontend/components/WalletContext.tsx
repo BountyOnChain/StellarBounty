@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { clearStoredWalletSession, readStoredWallet, saveStoredWallet } from "./wallet-storage";
 
 type WalletState = {
   publicKey: string | null;
@@ -21,15 +15,9 @@ type WalletState = {
 
 type FreighterApi = typeof import("@stellar/freighter-api");
 
-const WALLET_STORAGE_KEY = "stellar-bounty.wallet";
 const DEFAULT_NETWORK = "TESTNET";
 
 const WalletContext = createContext<WalletState | undefined>(undefined);
-
-type StoredWallet = {
-  publicKey: string;
-  freighterNetwork: string | null;
-};
 
 function normalizeNetwork(network: string | undefined) {
   return (network || DEFAULT_NETWORK).trim().toUpperCase();
@@ -56,26 +44,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const targetNetwork = normalizeNetwork(process.env.NEXT_PUBLIC_STELLAR_NETWORK);
 
   useEffect(() => {
-    const savedWallet = window.localStorage.getItem(WALLET_STORAGE_KEY);
+    const savedWallet = readStoredWallet();
 
     if (!savedWallet) {
       return;
     }
 
-    try {
-      const parsedWallet = JSON.parse(savedWallet) as StoredWallet;
-
-      if (parsedWallet?.publicKey) {
-        setPublicKey(parsedWallet.publicKey);
-        setFreighterNetwork(parsedWallet.freighterNetwork);
-      }
-    } catch {
-      window.localStorage.removeItem(WALLET_STORAGE_KEY);
-    }
+    setPublicKey(savedWallet.publicKey);
+    setFreighterNetwork(savedWallet.freighterNetwork);
   }, []);
 
   const disconnect = useCallback(() => {
-    window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    clearStoredWalletSession();
     setPublicKey(null);
     setFreighterNetwork(null);
     setError(null);
@@ -112,10 +92,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       setPublicKey(access.address);
       setFreighterNetwork(activeNetwork);
-      window.localStorage.setItem(
-        WALLET_STORAGE_KEY,
-        JSON.stringify({ publicKey: access.address, freighterNetwork: activeNetwork }),
-      );
+      saveStoredWallet({ publicKey: access.address, freighterNetwork: activeNetwork });
 
       if (activeNetwork !== targetNetwork) {
         setError(`Freighter is on ${activeNetwork}. This app is configured for ${targetNetwork}.`);

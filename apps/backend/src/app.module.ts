@@ -9,6 +9,14 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { BountiesController } from './bounties.controller';
 import { BountiesService } from './bounties.service';
+import {
+  createDbPoolExtra,
+  DEFAULT_DB_POOL_CONNECT_TIMEOUT_MS,
+  DEFAULT_DB_POOL_IDLE_TIMEOUT_MS,
+  DEFAULT_DB_POOL_MAX,
+  DEFAULT_DB_RETRY_ATTEMPTS,
+  DEFAULT_DB_RETRY_DELAY_MS,
+} from './db-pool.config';
 import { Bounty } from './entities/bounty.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
@@ -36,9 +44,15 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         CORS_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
         CORS_ORIGINS: Joi.string().optional(),
         AUTH_RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
+        AUTH_NONCE_TTL_MS: Joi.number().integer().positive().default(300000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
         MAX_BODY_SIZE: Joi.string().default('1mb'),
+        DB_POOL_MAX: Joi.number().integer().positive().default(DEFAULT_DB_POOL_MAX),
+        DB_POOL_IDLE_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_IDLE_TIMEOUT_MS),
+        DB_POOL_CONNECT_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_CONNECT_TIMEOUT_MS),
+        DB_RETRY_ATTEMPTS: Joi.number().integer().positive().default(DEFAULT_DB_RETRY_ATTEMPTS),
+        DB_RETRY_DELAY_MS: Joi.number().integer().positive().default(DEFAULT_DB_RETRY_DELAY_MS),
         RATE_LIMIT_TTL_MS: Joi.number().integer().positive().default(60000),
         RATE_LIMIT_MAX: Joi.number().integer().positive().default(30),
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
@@ -74,14 +88,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         entities: [Bounty, Submission, Nonce],
         migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
         logger: new TypeOrmMetricsLogger(metrics),
+        extra: createDbPoolExtra(config),
+        retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', DEFAULT_DB_RETRY_ATTEMPTS),
+        retryDelay: config.get<number>('DB_RETRY_DELAY_MS', DEFAULT_DB_RETRY_DELAY_MS),
         maxQueryExecutionTime: 250,
         synchronize: false,
-        retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', 5),
-        retryDelay: config.get<number>('DB_RETRY_DELAY_MS', 3000),
-        extra: {
-          max: config.get<number>('DB_POOL_MAX', 10),
-          connectionTimeoutMillis: config.get<number>('DB_CONNECTION_TIMEOUT_MS', 30000),
-        },
       } as import('typeorm').DataSourceOptions),
     }),
   ],

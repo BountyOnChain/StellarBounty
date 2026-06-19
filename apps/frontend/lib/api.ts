@@ -10,18 +10,24 @@ type AuthTokenResponse = {
   accessToken: string;
 };
 
-async function getAccessToken(publicKey: string): Promise<string> {
+type JwtPayload = {
+  sub?: unknown;
+};
+
+export async function getAccessToken(publicKey: string): Promise<string> {
   const savedToken =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
-      : null;
+    typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
   if (savedToken) {
-    return savedToken;
+    if (isTokenForPublicKey(savedToken, publicKey)) {
+      return savedToken;
+    }
+
+    clearAuthToken();
   }
 
   const challengeResponse = await fetch(
-    `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`
+    `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`,
   );
   if (!challengeResponse.ok) {
     throw new Error("Failed to request wallet challenge.");
@@ -60,8 +66,32 @@ async function getAccessToken(publicKey: string): Promise<string> {
   return accessToken;
 }
 
-function clearAuthToken(): void {
+export function clearAuthToken(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+function isTokenForPublicKey(token: string, publicKey: string): boolean {
+  const payload = decodeJwtPayload(token);
+  return payload?.sub === publicKey;
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
+  const [, encodedPayload] = token.split(".");
+  if (!encodedPayload || typeof globalThis.atob !== "function") {
+    return null;
+  }
+
+  try {
+    const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    return JSON.parse(globalThis.atob(padded)) as JwtPayload;
+  } catch {
+    return null;
+  }
 }
 
 export function useAuth() {
@@ -83,6 +113,6 @@ export function useAuth() {
       isAuthenticating,
       apiUrl: API_URL,
     }),
-    [getToken, isAuthenticating]
+    [getToken, isAuthenticating],
   );
 }
