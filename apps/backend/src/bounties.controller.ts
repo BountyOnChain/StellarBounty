@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
+import { Throttle } from '@nestjs/throttler';
+import { ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -14,8 +14,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 
-@ApiTags('bounties')
-@Controller('bounties')
+@ApiTags('v1: bounties')
+@Controller('api/v1/bounties')
 export class BountiesController {
   constructor(private readonly bountiesService: BountiesService) {}
 
@@ -25,6 +25,7 @@ export class BountiesController {
   @ApiBadRequestResponse({ description: 'Invalid bounty payload.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post()
   create(@Body() dto: CreateBountyDto) {
     return this.bountiesService.create(dto);
@@ -32,6 +33,7 @@ export class BountiesController {
 
   @ApiOperation({ summary: 'List all bounties' })
   @ApiOkResponse({ description: 'Bounties ordered newest first.', type: [BountyResponseDto] })
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get()
   findAll() {
     return this.bountiesService.findAll();
@@ -41,6 +43,7 @@ export class BountiesController {
   @ApiParam({ name: 'id', description: 'Bounty UUID' })
   @ApiOkResponse({ description: 'Requested bounty.', type: BountyResponseDto })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.bountiesService.findOne(id);
@@ -54,6 +57,7 @@ export class BountiesController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateBountyDto) {
     return this.bountiesService.update(id, dto);
@@ -66,8 +70,21 @@ export class BountiesController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.bountiesService.remove(id);
+  }
+
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Restore a soft-deleted bounty' })
+  @ApiParam({ name: 'id', description: 'Bounty UUID' })
+  @ApiOkResponse({ description: 'Restored bounty.', type: BountyResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiNotFoundResponse({ description: 'Bounty not found.' })
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/restore')
+  restore(@Param('id') id: string) {
+    return this.bountiesService.restore(id);
   }
 }

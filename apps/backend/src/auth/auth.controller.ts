@@ -16,8 +16,8 @@ import {
 import { ChallengeQueryDto, ChallengeResponseDto } from './dto/challenge-query.dto';
 import { VerifyDto, VerifyResponseDto } from './dto/verify.dto';
 
-@ApiTags('auth')
-@Controller('auth')
+@ApiTags('v1: auth')
+@Controller('api/v1/auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
