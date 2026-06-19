@@ -144,6 +144,7 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Completed);
         Self::clear_pending_operation(&env);
+        let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
         env.events()
             .publish((symbol_short!("approve"), owner), (amount, contributor));
     }
@@ -176,10 +177,10 @@ impl EscrowContract {
             "cancel only allowed from Created or Funded"
         );
 
+        let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
         if status == BountyStatus::Funded {
             let amount: i128 = env.storage().instance().get(&symbol_short!("AMOUNT")).unwrap();
             let token_address: Address = env.storage().instance().get(&symbol_short!("TOKEN")).unwrap();
-            let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
             let token = token::Client::new(&env, &token_address);
             token.transfer(&env.current_contract_address(), &owner, &amount);
 
@@ -818,7 +819,7 @@ mod tests {
     fn test_initialize_emits_event() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
         let events_before = env.events().all().len();
-        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
         let events_after = env.events().all().len();
         assert!(
             events_after > events_before,
@@ -831,7 +832,7 @@ mod tests {
     #[test]
     fn test_fund_emits_event() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
-        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
         let events_before = env.events().all().len();
         client.fund(&owner);
         let events_after = env.events().all().len();
@@ -846,7 +847,7 @@ mod tests {
     #[test]
     fn test_lifecycle_emits_events() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
-        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
         client.fund(&owner);
         let events_before = env.events().all().len();
         let contributor = Address::generate(&env);
@@ -865,7 +866,7 @@ mod tests {
     #[test]
     fn test_cancel_emits_event() {
         let (env, client, owner, token_address, _, arbitrator, amount) = setup();
-        client.initialize(&owner, &amount, &token_address, &arbitrator);
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
         client.fund(&owner);
         let events_before = env.events().all().len();
         client.cancel(&owner);
