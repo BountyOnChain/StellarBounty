@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env};
 
 const DEFAULT_TIMELOCK_SECONDS: u64 = 24 * 60 * 60;
 
@@ -387,11 +385,7 @@ impl EscrowContract {
             .ok_or(ContractError::NotInitialized)
     }
 
-    fn queue_operation(
-        env: &Env,
-        initiator: &Address,
-        operation: TimelockOperation,
-    ) -> Result<(), ContractError> {
+    fn queue_operation(env: &Env, initiator: &Address, operation: TimelockOperation) -> Result<(), ContractError> {
         if env.storage().instance().has(&symbol_short!("PENDING")) {
             return Err(ContractError::PendingOperationExists);
         }
@@ -661,19 +655,13 @@ mod tests {
     fn test_execute_approve_before_timelock_errs() {
         let (_, client, owner, _, _, _, _, _) = setup_under_review();
         client.approve(&owner);
-        assert_eq!(
-            client.try_execute_approve(),
-            Err(Ok(ContractError::OperationLocked))
-        );
+        assert_eq!(client.try_execute_approve(), Err(Ok(ContractError::OperationLocked)));
     }
 
     #[test]
     fn test_execute_approve_without_pending_errs() {
         let (_, client, _, _, _, _, _, _) = setup_under_review();
-        assert_eq!(
-            client.try_execute_approve(),
-            Err(Ok(ContractError::NoPendingOperation))
-        );
+        assert_eq!(client.try_execute_approve(), Err(Ok(ContractError::NoPendingOperation)));
     }
 
     #[test]
@@ -683,10 +671,7 @@ mod tests {
         client.cancel_operation(&owner);
 
         unlock_pending(&env);
-        assert_eq!(
-            client.try_execute_approve(),
-            Err(Ok(ContractError::NoPendingOperation))
-        );
+        assert_eq!(client.try_execute_approve(), Err(Ok(ContractError::NoPendingOperation)));
     }
 
     #[test]
@@ -802,10 +787,7 @@ mod tests {
         assert_eq!(client.get_status(), BountyStatus::Disputed);
 
         unlock_pending(&env);
-        assert_eq!(
-            client.try_execute_approve(),
-            Err(Ok(ContractError::NoPendingOperation))
-        );
+        assert_eq!(client.try_execute_approve(), Err(Ok(ContractError::NoPendingOperation)));
     }
 
     #[test]
