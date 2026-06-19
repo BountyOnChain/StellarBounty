@@ -37,6 +37,7 @@ describe('BountiesService', () => {
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
       findOne: jest.fn(),
+      findAndCount: jest.fn(),
       softRemove: jest.fn(async (input) => input),
       restore: jest.fn(async (id) => id),
       remove: jest.fn(),
