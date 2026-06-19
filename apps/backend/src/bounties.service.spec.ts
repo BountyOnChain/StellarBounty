@@ -19,7 +19,7 @@ describe('BountiesService', () => {
       id: 'bounty-1',
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration with tests.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: new Date('2026-12-31T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
@@ -67,12 +67,12 @@ describe('BountiesService', () => {
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          rewardAmount: '10000000',
+          rewardAmount: 10000000n,
           deadline: new Date('2026-12-31T00:00:00.000Z'),
         }),
       );
       expect(repository.save).toHaveBeenCalled();
-      expect(result.rewardAmount).toBe('10000000');
+      expect(result.rewardAmount).toBe(10000000n);
     });
 
     it('stores a null deadline when the DTO omits one', async () => {
@@ -138,7 +138,7 @@ describe('BountiesService', () => {
 
       expect(result).toMatchObject({
         title: 'Updated title',
-        rewardAmount: '25000000',
+        rewardAmount: 25000000n,
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);
