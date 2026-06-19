@@ -63,10 +63,8 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
 
-        env.events().publish(
-            (symbol_short!("init"), owner),
-            (amount, token_address, arbitrator),
-        );
+        env.events()
+            .publish((symbol_short!("init"), owner), (amount, token_address, arbitrator));
     }
 
     /// Fund the bounty. Transfers `amount` tokens from owner into the contract.
@@ -90,10 +88,7 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
 
-        env.events().publish(
-            (symbol_short!("fund"), owner),
-            (amount,),
-        );
+        env.events().publish((symbol_short!("fund"), owner), (amount,));
     }
 
     /// Contributor starts work. Transitions Funded → InProgress.
@@ -105,10 +100,7 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
 
-        env.events().publish(
-            (symbol_short!("startwork"), contributor),
-            (),
-        );
+        env.events().publish((symbol_short!("startwork"), contributor), ());
     }
 
     /// Contributor submits work. Transitions InProgress → UnderReview.
@@ -120,10 +112,7 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
 
-        env.events().publish(
-            (symbol_short!("submit"), contributor),
-            (),
-        );
+        env.events().publish((symbol_short!("submit"), contributor), ());
     }
 
     /// Owner approves and releases funds to contributor. Transitions UnderReview → Completed.
@@ -155,10 +144,8 @@ impl EscrowContract {
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Completed);
         Self::clear_pending_operation(&env);
-        env.events().publish(
-            (symbol_short!("approve"), owner),
-            (amount, contributor),
-        );
+        env.events()
+            .publish((symbol_short!("approve"), owner), (amount, contributor));
     }
 
     /// Owner cancels and gets a refund. Only valid from Created or Funded.
@@ -196,15 +183,10 @@ impl EscrowContract {
             let token = token::Client::new(&env, &token_address);
             token.transfer(&env.current_contract_address(), &owner, &amount);
 
-            env.events().publish(
-                (symbol_short!("cancel"), owner),
-                (Some(amount),),
-            );
+            env.events().publish((symbol_short!("cancel"), owner), (Some(amount),));
         } else {
-            env.events().publish(
-                (symbol_short!("cancel"), owner),
-                (Option::<i128>::None,),
-            );
+            env.events()
+                .publish((symbol_short!("cancel"), owner), (Option::<i128>::None,));
         }
 
         env.storage()
