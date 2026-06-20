@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Full-stack Docker Compose development setup for frontend, backend, PostgreSQL, and Stellar Quickstart.
+
 ### Changed
 
 ### Deprecated
