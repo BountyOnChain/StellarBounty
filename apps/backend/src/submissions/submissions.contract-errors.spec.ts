@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
+import { AuditService } from '../audit/audit.service';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { MetricsService } from '../metrics/metrics.service';
@@ -86,6 +87,7 @@ describe('SubmissionsService contract error handling', () => {
       recordStellarRpcFailure: jest.fn(),
       recordStellarRpcRetry: jest.fn(),
     };
+    const audit = { log: jest.fn() };
     mockServer.getAccount.mockRejectedValue(Object.assign(new Error('rpc unavailable'), { code: 'ECONNRESET' }));
 
     const service = new SubmissionsService(
@@ -93,6 +95,7 @@ describe('SubmissionsService contract error handling', () => {
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
       metrics as unknown as MetricsService,
+      audit as unknown as AuditService,
     );
 
     await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow('rpc unavailable');

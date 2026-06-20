@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { AuditService } from '../audit/audit.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { withStellarRpcRetry } from '../common/stellar-rpc-retry';
 import { CreateSubmissionDto } from './submissions.dto';
@@ -26,6 +27,7 @@ export class SubmissionsService {
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
     private readonly metrics: MetricsService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -38,7 +40,15 @@ export class SubmissionsService {
       notes: dto.notes ?? null,
       contributorAddress,
     });
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    await this.audit.log({
+      address: contributorAddress,
+      action: 'submission.create',
+      resourceType: 'submission',
+      resourceId: saved.id,
+      metadata: { bountyId },
+    });
+    return saved;
   }
 
   async findAll(bountyId: string, ownerAddress: string) {
@@ -67,7 +77,15 @@ export class SubmissionsService {
     submission.status = SubmissionStatus.APPROVED;
     bounty.status = BountyStatus.COMPLETED;
     await this.bountyRepo.save(bounty);
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    await this.audit.log({
+      address: ownerAddress,
+      action: 'submission.approve',
+      resourceType: 'submission',
+      resourceId: saved.id,
+      metadata: { bountyId },
+    });
+    return saved;
   }
 
   async reject(bountyId: string, subId: string, ownerAddress: string) {
@@ -79,7 +97,15 @@ export class SubmissionsService {
     if (!submission) throw new NotFoundException('Submission not found');
 
     submission.status = SubmissionStatus.REJECTED;
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+    await this.audit.log({
+      address: ownerAddress,
+      action: 'submission.reject',
+      resourceType: 'submission',
+      resourceId: saved.id,
+      metadata: { bountyId },
+    });
+    return saved;
   }
 
   private resolveRpcUrls(network: string): string[] {

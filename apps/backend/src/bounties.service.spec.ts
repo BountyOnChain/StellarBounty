@@ -2,14 +2,16 @@ import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AuditService } from './audit/audit.service';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
 
-type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends object = object> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let audit: Pick<AuditService, 'log'>;
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -42,6 +44,7 @@ describe('BountiesService', () => {
       restore: jest.fn(async (id) => id),
       remove: jest.fn(),
     };
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -49,6 +52,10 @@ describe('BountiesService', () => {
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: AuditService,
+          useValue: audit,
         },
       ],
     }).compile();
@@ -73,6 +80,16 @@ describe('BountiesService', () => {
         }),
       );
       expect(repository.save).toHaveBeenCalled();
+      expect(audit.log).toHaveBeenCalledWith({
+        address: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+        action: 'bounty.create',
+        resourceType: 'bounty',
+        resourceId: 'bounty-1',
+        metadata: {
+          ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+          rewardAmount: '10000000',
+        },
+      });
       expect(result.rewardAmount).toBe(10000000n);
     });
 
@@ -197,6 +214,13 @@ describe('BountiesService', () => {
         deadline: new Date('2027-01-15T00:00:00.000Z'),
       });
       expect(repository.save).toHaveBeenCalledWith(existing);
+      expect(audit.log).toHaveBeenCalledWith({
+        address: existing.ownerAddress,
+        action: 'bounty.update',
+        resourceType: 'bounty',
+        resourceId: existing.id,
+        metadata: { changedFields: ['title', 'rewardAmount', 'deadline'] },
+      });
     });
 
     it('preserves the existing deadline when update deadline is undefined', async () => {
@@ -231,6 +255,12 @@ describe('BountiesService', () => {
 
       await expect(service.remove('bounty-1')).resolves.toEqual({ deleted: true });
       expect(repository.softRemove).toHaveBeenCalledWith(bounty);
+      expect(audit.log).toHaveBeenCalledWith({
+        address: bounty.ownerAddress,
+        action: 'bounty.delete',
+        resourceType: 'bounty',
+        resourceId: bounty.id,
+      });
       expect(repository.remove).not.toHaveBeenCalled();
     });
 

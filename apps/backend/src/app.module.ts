@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { BountiesController } from './bounties.controller';
@@ -18,10 +19,12 @@ import {
   DEFAULT_DB_RETRY_DELAY_MS,
 } from './db-pool.config';
 import { Bounty } from './entities/bounty.entity';
+import { AuditLog } from './entities/audit-log.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
+import { CreateAuditLogs1747657600000 } from './migrations/1747657600000-CreateAuditLogs';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CspReportController } from './csp-report.controller';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
@@ -81,6 +84,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         limit: config.get<number>('RATE_LIMIT_MAX', 30),
       }]),
     }),
+    AuditModule,
     AuthModule,
     SubmissionsModule,
     HealthModule,
@@ -92,8 +96,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       useFactory: (config: ConfigService, metrics: MetricsService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [Bounty, Submission, Nonce],
-        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
+        entities: [Bounty, Submission, Nonce, AuditLog],
+        migrations: [InitSchema1747657200000, AddNoncesTable1747657300000, CreateAuditLogs1747657600000],
         logger: new TypeOrmMetricsLogger(metrics),
         extra: createDbPoolExtra(config),
         retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', DEFAULT_DB_RETRY_ATTEMPTS),

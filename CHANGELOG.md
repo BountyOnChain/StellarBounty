@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Database-backed audit logs for bounty and submission mutations.
+
 ### Changed
 
 ### Deprecated

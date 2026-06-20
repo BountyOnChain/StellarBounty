@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse,
   ApiBearerAuth,
@@ -29,8 +29,8 @@ export class BountiesController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post()
-  create(@Body() dto: CreateBountyDto) {
-    return this.bountiesService.create(dto);
+  create(@Body() dto: CreateBountyDto, @Request() req: { user: { address: string } }) {
+    return this.bountiesService.create(dto, req.user.address);
   }
 
   @ApiOperation({ summary: 'List all bounties (paginated, newest first)' })
@@ -73,8 +73,12 @@ export class BountiesController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateBountyDto) {
-    return this.bountiesService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBountyDto,
+    @Request() req: { user: { address: string } },
+  ) {
+    return this.bountiesService.update(id, dto, req.user.address);
   }
 
   @ApiBearerAuth('access-token')
@@ -86,8 +90,8 @@ export class BountiesController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.bountiesService.remove(id);
+  remove(@Param('id') id: string, @Request() req: { user: { address: string } }) {
+    return this.bountiesService.remove(id, req.user.address);
   }
 
   @ApiBearerAuth('access-token')
@@ -98,7 +102,7 @@ export class BountiesController {
   @ApiNotFoundResponse({ description: 'Bounty not found.' })
   @UseGuards(JwtAuthGuard)
   @Patch(':id/restore')
-  restore(@Param('id') id: string) {
-    return this.bountiesService.restore(id);
+  restore(@Param('id') id: string, @Request() req: { user: { address: string } }) {
+    return this.bountiesService.restore(id, req.user.address);
   }
 }

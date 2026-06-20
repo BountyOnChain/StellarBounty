@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
+import { AuditService } from '../audit/audit.service';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { MetricsService } from '../metrics/metrics.service';
@@ -51,6 +52,7 @@ describe('SubmissionsService', () => {
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
   let metrics: Pick<MetricsService, 'recordStellarRpcFailure' | 'recordStellarRpcRetry'>;
+  let audit: Pick<AuditService, 'log'>;
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
@@ -100,7 +102,7 @@ describe('SubmissionsService', () => {
 
     submissionRepo = {
       create: jest.fn((input) => input),
-      save: jest.fn(async (input) => input),
+      save: jest.fn(async (input) => ({ id: 'submission1', ...input })),
       findBy: jest.fn(),
       findOneBy: jest.fn(),
     };
@@ -115,12 +117,14 @@ describe('SubmissionsService', () => {
       recordStellarRpcFailure: jest.fn(),
       recordStellarRpcRetry: jest.fn(),
     };
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     service = new SubmissionsService(
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
       metrics as MetricsService,
+      audit as AuditService,
     );
   });
 
@@ -128,7 +132,7 @@ describe('SubmissionsService', () => {
     it('creates a submission with nullable notes for an existing bounty', async () => {
       bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty());
 
-      const result = await service.create(
+      await service.create(
         'bounty1',
         { link: 'https://github.com/example/repo/pull/1' },
         'GCONTRIBUTOR',
@@ -140,7 +144,17 @@ describe('SubmissionsService', () => {
         notes: null,
         contributorAddress: 'GCONTRIBUTOR',
       });
-      expect(submissionRepo.save).toHaveBeenCalledWith(result);
+      expect(submissionRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+        bountyId: 'bounty1',
+        contributorAddress: 'GCONTRIBUTOR',
+      }));
+      expect(audit.log).toHaveBeenCalledWith({
+        address: 'GCONTRIBUTOR',
+        action: 'submission.create',
+        resourceType: 'submission',
+        resourceId: 'submission1',
+        metadata: { bountyId: 'bounty1' },
+      });
     });
 
     it('throws NotFoundException when creating for a missing bounty', async () => {
@@ -186,6 +200,13 @@ describe('SubmissionsService', () => {
       expect(bounty.status).toBe(BountyStatus.COMPLETED);
       expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
       expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+      expect(audit.log).toHaveBeenCalledWith({
+        address: 'GOWNER',
+        action: 'submission.approve',
+        resourceType: 'submission',
+        resourceId: 'submission1',
+        metadata: { bountyId: 'bounty1' },
+      });
       expect(StellarSdk.rpc.Server).not.toHaveBeenCalled();
     });
 
@@ -367,6 +388,13 @@ describe('SubmissionsService', () => {
 
       expect(result.status).toBe(SubmissionStatus.REJECTED);
       expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+      expect(audit.log).toHaveBeenCalledWith({
+        address: 'GOWNER',
+        action: 'submission.reject',
+        resourceType: 'submission',
+        resourceId: 'submission1',
+        metadata: { bountyId: 'bounty1' },
+      });
     });
 
     it('throws NotFoundException when rejecting a missing submission', async () => {

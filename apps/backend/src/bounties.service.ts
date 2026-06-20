@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AuditService } from './audit/audit.service';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 import { sanitizeDescription } from './common/sanitize-description';
 import {
@@ -15,9 +16,10 @@ export class BountiesService {
   constructor(
     @InjectRepository(Bounty)
     private readonly bounties: Repository<Bounty>,
+    private readonly audit: AuditService,
   ) {}
 
-  async create(dto: CreateBountyDto) {
+  async create(dto: CreateBountyDto, actorAddress = dto.ownerAddress) {
     // Re-initialization protection: check if bounty with same title already exists
     const existing = await this.bounties.findOne({ where: { title: dto.title } });
     if (existing) {
@@ -30,7 +32,18 @@ export class BountiesService {
       rewardAmount: BigInt(dto.rewardAmount),
       deadline: dto.deadline ? new Date(dto.deadline) : null,
     });
-    return this.bounties.save(bounty);
+    const saved = await this.bounties.save(bounty);
+    await this.audit.log({
+      address: actorAddress,
+      action: 'bounty.create',
+      resourceType: 'bounty',
+      resourceId: saved.id,
+      metadata: {
+        ownerAddress: saved.ownerAddress,
+        rewardAmount: saved.rewardAmount.toString(),
+      },
+    });
+    return saved;
   }
 
   /**
@@ -64,24 +77,39 @@ export class BountiesService {
     return bounty;
   }
 
-  async update(id: string, dto: UpdateBountyDto) {
+  async update(id: string, dto: UpdateBountyDto, actorAddress?: string) {
     const bounty = await this.findOne(id);
+    const changedFields = Object.keys(dto);
     Object.assign(bounty, {
       ...dto,
       description: dto.description === undefined ? bounty.description : sanitizeDescription(dto.description),
       rewardAmount: dto.rewardAmount !== undefined ? BigInt(dto.rewardAmount) : bounty.rewardAmount,
       deadline: dto.deadline === undefined ? bounty.deadline : new Date(dto.deadline),
     });
-    return this.bounties.save(bounty);
+    const saved = await this.bounties.save(bounty);
+    await this.audit.log({
+      address: actorAddress ?? bounty.ownerAddress,
+      action: 'bounty.update',
+      resourceType: 'bounty',
+      resourceId: saved.id,
+      metadata: { changedFields },
+    });
+    return saved;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorAddress?: string) {
     const bounty = await this.findOne(id);
     await this.bounties.softRemove(bounty);
+    await this.audit.log({
+      address: actorAddress ?? bounty.ownerAddress,
+      action: 'bounty.delete',
+      resourceType: 'bounty',
+      resourceId: bounty.id,
+    });
     return { deleted: true };
   }
 
-  async restore(id: string) {
+  async restore(id: string, actorAddress?: string) {
     // softRemove sets deletedAt, restore unsets it
     const bounty = await this.bounties.findOne({
       where: { id },
@@ -94,6 +122,13 @@ export class BountiesService {
       return bounty;
     }
     await this.bounties.restore(id);
-    return this.findOne(id);
+    const restored = await this.findOne(id);
+    await this.audit.log({
+      address: actorAddress ?? restored.ownerAddress,
+      action: 'bounty.restore',
+      resourceType: 'bounty',
+      resourceId: restored.id,
+    });
+    return restored;
   }
 }
