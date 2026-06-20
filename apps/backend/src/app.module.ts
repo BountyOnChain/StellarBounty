@@ -25,11 +25,13 @@ import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNonce
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CspReportController } from './csp-report.controller';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
+import { AuditLogMiddleware } from './common/middleware/audit-log.middleware';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+import { DEFAULT_MAX_BODY_SIZE } from './body-size.config';
 
 @Module({
   imports: [
@@ -50,7 +52,9 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
         AUTH_NONCE_TTL_MS: Joi.number().integer().positive().default(300000),
         AUTH_CHALLENGE_RATE_LIMIT: Joi.number().integer().positive().default(5),
         AUTH_VERIFY_RATE_LIMIT: Joi.number().integer().positive().default(10),
-        MAX_BODY_SIZE: Joi.string().default('1mb'),
+        MAX_BODY_SIZE: Joi.string().default(DEFAULT_MAX_BODY_SIZE),
+        NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+        TRUST_PROXY: Joi.boolean().default(false),
         DB_POOL_MAX: Joi.number().integer().positive().default(DEFAULT_DB_POOL_MAX),
         DB_POOL_IDLE_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_IDLE_TIMEOUT_MS),
         DB_POOL_CONNECT_TIMEOUT_MS: Joi.number().integer().positive().default(DEFAULT_DB_POOL_CONNECT_TIMEOUT_MS),
@@ -106,6 +110,6 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(MetricsMiddleware, LoggerMiddleware).forRoutes('*');
+    consumer.apply(MetricsMiddleware, LoggerMiddleware, AuditLogMiddleware).forRoutes('*');
   }
 }

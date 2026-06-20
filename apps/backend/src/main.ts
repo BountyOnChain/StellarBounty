@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import compression from 'compression';
 import helmet from 'helmet';
-import { json, Request, Response, NextFunction, urlencoded } from 'express';
+import { json, urlencoded } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { getMaxBodySize } from './body-size.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -14,6 +15,7 @@ import { createCorsOptions } from './cors.config';
 import { createContentSecurityPolicy } from './csp.config';
 import { createGracefulShutdownHandler } from './graceful-shutdown';
 import { setupSwagger } from './swagger.setup';
+import { createHstsConfig, shouldTrustProxy } from './transport-security.config';
 import { createValidationPipeOptions } from './validation-pipe.config';
 
 async function bootstrap() {
@@ -29,18 +31,18 @@ async function bootstrap() {
 
   // Request body size limits — DoS protection (#158)
   app.use(json({ limit: maxBodySize }));
-  app.use(urlencoded({ extended: true, limit: maxBodySize }));
+  app.use(urlencoded({ extended: true, limit: maxBodySize, parameterLimit: 1000 }));
 
-  app.use(helmet({ contentSecurityPolicy: createContentSecurityPolicy(config) }));
+  if (shouldTrustProxy(config)) {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
+  app.use(helmet({
+    contentSecurityPolicy: createContentSecurityPolicy(config),
+    hsts: createHstsConfig(config),
+  }));
   // HSTS: force HTTPS in production (1 year, includeSubDomains, preload)
   if (config.get<string>('NODE_ENV') === 'production') {
-    app.use(
-      helmet.hsts({
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true,
-      }),
-    );
     // Redirect HTTP to HTTPS
     app.use((req: Request, res: Response, next: NextFunction) => {
       if (req.headers['x-forwarded-proto'] !== 'https') {

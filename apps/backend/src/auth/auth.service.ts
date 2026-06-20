@@ -59,6 +59,31 @@ export class AuthService {
     return { accessToken };
   }
 
+  // Session management — token refresh and revocation
+  private readonly tokenBlacklist = new Set<string>();
+
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      if (this.tokenBlacklist.has(refreshToken)) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+      const accessToken = this.jwtService.sign({ sub: payload.sub });
+      return { accessToken };
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async revokeToken(token: string): Promise<{ revoked: boolean }> {
+    this.tokenBlacklist.add(token);
+    return { revoked: true };
+  }
+
+  isRevoked(token: string): boolean {
+    return this.tokenBlacklist.has(token);
+  }
+
   private async pruneExpired(): Promise<void> {
     const now = new Date();
     await this.nonceRepository

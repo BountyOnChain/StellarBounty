@@ -36,6 +36,7 @@ describe('BountiesService', () => {
       create: jest.fn((input) => input),
       save: jest.fn(async (input) => createBounty(input)),
       find: jest.fn(),
+      findAndCount: jest.fn(),
       findOne: jest.fn(),
       softRemove: jest.fn(async (input) => input),
       restore: jest.fn(async (id) => id),
@@ -113,12 +114,53 @@ describe('BountiesService', () => {
     });
   });
 
-  it('findAll returns bounties ordered newest first', async () => {
-    const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
-    repository.find!.mockResolvedValueOnce(bounties);
+  describe('findAll', () => {
+    it('returns paginated bounties ordered newest first with default page=1, limit=20', async () => {
+      const bounties = [createBounty({ id: 'new' }), createBounty({ id: 'old' })];
+      repository.findAndCount!.mockResolvedValueOnce([bounties, 2]);
 
-    await expect(service.findAll()).resolves.toBe(bounties);
-    expect(repository.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+      const result = await service.findAll();
+
+      expect(repository.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        skip: 0,
+        take: 20,
+      });
+      expect(result).toEqual({
+        data: bounties,
+        total: 2,
+        page: 1,
+        pageSize: 20,
+        totalPages: 1,
+      });
+    });
+
+    it('applies skip/take derived from page and limit', async () => {
+      const bounties = [createBounty({ id: 'b' })];
+      repository.findAndCount!.mockResolvedValueOnce([bounties, 45]);
+
+      const result = await service.findAll({ page: 2, limit: 10 });
+
+      expect(repository.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        skip: 10,
+        take: 10,
+      });
+      expect(result.total).toBe(45);
+      expect(result.page).toBe(2);
+      expect(result.pageSize).toBe(10);
+      expect(result.totalPages).toBe(5);
+    });
+
+    it('returns totalPages = 1 even when total is 0 (defensive)', async () => {
+      repository.findAndCount!.mockResolvedValueOnce([[], 0]);
+
+      const result = await service.findAll({ page: 1, limit: 20 });
+
+      expect(result.data).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(1);
+    });
   });
 
   describe('findOne', () => {
@@ -226,6 +268,40 @@ describe('BountiesService', () => {
 
       await expect(service.restore('missing')).rejects.toThrow(NotFoundException);
       expect(repository.restore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('re-initialization protection', () => {
+    it('should not create duplicate bounty with same id', async () => {
+      const existing = createBounty({ id: 'bounty-1' });
+      repository.findOne!.mockResolvedValueOnce(existing);
+
+      await service.create({
+        title: 'Duplicate bounty',
+        description: 'Should not be created',
+        rewardAmount: '5000000',
+        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+      });
+
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should allow creation when no bounty exists with same id', async () => {
+      repository.findOne!.mockResolvedValueOnce(null);
+      const newBounty = createBounty({ id: 'bounty-2' });
+      repository.create!.mockReturnValueOnce(newBounty);
+      repository.save!.mockResolvedValueOnce(newBounty);
+
+      await service.create({
+        title: 'New bounty',
+        description: 'Fresh creation',
+        rewardAmount: '10000000',
+        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+      });
+
+      expect(repository.create).toHaveBeenCalled();
+      expect(repository.save).toHaveBeenCalled();
     });
   });
 });

@@ -15,6 +15,7 @@ import {
 } from './auth-rate-limit.config';
 import { ChallengeQueryDto, ChallengeResponseDto } from './dto/challenge-query.dto';
 import { VerifyDto, VerifyResponseDto } from './dto/verify.dto';
+import { RefreshTokenDto, RevokeTokenDto } from './dto/refresh-token.dto';
 
 @ApiTags('v1: auth')
 @Controller('api/v1/auth')
@@ -49,5 +50,20 @@ export class AuthController {
   })
   verify(@Body() body: VerifyDto) {
     return this.authService.verify(body.address, body.signature, body.nonce);
+  }
+
+  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiOkResponse({ description: 'New access token generated.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or revoked refresh token.' })
+  @Post('refresh')
+  refresh(@Body() body: RefreshTokenDto) {
+    return this.authService.refreshToken(body.refreshToken);
+  }
+
+  @ApiOperation({ summary: 'Revoke a token (logout)' })
+  @ApiOkResponse({ description: 'Token revoked successfully.' })
+  @Post('revoke')
+  revoke(@Body() body: RevokeTokenDto) {
+    return this.authService.revokeToken(body.token);
   }
 }

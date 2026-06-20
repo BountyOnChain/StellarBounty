@@ -27,10 +27,14 @@ export const metadata: Metadata = {
 type SortOption = "newest" | "highest_reward" | "closest_deadline";
 type StatusFilter = "all" | "open" | "in_progress" | "completed";
 
+const DEFAULT_PAGE_SIZE = 20;
+
 type SearchParams = {
   sort?: string;
   status?: string;
   search?: string;
+  page?: string;
+  limit?: string;
 };
 
 type ApiBounty = Partial<BountyCardData> & {
@@ -40,30 +44,72 @@ type ApiBounty = Partial<BountyCardData> & {
   dueDate?: string | null;
 };
 
-type ApiBountiesResponse = ApiBounty[] | { data?: ApiBounty[] };
+type ApiBountiesPayload = {
+  data?: ApiBounty[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
+};
 
-async function getBounties(): Promise<BountyCardData[]> {
+type ApiBountiesResponse = ApiBounty[] | ApiBountiesPayload;
+
+type LoadedBounties = {
+  bounties: BountyCardData[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+function normalizePage(value: string | undefined): number {
+  const n = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+function normalizeLimit(value: string | undefined): number {
+  const n = Number.parseInt(value ?? `${DEFAULT_PAGE_SIZE}`, 10);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_PAGE_SIZE;
+  // Cap at 100 to match the backend's MAX_PAGE_SIZE.
+  return Math.min(100, n);
+}
+
+async function getBounties(
+  page: number,
+  limit: number,
+): Promise<LoadedBounties> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
-    const response = await fetch(`${apiUrl}/api/v1/bounties`, { next: { revalidate } });
+    const url = new URL(`${apiUrl}/api/v1/bounties`);
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("limit", String(limit));
+    const response = await fetch(url, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return [];
+      return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
-    const bounties = Array.isArray(payload) ? payload : payload.data ?? [];
+    const data = Array.isArray(payload) ? payload : payload.data ?? [];
+    const total = Array.isArray(payload) ? data.length : payload.total ?? data.length;
+    const respPage = Array.isArray(payload) ? 1 : payload.page ?? page;
+    const respPageSize = Array.isArray(payload) ? data.length : payload.pageSize ?? limit;
+    const totalPages = Array.isArray(payload)
+      ? 1
+      : payload.totalPages ?? Math.max(1, Math.ceil(total / Math.max(1, respPageSize)));
 
-    return bounties.map((bounty, index) => ({
+    const bounties = data.map((bounty, index) => ({
       id: bounty.id ?? bounty._id ?? index,
       title: bounty.title ?? "Untitled bounty",
       reward: bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? null,
       deadline: bounty.deadline ?? bounty.dueDate ?? null,
       status: bounty.status ?? "open",
     }));
+
+    return { bounties, total, page: respPage, pageSize: respPageSize, totalPages };
   } catch {
-    return [];
+    return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
   }
 }
 
@@ -132,12 +178,87 @@ function applyListingControls(
   });
 }
 
+function buildPageHref(
+  searchParams: SearchParams,
+  nextPage: number,
+  nextLimit: number,
+): string {
+  const params = new URLSearchParams();
+  const sort = normalizeSort(searchParams.sort);
+  if (sort !== "newest") params.set("sort", sort);
+  const status = normalizeStatus(searchParams.status);
+  if (status !== "all") params.set("status", status);
+  if (searchParams.search) params.set("search", searchParams.search);
+  if (nextLimit !== DEFAULT_PAGE_SIZE) params.set("limit", String(nextLimit));
+  if (nextPage > 1) params.set("page", String(nextPage));
+  const qs = params.toString();
+  return qs ? `/?${qs}` : "/";
+}
+
+function PaginationControls({
+  currentPage,
+  totalPages,
+  pageSize,
+  searchParams,
+}: {
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  searchParams: SearchParams;
+}) {
+  if (totalPages <= 1) {
+    return null;
+  }
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+  const prevHref = buildPageHref(searchParams, currentPage - 1, pageSize);
+  const nextHref = buildPageHref(searchParams, currentPage + 1, pageSize);
+
+  return (
+    <nav
+      aria-label="Pagination"
+      className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:px-6"
+    >
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Page <span className="font-semibold text-slate-900 dark:text-slate-100">{currentPage}</span> of{" "}
+        <span className="font-semibold text-slate-900 dark:text-slate-100">{totalPages}</span>
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href={prevHref}
+          aria-disabled={!hasPrev}
+          className={`inline-flex min-w-24 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium transition ${
+            hasPrev
+              ? "border-slate-300 text-slate-700 hover:border-slate-500 hover:text-slate-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
+              : "pointer-events-none cursor-not-allowed border-slate-200 text-slate-400 opacity-50 dark:border-slate-800 dark:text-slate-600"
+          }`}
+        >
+          ← Previous
+        </Link>
+        <Link
+          href={nextHref}
+          aria-disabled={!hasNext}
+          className={`inline-flex min-w-24 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+            hasNext
+              ? "bg-yellow-400 text-slate-950 hover:bg-yellow-300"
+              : "pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-600"
+          }`}
+        >
+          Next →
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const allBounties = await getBounties();
+  const page = normalizePage(searchParams?.page);
+  const pageSize = normalizeLimit(searchParams?.limit);
+  const { bounties: pageBounties, total, totalPages } = await getBounties(page, pageSize);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.search ?? "";
-  const bounties = applyListingControls(allBounties, { sort, status, search });
+  const bounties = applyListingControls(pageBounties, { sort, status, search });
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
@@ -219,7 +340,13 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <p>
               Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
-              <span className="font-semibold text-slate-900 dark:text-slate-200">{allBounties.length}</span> bounties
+              <span className="font-semibold text-slate-900 dark:text-slate-200">{total}</span> bounties
+              {totalPages > 1 ? (
+                <>
+                  {" "}· page <span className="font-semibold text-slate-900 dark:text-slate-200">{page}</span> of{" "}
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">{totalPages}</span>
+                </>
+              ) : null}
             </p>
             <p className="text-slate-500 dark:text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
           </div>
@@ -243,6 +370,13 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             </Link>
           </section>
         )}
+
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          searchParams={searchParams ?? {}}
+        />
       </div>
     </main>
   );

@@ -1,0 +1,6 @@
+apps/contracts/ @bounty-team/contracts-reviewers
+apps/backend/ @bounty-team/backend-reviewers
+apps/frontend/ @bounty-team/frontend-reviewers
+.github/ @bounty-team/devops-reviewers
+docker-compose.yml @bounty-team/maintainers
+.env.example @bounty-team/maintainers

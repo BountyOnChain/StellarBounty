@@ -92,6 +92,27 @@ export class SubmissionsService {
     return backup ? [primary, backup] : [primary];
   }
 
+  private async getDynamicFee(server: StellarSdk.rpc.Server, retryOptions: ReturnType<typeof this.createStellarRpcRetryOptions>): Promise<number> {
+    try {
+      const feeStats = await withStellarRpcRetry(
+        'getFeeStats',
+        () => server.getFeeStats(),
+        retryOptions,
+      );
+      const feeStatsAny = feeStats as unknown as { feeCharged: { p95: string } };
+      const p95 = Number(feeStatsAny.feeCharged.p95);
+      const maxFee = Number(this.config.get<number>('STELLAR_MAX_FEE', 100000));
+      const fee = Math.min(p95, maxFee);
+      this.logger.log(`Fee stats: p95=${p95}, maxFee=${maxFee}, using=${fee}`);
+      return fee;
+    } catch (error) {
+      this.logger.warn(
+        `getFeeStats failed, falling back to BASE_FEE: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return Number(StellarSdk.BASE_FEE);
+    }
+  }
+
   private async callContractApprove(bountyId: string, ownerAddress: string): Promise<void> {
     const contractId =
       this.config.get<string>(`SOROBAN_CONTRACT_${bountyId.toUpperCase()}`) ??
@@ -116,9 +137,11 @@ export class SubmissionsService {
           retryOptions,
         );
 
+        const fee = await this.getDynamicFee(server, retryOptions);
+
         const contract = new StellarSdk.Contract(contractId);
         const tx = new StellarSdk.TransactionBuilder(account, {
-          fee: StellarSdk.BASE_FEE,
+          fee: String(fee),
           networkPassphrase,
         })
           .addOperation(
@@ -142,7 +165,11 @@ export class SubmissionsService {
           );
         }
         if ('transactionData' in simResult) {
-          this.logger.log(`Stellar tx simulation OK: bountyId=${bountyId}`);
+          const simSuccess = simResult as StellarSdk.rpc.Api.SimulateTransactionSuccessResponse;
+          const minResourceFee = simSuccess.minResourceFee ? Number(simSuccess.minResourceFee) : null;
+          this.logger.log(
+            `Stellar tx simulation OK: bountyId=${bountyId}, fee=${fee} stroops, minResourceFee=${minResourceFee ?? 'N/A'}`,
+          );
         }
 
         const prepared = await withStellarRpcRetry(

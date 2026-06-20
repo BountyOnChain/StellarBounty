@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse,
   ApiBearerAuth,
@@ -13,6 +13,8 @@ import { ApiBadRequestResponse,
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
+import { PaginationQueryDto, PaginatedResponse } from './common/pagination.dto';
+import { Bounty } from './entities/bounty.entity';
 
 @ApiTags('v1: bounties')
 @Controller('api/v1/bounties')
@@ -31,12 +33,24 @@ export class BountiesController {
     return this.bountiesService.create(dto);
   }
 
-  @ApiOperation({ summary: 'List all bounties' })
-  @ApiOkResponse({ description: 'Bounties ordered newest first.', type: [BountyResponseDto] })
+  @ApiOperation({ summary: 'List all bounties (paginated, newest first)' })
+  @ApiOkResponse({
+    description: 'Paginated list of bounties with metadata.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { type: 'array', items: { $ref: '#/components/schemas/BountyResponseDto' } },
+        total: { type: 'integer', example: 123 },
+        page: { type: 'integer', example: 1 },
+        pageSize: { type: 'integer', example: 20 },
+        totalPages: { type: 'integer', example: 7 },
+      },
+    },
+  })
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get()
-  findAll() {
-    return this.bountiesService.findAll();
+  findAll(@Query() pagination: PaginationQueryDto): Promise<PaginatedResponse<Bounty>> {
+    return this.bountiesService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })
