@@ -30,6 +30,28 @@ Maintain a permanent record of all deployed contract addresses:
 | testnet | TBD | TBD | Development testing |
 | mainnet | TBD | TBD | Production deployment |
 
+## Authentication Reliability
+
+### Nonce TTL Monitoring
+
+**Constraint:** Authentication nonce TTL is hardcoded to 5 minutes (300,000ms) by default. This can cause authentication failures for users with slow connections.
+
+#### Monitoring Metrics
+
+Track the following metrics to identify nonce expiration issues:
+
+- **Nonce expiration rate**: Percentage of authentication failures due to expired nonces
+- **Average authentication time**: Time between challenge request and verification
+- **Regional failure rates**: Authentication failures by geographic region
+- **Wallet-specific failures**: Failure rates by wallet implementation
+
+#### Operational Recommendations
+
+- **Environment Configuration**: Set `AUTH_NONCE_TTL_MS` explicitly in production (consider 10-15 minutes)
+- **Error Tracking**: Monitor logs for "Invalid or expired nonce" errors
+- **User Support**: Prepare troubleshooting guides for nonce expiration issues
+- **Performance Testing**: Regularly test authentication flows under various network conditions
+
 ## Database Backup & Restore
 
 ### Overview

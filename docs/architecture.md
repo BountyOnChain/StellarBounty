@@ -75,3 +75,31 @@ The Next.js frontend provides:
 2. **Time-lock Operations**: Critical operations are time-locked to prevent rushed decisions
 3. **Authorization**: All state changes require proper authorization from relevant parties
 4. **Arbitration**: Dispute resolution mechanism built into contract logic
+
+## Reliability Considerations
+
+### Nonce TTL Configuration
+
+**Constraint:** The authentication nonce TTL is hardcoded to 5 minutes (300,000ms) by default in `apps/backend/src/auth/auth.service.ts`.
+
+#### Implementation Details
+
+- **Default Value**: 300,000ms (5 minutes) - see line 23 of `auth.service.ts`
+- **Configuration**: Can be overridden via `AUTH_NONCE_TTL_MS` environment variable
+- **Usage**: Nonces are used for Stellar wallet challenge-response authentication
+- **Cleanup**: Expired nonces are automatically pruned via `pruneExpired()` method
+
+#### Reliability Implications
+
+1. **Short Window**: 5 minutes may be insufficient for users with slow network connections or complex signing workflows
+2. **User Experience**: Failed authentication due to nonce expiration can frustrate users
+3. **Network Latency**: Users in regions with poor connectivity may experience timeouts
+4. **Mobile Wallets**: Some mobile wallet implementations may have delays in signing operations
+
+#### Recommendations
+
+- **Environment Configuration**: Always set `AUTH_NONCE_TTL_MS` explicitly in production environments
+- **Monitoring**: Track nonce expiration rates to identify if users are experiencing timeouts
+- **User Communication**: Provide clear error messages when nonce expiration occurs
+- **Testing**: Test authentication flows with various network conditions and wallet implementations
+- **Consider Longer TTL**: For production deployments, consider increasing to 10-15 minutes to accommodate edge cases
