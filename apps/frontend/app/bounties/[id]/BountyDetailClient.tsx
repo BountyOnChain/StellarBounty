@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { isAbortError } from "@/lib/is-abort-error";
 
 type Bounty = {
   id: string;
@@ -28,6 +29,15 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
   const [workLink, setWorkLink] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMountedRef = useRef(true);
+  const submitControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      submitControllerRef.current?.abort();
+    };
+  }, []);
 
   const isOpen = bounty.status === "open";
   const canSubmit = Boolean(publicKey) && isOpen;
@@ -45,31 +55,47 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       return;
     }
 
-    setIsSubmitting(true);
+    submitControllerRef.current?.abort();
+    const controller = new AbortController();
+    submitControllerRef.current = controller;
 
     try {
-      const accessToken = await getToken(publicKey as string);
-      const response = await fetch(`${apiUrl}/api/v1/bounties/${bounty.id}/submissions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+      setIsSubmitting(true);
+      const accessToken = await getToken(publicKey as string, controller.signal);
+      const response = await fetch(
+        `${apiUrl}/api/v1/bounties/${bounty.id}/submissions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
         },
-        body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
-      });
+      );
 
       if (!response.ok) {
         if (response.status === 401) clearToken();
         throw new Error("Submission failed. Please try again.");
       }
 
-      setWorkLink("");
-      setNotes("");
-      toast.success("Work submitted successfully.");
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setWorkLink("");
+        setNotes("");
+        toast.success("Work submitted successfully.");
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
+      if (!isAbortError(error) && isMountedRef.current) {
+        toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
+      }
     } finally {
-      setIsSubmitting(false);
+      if (submitControllerRef.current === controller) {
+        submitControllerRef.current = null;
+        if (isMountedRef.current) {
+          setIsSubmitting(false);
+        }
+      }
     }
   }
 

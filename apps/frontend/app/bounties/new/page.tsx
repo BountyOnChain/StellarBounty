@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import MarkdownRenderer from "@/app/components/MarkdownRenderer";
 import { useWallet } from "@/components/WalletContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { isAbortError } from "@/lib/is-abort-error";
 
 const MAX_REWARD_AMOUNT = 1_000_000_000;
 
@@ -46,6 +47,8 @@ export default function CreateBountyPage() {
   const { getToken, clearToken, apiUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+  const submitControllerRef = useRef<AbortController | null>(null);
 
   const {
     register,
@@ -71,6 +74,13 @@ export default function CreateBountyPage() {
     }
   }, [publicKey, router]);
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      submitControllerRef.current?.abort();
+    };
+  }, []);
+
   const fieldErrorClass = useMemo(() => "mt-1 text-sm text-red-600 dark:text-red-300", []);
 
   const onSubmit = handleSubmit(async (values) => {
@@ -79,16 +89,21 @@ export default function CreateBountyPage() {
       return;
     }
 
+    submitControllerRef.current?.abort();
+    const controller = new AbortController();
+    submitControllerRef.current = controller;
+
     setSubmitError(null);
 
     try {
-      const accessToken = await getToken(publicKey);
+      const accessToken = await getToken(publicKey, controller.signal);
       const response = await fetch(`${apiUrl}/api/v1/bounties`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
+        signal: controller.signal,
         body: JSON.stringify({
           title: values.title.trim(),
           description: values.description.trim(),
@@ -105,6 +120,10 @@ export default function CreateBountyPage() {
         const message = Array.isArray(payload?.message)
           ? payload.message.join(" ")
           : payload?.message;
+
+        if (!isMountedRef.current || controller.signal.aborted) {
+          return;
+        }
 
         if (message?.toLowerCase().includes("title")) {
           setError("title", { message });
@@ -129,12 +148,24 @@ export default function CreateBountyPage() {
       }
 
       const created = (await response.json()) as CreateBountyResponse;
-      toast.success("Bounty created successfully.");
-      router.push(`/bounties/${created.id}`);
+      if (isMountedRef.current && !controller.signal.aborted) {
+        toast.success("Bounty created successfully.");
+        router.push(`/bounties/${created.id}`);
+      }
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+
       const message = formatErrorMessage(error);
-      setSubmitError(message);
-      toast.error(message);
+      if (isMountedRef.current) {
+        setSubmitError(message);
+        toast.error(message);
+      }
+    } finally {
+      if (submitControllerRef.current === controller) {
+        submitControllerRef.current = null;
+      }
     }
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signMessage } from "@stellar/freighter-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -14,7 +14,7 @@ type JwtPayload = {
   sub?: unknown;
 };
 
-export async function getAccessToken(publicKey: string): Promise<string> {
+export async function getAccessToken(publicKey: string, signal?: AbortSignal): Promise<string> {
   const savedToken =
     typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
@@ -28,6 +28,7 @@ export async function getAccessToken(publicKey: string): Promise<string> {
 
   const challengeResponse = await fetch(
     `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`,
+    { signal },
   );
   if (!challengeResponse.ok) {
     throw new Error("Failed to request wallet challenge.");
@@ -46,6 +47,7 @@ export async function getAccessToken(publicKey: string): Promise<string> {
   const verifyResponse = await fetch(`${API_URL}/api/v1/auth/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal,
     body: JSON.stringify({
       address: publicKey,
       signature: signed.signedMessage,
@@ -96,13 +98,25 @@ function decodeJwtPayload(token: string): JwtPayload | null {
 
 export function useAuth() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const isMountedRef = useRef(true);
 
-  const getToken = useCallback(async (publicKey: string): Promise<string> => {
-    setIsAuthenticating(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const getToken = useCallback(async (publicKey: string, signal?: AbortSignal): Promise<string> => {
+    if (isMountedRef.current) {
+      setIsAuthenticating(true);
+    }
+
     try {
-      return await getAccessToken(publicKey);
+      return await getAccessToken(publicKey, signal);
     } finally {
-      setIsAuthenticating(false);
+      if (isMountedRef.current) {
+        setIsAuthenticating(false);
+      }
     }
   }, []);
 
