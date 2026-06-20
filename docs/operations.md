@@ -258,6 +258,48 @@ Backups stored in S3 are automatically removed after 30 days via the bucket life
 aws s3 ls s3://stellar-bounty-db-backups/
 ```
 
+---
+
+## Error Tracking
+
+StellarBounty can report backend and frontend errors to Sentry. Leave the DSN
+variables unset in local development; the SDKs initialize as no-ops when no DSN
+is configured.
+
+### Runtime Configuration
+
+| Variable | Scope | Description |
+|----------|-------|-------------|
+| `SENTRY_DSN` | Backend, frontend server/edge | Private server-side DSN |
+| `NEXT_PUBLIC_SENTRY_DSN` | Frontend browser | Public browser DSN |
+| `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | All apps | Deployment environment |
+| `SENTRY_RELEASE` / `NEXT_PUBLIC_SENTRY_RELEASE` | All apps | Release or git SHA attached to errors |
+| `SENTRY_ORG` | Frontend build | Sentry organization for source map upload |
+| `SENTRY_PROJECT` | Frontend build | Sentry project for source map upload |
+| `SENTRY_AUTH_TOKEN` | Frontend build | CI secret used by the Sentry build plugin |
+
+### Source Maps
+
+Set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` in CI before running
+the frontend build. When all three are present, the Next.js Sentry plugin enables
+production browser source maps, uploads them to Sentry, and deletes local source
+maps after upload.
+
+### Alerts
+
+Create a Sentry metric alert for the frontend and backend projects:
+
+- **Condition:** event count is greater than 5 in 1 minute
+- **Filter:** `environment:production`
+- **Action:** send a Slack notification to the on-call or operations channel
+
+### Privacy
+
+The backend and frontend Sentry hooks scrub keys matching tokens, JWTs,
+authorization headers, cookies, nonces, signatures, private keys, passwords, and
+secrets before events leave the process. Wallet addresses are preserved as user
+context so an operator can correlate repeated failures for the same account.
+
 Select the desired backup file and restore:
 
 ```bash

@@ -67,6 +67,7 @@ cargo test
 | `STELLAR_NETWORK` | `testnet` or `mainnet` |
 | `NEXT_PUBLIC_API_URL` | Backend URL used by the frontend |
 | `NEXT_PUBLIC_SITE_URL` | Public frontend URL used for canonical links, OpenGraph URLs, and sitemap entries |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Optional Sentry DSNs for backend, server-rendered frontend errors, and browser errors |
 
 ## Contributing
 

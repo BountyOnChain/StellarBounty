@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { Request, Response } from 'express';
 import { jsonLogger } from '../json-logger.service';
 
@@ -17,12 +18,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const isHttp = exception instanceof HttpException;
     const statusCode = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const response = isHttp ? exception.getResponse() : undefined;
     const message = isHttp
-      ? ((exception.getResponse() as any)?.message ?? exception.message)
+      ? (typeof response === 'object' && response !== null && 'message' in response
+        ? response.message
+        : exception.message)
       : 'Internal server error';
 
     if (!isHttp) {
       jsonLogger.mergeContext({ method: req.method, path: req.originalUrl ?? req.url });
+      this.captureUnhandledException(exception, req);
       jsonLogger.error(
         `Unhandled exception on ${req.method} ${req.url}`,
         exception instanceof Error ? exception.stack : String(exception),
@@ -32,6 +37,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     res.status(statusCode).json({
       error: { code: HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR', message, statusCode },
+    });
+  }
+
+  private captureUnhandledException(exception: unknown, req: Request): void {
+    const user = (req as Request & { user?: { address?: string; sub?: string } }).user;
+
+    Sentry.withScope((scope) => {
+      scope.setContext('request', {
+        method: req.method,
+        url: req.originalUrl ?? req.url,
+        requestId: req.headers['x-request-id'],
+      });
+
+      const address = user?.address ?? user?.sub;
+      if (address) {
+        scope.setUser({ id: address });
+      }
+
+      Sentry.captureException(exception);
     });
   }
 }

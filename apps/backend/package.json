@@ -28,6 +28,7 @@
     "@nestjs/swagger": "^7.4.2",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^10.0.2",
+    "@sentry/nestjs": "^10.59.0",
     "@stellar/stellar-sdk": "^13.1.0",
     "@types/sanitize-html": "^2.16.1",
     "class-transformer": "^0.5.1",

@@ -1,3 +1,4 @@
+import './sentry.config';
 import 'reflect-metadata';
 import { randomUUID } from 'crypto';
 import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';

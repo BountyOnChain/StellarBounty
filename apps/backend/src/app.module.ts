@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SentryModule } from '@sentry/nestjs/setup';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -71,8 +72,12 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
           .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
           .default('log'),
         SERVICE_NAME: Joi.string().default('stellar-bounty-backend'),
+        SENTRY_DSN: Joi.string().uri().optional(),
+        SENTRY_ENVIRONMENT: Joi.string().optional(),
+        SENTRY_RELEASE: Joi.string().optional(),
       }),
     }),
+    SentryModule.forRoot(),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
