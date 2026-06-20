@@ -21,6 +21,8 @@ type StellarRpcMetric = {
   retryable?: boolean;
 };
 
+type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
 const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 
 @Injectable()
@@ -35,6 +37,8 @@ export class MetricsService {
   private readonly stellarRpcFailures = new Map<string, number>();
   private readonly stellarRpcRetries = new Map<string, number>();
   private activeWebSocketConnections = 0;
+  private circuitBreakerState: CircuitBreakerState = 'CLOSED';
+  private circuitBreakerStateChanges = 0;
 
   recordHttpRequest(metric: RequestMetric): void {
     const key = this.httpKey(metric);
@@ -76,6 +80,11 @@ export class MetricsService {
     this.stellarRpcRetries.set(key, (this.stellarRpcRetries.get(key) ?? 0) + 1);
   }
 
+  recordCircuitBreakerStateChange(state: CircuitBreakerState): void {
+    this.circuitBreakerState = state;
+    this.circuitBreakerStateChanges += 1;
+  }
+
   incrementActiveWebSocketConnections(): void {
     this.activeWebSocketConnections += 1;
   }
@@ -99,6 +108,7 @@ export class MetricsService {
     this.appendHttpMetrics(lines);
     this.appendDatabaseMetrics(lines);
     this.appendStellarRpcMetrics(lines);
+    this.appendCircuitBreakerMetrics(lines);
     this.appendWebSocketMetrics(lines);
 
     return `${lines.join('\n')}\n`;
@@ -222,6 +232,21 @@ export class MetricsService {
       .forEach(([key, count]) => {
         lines.push(`stellar_bounty_stellar_rpc_retries_total{${key}} ${count}`);
       });
+  }
+
+  private appendCircuitBreakerMetrics(lines: string[]): void {
+    const stateValue = this.circuitBreakerState === 'CLOSED' ? 0
+      : this.circuitBreakerState === 'OPEN' ? 1
+      : 2;
+
+    lines.push(
+      '# HELP stellar_bounty_circuit_breaker_state Current circuit breaker state (0=closed, 1=open, 2=half_open).',
+      '# TYPE stellar_bounty_circuit_breaker_state gauge',
+      `stellar_bounty_circuit_breaker_state ${stateValue}`,
+      '# HELP stellar_bounty_circuit_breaker_state_changes_total Total circuit breaker state transitions.',
+      '# TYPE stellar_bounty_circuit_breaker_state_changes_total counter',
+      `stellar_bounty_circuit_breaker_state_changes_total ${this.circuitBreakerStateChanges}`,
+    );
   }
 
   private httpKey(metric: RequestMetricLabels): string {

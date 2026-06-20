@@ -13,11 +13,13 @@ import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { MetricsService } from '../metrics/metrics.service';
 import { withStellarRpcRetry } from '../common/stellar-rpc-retry';
+import { StellarRpcCircuitBreaker } from '../common/circuit-breaker';
 import { CreateSubmissionDto } from './submissions.dto';
 
 @Injectable()
 export class SubmissionsService {
   private readonly logger = new Logger(SubmissionsService.name);
+  private readonly rpcCircuitBreaker: StellarRpcCircuitBreaker;
 
   constructor(
     @InjectRepository(Submission)
@@ -26,7 +28,18 @@ export class SubmissionsService {
     private readonly bountyRepo: Repository<Bounty>,
     private readonly config: ConfigService,
     private readonly metrics: MetricsService,
-  ) {}
+  ) {
+    this.rpcCircuitBreaker = new StellarRpcCircuitBreaker({
+      failureThreshold: Number(this.config.get<number>('CIRCUIT_BREAKER_FAILURE_THRESHOLD', 5)),
+      failureWindowMs: Number(this.config.get<number>('CIRCUIT_BREAKER_FAILURE_WINDOW_MS', 60_000)),
+      openTimeoutMs: Number(this.config.get<number>('CIRCUIT_BREAKER_OPEN_TIMEOUT_MS', 30_000)),
+      logger: this.logger,
+      onStateChange: (from, to) => {
+        this.logger.log(`Circuit breaker state change: ${from} → ${to}`);
+        this.metrics.recordCircuitBreakerStateChange(to);
+      },
+    });
+  }
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
     const bounty = await this.bountyRepo.findOneBy({ id: bountyId });
@@ -93,6 +106,16 @@ export class SubmissionsService {
   }
 
   private async callContractApprove(bountyId: string, ownerAddress: string): Promise<void> {
+    // Circuit breaker: fail fast if RPC is experiencing issues
+    if (!this.rpcCircuitBreaker.allowRequest()) {
+      this.logger.warn(
+        `Stellar RPC circuit is OPEN: rejecting contract approval for bountyId=${bountyId}`,
+      );
+      throw new BadRequestException(
+        'Stellar RPC is temporarily unavailable. Please try again later.',
+      );
+    }
+
     const contractId =
       this.config.get<string>(`SOROBAN_CONTRACT_${bountyId.toUpperCase()}`) ??
       this.config.get<string>('SOROBAN_CONTRACT_ID');
@@ -167,6 +190,7 @@ export class SubmissionsService {
             `Stellar RPC failover: primary failed, backup succeeded. bountyId=${bountyId}, backupRpcUrl=${rpcUrl}`,
           );
         }
+        this.rpcCircuitBreaker.recordSuccess();
         return; // success — stop trying
       } catch (error) {
         if (error instanceof BadRequestException) throw error;
@@ -177,6 +201,7 @@ export class SubmissionsService {
       }
     }
     // All RPC URLs exhausted
+    this.rpcCircuitBreaker.recordFailure();
     this.logger.warn(
       `Stellar contract approval failed after all RPC endpoints failed: bountyId=${bountyId}, contractId=${contractId}, rpcUrls=${rpcUrls.join(',')}, lastError=${lastError instanceof Error ? lastError.message : String(lastError)}`,
     );
