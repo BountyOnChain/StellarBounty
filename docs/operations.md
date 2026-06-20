@@ -1,5 +1,35 @@
 # Operations Runbook
 
+## Smart Contract Operations
+
+**Critical Constraint:** Soroban contracts are immutable. Once deployed, they cannot be upgraded or modified. This affects all operational procedures involving smart contracts.
+
+### Contract Monitoring
+
+- **No Upgrade Path**: Monitor contract behavior carefully as bugs cannot be fixed post-deployment
+- **Event Logging**: Track all contract events for audit trails and debugging
+- **State Verification**: Regularly verify contract state matches expected values
+- **Address Management**: Maintain permanent records of deployed contract addresses
+
+### Incident Response
+
+If critical issues are discovered in deployed contracts:
+
+1. **Assess Impact**: Determine severity and affected users
+2. **Communication**: Notify users of the issue and any workarounds
+3. **Migration Planning**: Plan deployment of new contract instance if necessary
+4. **User Migration**: Guide users to migrate to new contract address
+5. **State Preservation**: Document existing state as it cannot be transferred
+
+### Contract Address Records
+
+Maintain a permanent record of all deployed contract addresses:
+
+| Network | Contract Address | Deployment Date | Notes |
+|---------|------------------|-----------------|-------|
+| testnet | TBD | TBD | Development testing |
+| mainnet | TBD | TBD | Production deployment |
+
 ## Database Backup & Restore
 
 ### Overview

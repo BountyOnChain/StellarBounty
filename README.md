@@ -4,6 +4,8 @@ A decentralized bounty and task marketplace built on the Stellar network. Projec
 
 > **Status:** Early development — contributors welcome. Browse [open issues](https://github.com/BountyOnChain/StellarBounty/issues) to get started.
 
+> **Important:** Soroban contracts are immutable. Once deployed, they cannot be upgraded or modified. See [Architecture](docs/architecture.md) for details.
+
 ## Structure
 
 ```
