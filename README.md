@@ -46,6 +46,36 @@ npm run dev:frontend
 npm run dev:backend
 ```
 
+## Docker Compose Development
+
+Use Docker Compose when you want the frontend, backend, PostgreSQL, and a local
+Stellar Quickstart RPC to start together:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Service URLs:
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend | http://localhost:4000 |
+| Swagger | http://localhost:4000/docs |
+| PostgreSQL | localhost:5432 |
+| Stellar Quickstart | http://localhost:8000 |
+| Stellar RPC | http://localhost:8000/rpc |
+
+For hot reload through Docker Compose watch, run:
+
+```bash
+docker compose watch
+```
+
+The `DOCKER_*` values in `.env.example` keep container-to-container URLs
+separate from browser-facing `localhost` URLs.
+
 ## Contracts
 
 ```bash

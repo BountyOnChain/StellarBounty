@@ -10,6 +10,12 @@ FROM deps AS build
 COPY apps/backend apps/backend
 RUN npm run build --workspace=apps/backend
 
+FROM deps AS development
+ENV NODE_ENV=development
+COPY apps/backend apps/backend
+EXPOSE 4000
+CMD ["npm", "run", "dev", "--workspace=apps/backend"]
+
 FROM node:20-alpine AS production-deps
 WORKDIR /app
 ENV NODE_ENV=production

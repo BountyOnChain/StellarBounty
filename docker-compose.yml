@@ -3,27 +3,76 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+      target: development
+    command: npm run dev --workspace=apps/backend
     environment:
-      DATABASE_URL: postgres://postgres:password@postgres:5432/stellar_bounty
-      JWT_SECRET: local-development-secret
-      STELLAR_NETWORK: testnet
-      CORS_ORIGIN: http://localhost:3000
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:password@postgres:5432/stellar_bounty}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret}
+      STELLAR_NETWORK: ${DOCKER_STELLAR_NETWORK:-testnet}
+      STELLAR_RPC_URL: ${DOCKER_STELLAR_RPC_URL:-http://quickstart:8000/rpc}
+      CORS_ORIGIN: ${DOCKER_CORS_ORIGIN:-http://localhost:3000}
+      NODE_ENV: development
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      quickstart:
+        condition: service_started
     ports:
       - '4000:4000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/api/v1 >/dev/null || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/backend
+          target: /app/apps/backend
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./apps/backend/package.json
+        - action: rebuild
+          path: ./package-lock.json
 
   frontend:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      target: development
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:4000
-        NEXT_PUBLIC_STELLAR_NETWORK: testnet
+        NEXT_PUBLIC_API_URL: ${DOCKER_NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_STELLAR_NETWORK: ${DOCKER_NEXT_PUBLIC_STELLAR_NETWORK:-testnet}
+    command: npm run dev --workspace=apps/frontend -- -H 0.0.0.0
+    environment:
+      NEXT_PUBLIC_API_URL: ${DOCKER_NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      NEXT_PUBLIC_STELLAR_NETWORK: ${DOCKER_NEXT_PUBLIC_STELLAR_NETWORK:-testnet}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - '3000:3000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000 >/dev/null || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/frontend
+          target: /app/apps/frontend
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./apps/frontend/package.json
+        - action: rebuild
+          path: ./package-lock.json
 
   postgres:
     image: postgres:16-alpine
@@ -35,6 +84,23 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stellar_bounty']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  quickstart:
+    image: stellar/quickstart:latest
+    command: ['--local', '--enable', 'core,horizon,rpc']
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8000 >/dev/null || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
 
 volumes:
   postgres_data:
