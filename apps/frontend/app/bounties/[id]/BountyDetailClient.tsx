@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useRef, useEffect } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
@@ -22,6 +22,7 @@ function truncateAddress(address: string) {
 }
 
 export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { publicKey } = useWallet();
   const toast = useToast();
   const { getToken, clearToken, apiUrl } = useAuth();
@@ -49,6 +50,8 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
     try {
       const accessToken = await getToken(publicKey as string);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       const response = await fetch(`${apiUrl}/bounties/${bounty.id}/submissions`, {
         method: "POST",
         headers: {
@@ -56,6 +59,7 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ link: workLink, notes, submitter: publicKey }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -67,11 +71,21 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
       setNotes("");
       toast.success("Work submitted successfully.");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
       toast.error(error instanceof Error ? error.message : "Submission failed. Please try again.");
     } finally {
+      abortControllerRef.current = null;
+    }
       setIsSubmitting(false);
     }
   }
+
+  // Cleanup abort on component unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const statusKey = bounty.status.replace(/-/g, "_") as
     | "open"

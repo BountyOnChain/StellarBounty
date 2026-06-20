@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useWallet } from "../../components/WalletContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useFetch } from "@/lib/use-fetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -38,23 +39,26 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!publicKey) return;
+// Use custom hook to fetch data with abort support
 
-    setLoading(true);
-    setError(null);
 
-    Promise.all([
-      fetch(`${API_URL}/submissions?contributor=${publicKey}`).then((r) => r.json()),
-      fetch(`${API_URL}/bounties?owner=${publicKey}`).then((r) => r.json()),
-    ])
-      .then(([subs, bounts]) => {
-        setSubmissions(subs);
-        setBounties(bounts);
-      })
-      .catch(() => setError("Failed to load dashboard data."))
-      .finally(() => setLoading(false));
-  }, [publicKey]);
+// Fetch submissions and bounties when publicKey is available
+const { data: subsData, loading: loadingSubs, error: errorSubs } = useFetch<Submission[]>(
+  `${API_URL}/submissions?contributor=${publicKey}`,
+  { enabled: !!publicKey }
+);
+const { data: bountsData, loading: loadingBounts, error: errorBounts } = useFetch<Bounty[]>(
+  `${API_URL}/bounties?owner=${publicKey}`,
+  { enabled: !!publicKey }
+);
+
+// Sync fetched data into component state
+useEffect(() => {
+  if (subsData) setSubmissions(subsData);
+  if (bountsData) setBounties(bountsData);
+  setLoading(loadingSubs || loadingBounts);
+  setError(errorSubs?.message || errorBounts?.message || null);
+}, [subsData, bountsData, loadingSubs, loadingBounts, errorSubs, errorBounts]);
 
   if (!publicKey) {
     return (
