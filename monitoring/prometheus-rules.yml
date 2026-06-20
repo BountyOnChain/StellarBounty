@@ -1,0 +1,34 @@
+groups:
+  - name: stellar-bounty
+    rules:
+      - alert: StellarBountyHighHttpErrorRate
+        expr: sum(rate(stellar_bounty_http_requests_total{status_code=~"5.."}[5m])) / sum(rate(stellar_bounty_http_requests_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: StellarBounty HTTP 5xx rate is above 5%.
+
+      - alert: StellarBountySlowDatabaseQueries
+        expr: increase(stellar_bounty_database_slow_queries_total[10m]) > 10
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: More than 10 slow database queries were observed in 10 minutes.
+
+      - alert: StellarBountyStellarRpcFailures
+        expr: increase(stellar_bounty_stellar_rpc_failures_total[10m]) > 5
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Stellar RPC failures are rising.
+
+      - alert: StellarBountyNoHttpTraffic
+        expr: absent(stellar_bounty_http_requests_total) or sum(rate(stellar_bounty_http_requests_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: No backend HTTP traffic has been observed for 15 minutes.

@@ -1,5 +1,18 @@
 # Operations Runbook
 
+## Monitoring
+
+The backend exposes Prometheus metrics from `MetricsService`.
+
+Use these starter assets:
+
+- Alert rules: `monitoring/prometheus-rules.yml`
+- Grafana dashboard: `monitoring/grafana-dashboard.json`
+
+The alerts cover HTTP 5xx rate, slow database queries, Stellar RPC failures, and missing backend
+traffic. Import the dashboard into Grafana with a Prometheus data source configured for the backend
+metrics endpoint.
+
 ## Database Backup & Restore
 
 ### Overview
