@@ -73,11 +73,11 @@ export class JsonLoggerService implements LoggerService {
     return this.als.getStore();
   }
 
-  log(message: any, context?: string): void {
+  log(message: unknown, context?: string): void {
     this.emit('log', message, context);
   }
 
-  error(message: any, trace?: string | Error, context?: string): void {
+  error(message: unknown, trace?: string | Error, context?: string): void {
     const traceString = typeof trace === 'string' ? trace : trace?.stack;
     const traceError = trace instanceof Error ? trace : undefined;
     const stack = traceString ?? (message instanceof Error ? message.stack : undefined);
@@ -88,15 +88,15 @@ export class JsonLoggerService implements LoggerService {
     });
   }
 
-  warn(message: any, context?: string): void {
+  warn(message: unknown, context?: string): void {
     this.emit('warn', message, context);
   }
 
-  debug(message: any, context?: string): void {
+  debug(message: unknown, context?: string): void {
     this.emit('debug', message, context);
   }
 
-  verbose(message: any, context?: string): void {
+  verbose(message: unknown, context?: string): void {
     this.emit('verbose', message, context);
   }
 
@@ -108,7 +108,7 @@ export class JsonLoggerService implements LoggerService {
 
   private emit(
     level: LogLevel,
-    message: any,
+    message: unknown,
     context?: string,
     extra?: Record<string, unknown>,
   ): void {
@@ -136,7 +136,7 @@ export class JsonLoggerService implements LoggerService {
     sink.write(line + '\n');
   }
 
-  private normalizeMessage(message: any): unknown {
+  private normalizeMessage(message: unknown): unknown {
     if (message instanceof Error) {
       return { name: message.name, message: message.message };
     }

@@ -8,6 +8,10 @@ import {
 import { Request, Response } from 'express';
 import { jsonLogger } from '../json-logger.service';
 
+type HttpExceptionResponse = {
+  message?: unknown;
+};
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -17,8 +21,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const isHttp = exception instanceof HttpException;
     const statusCode = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const response = isHttp ? exception.getResponse() : undefined;
     const message = isHttp
-      ? ((exception.getResponse() as any)?.message ?? exception.message)
+      ? (typeof response === 'object' && response !== null
+          ? (response as HttpExceptionResponse).message ?? exception.message
+          : response ?? exception.message)
       : 'Internal server error';
 
     if (!isHttp) {

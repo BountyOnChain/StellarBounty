@@ -1,11 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, UpdateResult } from 'typeorm';
 import { BountiesService } from './bounties.service';
+import { CreateBountyDto } from './bounties/dto/bounty.dto';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
 
-type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends object = object> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
@@ -109,7 +110,7 @@ describe('BountiesService', () => {
           description: 'Invalid payload',
           rewardAmount: 'not-a-number',
           ownerAddress: 'GABC',
-        } as any),
+        } as unknown as CreateBountyDto),
       ).rejects.toThrow();
     });
   });
@@ -249,7 +250,7 @@ describe('BountiesService', () => {
       repository.findOne!
         .mockResolvedValueOnce(deleted)
         .mockResolvedValueOnce(restored);
-      repository.restore!.mockResolvedValueOnce({ affected: 1 } as any);
+      repository.restore!.mockResolvedValueOnce({ affected: 1 } as UpdateResult);
 
       await expect(service.restore('bounty-1')).resolves.toBe(restored);
       expect(repository.restore).toHaveBeenCalledWith('bounty-1');

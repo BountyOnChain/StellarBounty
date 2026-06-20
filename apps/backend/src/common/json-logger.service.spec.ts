@@ -17,8 +17,8 @@ describe('JsonLoggerService', () => {
     process.env = originalEnv;
   });
 
-  function parseLog(call: string): any {
-    return JSON.parse(call.replace(/\n$/, ''));
+  function parseLog(call: string): Record<string, unknown> {
+    return JSON.parse(call.replace(/\n$/, '')) as Record<string, unknown>;
   }
 
   it('emits a JSON entry with required fields on log()', () => {

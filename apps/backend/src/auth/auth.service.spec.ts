@@ -1,36 +1,45 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as StellarSdk from '@stellar/stellar-sdk';
+import { Repository } from 'typeorm';
 import { AuthService } from './auth.service';
+import { Nonce } from '../entities/nonce.entity';
+
+type MockRepository<T extends object = object> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
-  let nonceRepository: any;
+  let nonceRepository: MockRepository<Nonce> & {
+    deleteBuilder?: {
+      from: jest.Mock;
+      where: jest.Mock;
+      execute: jest.Mock;
+    };
+  };
 
   beforeEach(() => {
-    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as any;
-    const configService = { get: jest.fn().mockReturnValue(300000) } as any;
+    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as unknown as JwtService;
+    const configService = {
+      get: jest.fn().mockReturnValue(300000),
+    } as unknown as ConfigService;
 
-    const mockStore = new Map<string, any>();
+    const mockStore = new Map<string, Nonce>();
     nonceRepository = {
       findOne: jest.fn().mockImplementation(({ where }) => {
         return Promise.resolve(mockStore.get(where.address) || null);
       }),
-      create: jest.fn().mockImplementation((data) => data),
-      save: jest.fn().mockImplementation((entity) => {
+      create: jest.fn().mockImplementation((data: Partial<Nonce>) => data as Nonce),
+      save: jest.fn().mockImplementation((entity: Nonce) => {
         mockStore.set(entity.address, entity);
         return Promise.resolve(entity);
       }),
-      delete: jest.fn().mockImplementation(({ address }) => {
+      delete: jest.fn().mockImplementation(({ address }: { address: string }) => {
         mockStore.delete(address);
         return Promise.resolve();
       }),
       createQueryBuilder: jest.fn().mockReturnThis(),
-      deleteQuery: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue({}),
     };
     // Make queryBuilder mock chain work
     nonceRepository.deleteBuilder = {
@@ -42,7 +51,11 @@ describe('AuthService', () => {
       delete: jest.fn().mockReturnValue(nonceRepository.deleteBuilder),
     });
 
-    service = new AuthService(jwtService, configService, nonceRepository);
+    service = new AuthService(
+      jwtService,
+      configService,
+      nonceRepository as unknown as Repository<Nonce>,
+    );
   });
 
   describe('getChallenge', () => {
