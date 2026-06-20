@@ -9,7 +9,8 @@ describe('AuthService', () => {
   let nonceRepository: unknown;
 
   beforeEach(() => {
-    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as unknown;
+    jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as any;
+    const configService = { get: jest.fn().mockReturnValue(300000) } as any;
 
     const mockStore = new Map<string, unknown>();
     nonceRepository = {
@@ -41,7 +42,7 @@ describe('AuthService', () => {
       delete: jest.fn().mockReturnValue(nonceRepository.deleteBuilder),
     });
 
-    service = new AuthService(jwtService, nonceRepository);
+    service = new AuthService(jwtService, configService, nonceRepository);
   });
 
   describe('getChallenge', () => {
