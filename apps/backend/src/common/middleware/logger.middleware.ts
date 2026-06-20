@@ -6,9 +6,13 @@ import { jsonLogger } from '../json-logger.service';
 export class LoggerMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const start = Date.now();
-    const requestId = (req.headers['x-request-id'] as string | undefined) ?? '-';
+    const requestId = req.headers['x-request-id'] as string | undefined;
     const method = req.method;
     const path = req.originalUrl ?? req.url;
+
+    if (requestId) {
+      res.setHeader('x-request-id', requestId);
+    }
 
     res.on('finish', () => {
       const durationMs = Date.now() - start;
