@@ -60,6 +60,48 @@ jobs:
       - name: Build
         run: npm run build --workspace=apps/backend
 
+  migration-test:
+    name: Migration Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stellar
+          POSTGRES_PASSWORD: stellar
+          POSTGRES_DB: stellar_bounty_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stellar -d stellar_bounty_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://stellar:stellar@localhost:5432/stellar_bounty_test
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build backend
+        run: npm run build --workspace=apps/backend
+
+      - name: Check migration round-trip
+        run: npm run migration:check --workspace=apps/backend
+
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
