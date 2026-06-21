@@ -9,7 +9,8 @@
     "test": "jest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
     "lint": "next lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "audit": "npm audit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
