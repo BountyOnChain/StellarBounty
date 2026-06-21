@@ -183,7 +183,8 @@ impl EscrowContract {
         let owner: Address = env.storage().instance().get(&symbol_short!("OWNER")).unwrap();
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("approve")), ());
-        env.events().publish((symbol_short!("approve"), owner), (amount, contributor));
+        env.events()
+            .publish((symbol_short!("approve"), owner), (amount, contributor));
         Ok(())
     }
 
