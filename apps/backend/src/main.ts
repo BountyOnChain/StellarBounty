@@ -50,9 +50,11 @@ async function bootstrap() {
     });
   }
   app.use(compression());
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    req.headers['x-request-id'] = req.headers['x-request-id'] ?? randomUUID();
-    next();
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('x-request-id', requestId);
+    jsonLogger.runWithContext({ requestId, method: req.method, path: req.originalUrl ?? req.url }, () => next());
   });
   app.enableCors(createCorsOptions(config));
   app.setGlobalPrefix('api/v1');

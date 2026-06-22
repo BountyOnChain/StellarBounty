@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
-  let nonceRepository: unknown;
+  let nonceRepository: any;
 
   beforeEach(() => {
     jwtService = { sign: jest.fn().mockReturnValue('mock.jwt.token') } as any;

@@ -30,8 +30,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
+    const requestId = jsonLogger.currentContext?.requestId ?? (req.headers['x-request-id'] as string | undefined);
+
     res.status(statusCode).json({
-      error: { code: HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR', message, statusCode },
+      error: {
+        code: HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR',
+        message,
+        statusCode,
+        ...(requestId ? { requestId } : {}),
+      },
+      ...(requestId ? { requestId } : {}),
     });
   }
 }
