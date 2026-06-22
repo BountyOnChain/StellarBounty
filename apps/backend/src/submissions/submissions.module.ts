@@ -7,7 +7,6 @@ import { SubmissionsController } from './submissions.controller';
 import { SubmissionsService } from './submissions.service';
 import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { CircuitBreaker } from '../common/circuit-breaker';
-import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Submission, Bounty]), MetricsModule],
