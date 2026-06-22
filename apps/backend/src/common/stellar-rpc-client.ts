@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as StellarSdk from '@stellar/stellar-sdk';
-import { CircuitOpenError, CircuitBreaker } from './circuit-breaker';
+import { CircuitOpenError, CircuitBreaker, CircuitState } from './circuit-breaker';
 import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
@@ -11,11 +11,11 @@ export class StellarRpcClient {
 
   constructor(private readonly circuitBreaker: CircuitBreaker, private readonly metrics?: MetricsService) {}
 
-  getAccount(address: string): Promise<StellarSdk.rpc.Api.GetAccountResponse> {
+  getAccount(address: string): Promise<StellarSdk.Account> {
     return this.executeWithBreaker(() => this.getServer().getAccount(address));
   }
 
-  prepareTransaction(tx: StellarSdk.Transaction): Promise<StellarSdk.rpc.Api.PrepareTransactionResponse> {
+  prepareTransaction(tx: StellarSdk.Transaction): Promise<StellarSdk.Transaction | StellarSdk.FeeBumpTransaction> {
     const server = this.getServer();
     return this.executeWithBreaker(() => server.prepareTransaction(tx));
   }
@@ -39,7 +39,7 @@ export class StellarRpcClient {
 
     if (shouldReset) {
       this.circuitBreaker.addListener((_previousState, nextState) => {
-        if (nextState === CircuitBreaker.CircuitState.CLOSED) {
+        if (nextState === CircuitState.CLOSED) {
           this.logger.log('StellarRpcClient circuit closed — resuming normal operation');
         }
       });
