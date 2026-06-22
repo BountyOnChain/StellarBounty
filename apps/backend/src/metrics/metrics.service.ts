@@ -6,15 +6,12 @@ type CircuitStateSample = {
   state: CircuitState;
 };
 
-@Injectable()
-export class MetricsService {
-  private startedAt = Date.now();
-  private requestCounts = new Map<string, number>();
-  private requestLatencyBuckets = new Map<string, number[]>();
-  private requestLatencySums = new Map<string, number>();
-  private databaseQueryCounts = new Map<string, number>();
-  private databaseQueryErrors = new Map<string, number>();
-  private databaseQueryDurations: number[] = [];
+type RequestMetricLabels = {
+  method: string;
+  route: string;
+  statusCode: number;
+};
+
 type RequestMetric = RequestMetricLabels & {
   durationSeconds: number;
 };
@@ -34,13 +31,13 @@ const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.
 
 @Injectable()
 export class MetricsService {
-  private readonly startedAt = Date.now();
-  private readonly requestCounts = new Map<string, number>();
-  private readonly requestLatencyBuckets = new Map<string, number[]>();
-  private readonly requestLatencySums = new Map<string, number>();
-  private readonly databaseQueryCounts = new Map<string, number>();
-  private readonly databaseQueryErrors = new Map<string, number>();
-  private readonly databaseQueryDurations: number[] = [];
+  private startedAt = Date.now();
+  private requestCounts = new Map<string, number>();
+  private requestLatencyBuckets = new Map<string, number[]>();
+  private requestLatencySums = new Map<string, number>();
+  private databaseQueryCounts = new Map<string, number>();
+  private databaseQueryErrors = new Map<string, number>();
+  private databaseQueryDurations: number[] = [];
   private readonly stellarRpcFailures = new Map<string, number>();
   private readonly stellarRpcRetries = new Map<string, number>();
   private activeWebSocketConnections = 0;
@@ -62,7 +59,7 @@ export class MetricsService {
     this.circuitStateSamples.push({ name, state });
   }
 
-  recordHttpRequest(metric: { method: string; route: string; statusCode: number; durationSeconds: number }): void {
+  recordHttpRequest(metric: RequestMetric): void {
     const key = this.httpKey(metric);
     this.requestCounts.set(key, (this.requestCounts.get(key) ?? 0) + 1);
     this.requestLatencySums.set(key, (this.requestLatencySums.get(key) ?? 0) + metric.durationSeconds);
@@ -75,7 +72,7 @@ export class MetricsService {
     this.requestLatencyBuckets.set(key, buckets);
   }
 
-  recordDatabaseQuery(metric: { operation: string; durationSeconds?: number; failed?: boolean }): void {
+  recordDatabaseQuery(metric: DatabaseQueryMetric): void {
     this.databaseQueryCounts.set(metric.operation, (this.databaseQueryCounts.get(metric.operation) ?? 0) + 1);
     if (metric.failed) {
       this.databaseQueryErrors.set(metric.operation, (this.databaseQueryErrors.get(metric.operation) ?? 0) + 1);
@@ -211,28 +208,6 @@ export class MetricsService {
     );
   }
 
-  private appendWebSocketMetrics(lines: string[]): void {
-    lines.push(
-      '# HELP stellar_bounty_websocket_connections_active Active WebSocket connections.',
-      '# TYPE stellar_bounty_websocket_connections_active gauge',
-      `stellar_bounty_websocket_connections_active ${this.activeWebSocketConnections}`,
-    );
-  }
-
-  private appendCircuitMetrics(lines: string[]): void {
-    lines.push(
-      '# HELP stellar_bounty_circuit_breaker_state Current circuit breaker state (0=closed, 1=open, 2=half-open).',
-      '# TYPE stellar_bounty_circuit_breaker_state gauge',
-    );
-    this.circuitStateSamples.forEach(({ name, state }) => {
-      lines.push(`stellar_bounty_circuit_breaker_state{name="${this.escapeLabel(name)}",state="${CircuitState[state]}"} ${state}`);
-    });
-    if (this.circuitStateSamples.length === 0) {
-      lines.push('stellar_bounty_circuit_breaker_state{name="",state=""} 0');
-    }
-  }
-
-  private httpKey(metric: { method: string; route: string; statusCode: number }): string {
   private appendStellarRpcMetrics(lines: string[]): void {
     lines.push(
       '# HELP stellar_bounty_stellar_rpc_failures_total Stellar RPC call failures by operation and retryability.',
@@ -255,6 +230,27 @@ export class MetricsService {
       .forEach(([key, count]) => {
         lines.push(`stellar_bounty_stellar_rpc_retries_total{${key}} ${count}`);
       });
+  }
+
+  private appendWebSocketMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_websocket_connections_active Active WebSocket connections.',
+      '# TYPE stellar_bounty_websocket_connections_active gauge',
+      `stellar_bounty_websocket_connections_active ${this.activeWebSocketConnections}`,
+    );
+  }
+
+  private appendCircuitMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_circuit_breaker_state Current circuit breaker state (0=closed, 1=open, 2=half-open).',
+      '# TYPE stellar_bounty_circuit_breaker_state gauge',
+    );
+    this.circuitStateSamples.forEach(({ name, state }) => {
+      lines.push(`stellar_bounty_circuit_breaker_state{name="${this.escapeLabel(name)}",state="${CircuitState[state]}"} ${state}`);
+    });
+    if (this.circuitStateSamples.length === 0) {
+      lines.push('stellar_bounty_circuit_breaker_state{name="",state=""} 0');
+    }
   }
 
   private httpKey(metric: RequestMetricLabels): string {
@@ -280,5 +276,3 @@ export class MetricsService {
     return Number.isFinite(value) ? value.toString() : '0';
   }
 }
-
-const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];

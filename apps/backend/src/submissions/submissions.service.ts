@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,7 +18,8 @@ import { StellarRpcClient } from '../common/stellar-rpc-client';
 
 @Injectable()
 export class SubmissionsService {
-  private lastWarnMessage: { bountyId: string; contractId: string; rpcUrl: string; message: string } | null = null;
+  private readonly logger = new Logger(SubmissionsService.name);
+  private lastWarnMessage: string | null = null;
   private lastWarnTime = 0;
 
   constructor(
@@ -94,7 +96,10 @@ export class SubmissionsService {
     return backup ? [primary, backup] : [primary];
   }
 
-  private async getDynamicFee(server: StellarSdk.rpc.Server, retryOptions: ReturnType<typeof this.createStellarRpcRetryOptions>): Promise<number> {
+  private async getDynamicFee(
+    server: StellarSdk.rpc.Server,
+    retryOptions: ReturnType<typeof this.createStellarRpcRetryOptions>,
+  ): Promise<number> {
     try {
       const feeStats = await withStellarRpcRetry(
         'getFeeStats',
@@ -122,62 +127,13 @@ export class SubmissionsService {
     if (!contractId) return;
 
     const network = this.config.get<string>('STELLAR_NETWORK', 'testnet');
-    const rpcUrl =
-      this.config.get<string>('STELLAR_RPC_URL') ??
-      (network === 'mainnet'
-        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
-        : 'https://soroban-testnet.stellar.org');
     const rpcUrls = this.resolveRpcUrls(network);
     const networkPassphrase =
       network === 'mainnet' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
 
-    this.stellarRpcClient.initialize(rpcUrl, networkPassphrase);
-
-    try {
-      const account = await this.stellarRpcClient.getAccount(ownerAddress);
-
-      const contract = new StellarSdk.Contract(contractId);
-      const tx = new StellarSdk.TransactionBuilder(account, {
-        fee: StellarSdk.BASE_FEE,
-        networkPassphrase,
-      })
-        .addOperation(
-          contract.call('approve', StellarSdk.nativeToScVal(ownerAddress, { type: 'address' })),
-        )
-        .setTimeout(30)
-        .build();
-
-      const prepared = await this.stellarRpcClient.prepareTransaction(tx);
-      const signingSecret = this.config.get<string>('STELLAR_SIGNING_SECRET');
-      if (signingSecret) {
-        const signingKeypair = StellarSdk.Keypair.fromSecret(signingSecret);
-        prepared.sign(signingKeypair);
-        await this.stellarRpcClient.sendTransaction(prepared);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.stellarRpcClientThrottledWarn(bountyId, contractId, rpcUrl, message);
-    }
-  }
-
-  private stellarRpcClientThrottledWarn(
-    bountyId: string,
-    contractId: string,
-    rpcUrl: string,
-    message: string,
-  ): void {
-    const now = Date.now();
-    const key = `${bountyId}:${contractId}:${rpcUrl}:${message}`;
-    if (this.lastWarnMessage === key && now - this.lastWarnTime < 5_000) {
-      return;
-    }
-    this.lastWarnMessage = key;
-    this.lastWarnTime = now;
-    console.warn(
-      `Stellar contract approval skipped after RPC failure: bountyId=${bountyId}, contractId=${contractId}, rpcUrl=${rpcUrl}, error=${message}`,
-    );
     const retryOptions = this.createStellarRpcRetryOptions();
     let lastError: unknown;
+
     for (const rpcUrl of rpcUrls) {
       try {
         const server = new StellarSdk.rpc.Server(rpcUrl);
@@ -248,16 +204,38 @@ export class SubmissionsService {
       } catch (error) {
         if (error instanceof BadRequestException) throw error;
         lastError = error;
-        this.logger.warn(
-          `Stellar RPC attempt failed: bountyId=${bountyId}, rpcUrl=${rpcUrl}, error=${error instanceof Error ? error.message : String(error)}`,
+        this.stellarRpcClientThrottledWarn(
+          bountyId,
+          contractId,
+          rpcUrl,
+          error instanceof Error ? error.message : String(error),
         );
       }
     }
+
     // All RPC URLs exhausted
     this.logger.warn(
       `Stellar contract approval failed after all RPC endpoints failed: bountyId=${bountyId}, contractId=${contractId}, rpcUrls=${rpcUrls.join(',')}, lastError=${lastError instanceof Error ? lastError.message : String(lastError)}`,
     );
     throw lastError;
+  }
+
+  private stellarRpcClientThrottledWarn(
+    bountyId: string,
+    contractId: string,
+    rpcUrl: string,
+    message: string,
+  ): void {
+    const now = Date.now();
+    const key = `${bountyId}:${contractId}:${rpcUrl}:${message}`;
+    if (this.lastWarnMessage === key && now - this.lastWarnTime < 5_000) {
+      return;
+    }
+    this.lastWarnMessage = key;
+    this.lastWarnTime = now;
+    this.logger.warn(
+      `Stellar contract approval skipped after RPC failure: bountyId=${bountyId}, contractId=${contractId}, rpcUrl=${rpcUrl}, error=${message}`,
+    );
   }
 
   private createStellarRpcRetryOptions() {
