@@ -1,0 +1,164 @@
+{
+  "title": "Stellar Bounty Monitoring",
+  "uid": "stellar-bounty-dashboard",
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(stellar_bounty_http_requests_total[5m])) by (method, route, status_code)",
+          "legendFormat": "{{ method }} {{ route }} ({{ status_code }})"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+    },
+    {
+      "title": "HTTP Error Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "(sum(rate(stellar_bounty_http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(stellar_bounty_http_requests_total[5m]))) * 100",
+          "legendFormat": "Error Rate %"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+    },
+    {
+      "title": "API Latency (p95)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(stellar_bounty_http_request_duration_seconds_bucket[5m])) by (le, method, route))",
+          "legendFormat": "{{ method }} {{ route }}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+    },
+    {
+      "title": "Database Queries",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(stellar_bounty_database_queries_total[5m])) by (operation)",
+          "legendFormat": "{{ operation }}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 }
+    },
+    {
+      "title": "Database Query Errors",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(stellar_bounty_database_query_errors_total[5m])) by (operation)",
+          "legendFormat": "{{ operation }}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 }
+    },
+    {
+      "title": "Slow Queries Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(stellar_bounty_database_slow_queries_total[5m])",
+          "legendFormat": "Slow queries/second"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 }
+    },
+    {
+      "title": "Stellar RPC Failures",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(stellar_bounty_stellar_rpc_failures_total[5m])) by (operation, retryable)",
+          "legendFormat": "{{ operation }} (retryable: {{ retryable }})"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 }
+    },
+    {
+      "title": "Stellar RPC Retries",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(stellar_bounty_stellar_rpc_retries_total[5m])) by (operation, retryable)",
+          "legendFormat": "{{ operation }} (retryable: {{ retryable }})"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 }
+    },
+    {
+      "title": "WebSocket Connections",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "stellar_bounty_websocket_connections_active"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Memory Usage (MB)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "stellar_bounty_process_memory_bytes{type=\"rss\"} / 1024 / 1024",
+          "legendFormat": "RSS"
+        },
+        {
+          "expr": "stellar_bounty_process_memory_bytes{type=\"heapUsed\"} / 1024 / 1024",
+          "legendFormat": "Heap Used"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+    },
+    {
+      "title": "CPU Usage (%)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(stellar_bounty_process_cpu_seconds_total[5m]) * 100",
+          "legendFormat": "{{ type }}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+    }
+  ],
+  "schemaVersion": 27,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  }
+}

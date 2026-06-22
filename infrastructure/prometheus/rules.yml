@@ -1,0 +1,112 @@
+groups:
+  - name: stellar-bounty-alerts
+    interval: 30s
+    rules:
+      # Alert 1: High Error Rate (> 5%)
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(stellar_bounty_http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(stellar_bounty_http_requests_total[5m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "Error rate is {{ $value }}% (threshold: 5%)"
+          
+      # Alert 2: High API Latency (p95 > 2s)
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(stellar_bounty_http_request_duration_seconds_bucket[5m])) by (le, method, route, status_code)
+          ) > 2
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency detected"
+          description: "p95 latency is {{ $value }}s (threshold: 2s)"
+          
+      # Alert 3: Database Query Errors (> 10% error rate)
+      - alert: HighDatabaseErrorRate
+        expr: |
+          (
+            sum(rate(stellar_bounty_database_query_errors_total[5m]))
+            /
+            sum(rate(stellar_bounty_database_queries_total[5m]))
+          ) * 100 > 10
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High database query error rate"
+          description: "Database error rate is {{ $value }}% (threshold: 10%)"
+          
+      # Alert 4: Database Slow Queries (> 10% slow queries)
+      - alert: HighSlowQueryRate
+        expr: |
+          (
+            sum(rate(stellar_bounty_database_slow_queries_total[5m]))
+            /
+            sum(rate(stellar_bounty_database_queries_total[5m]))
+          ) * 100 > 10
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High rate of slow database queries"
+          description: "Slow query rate is {{ $value }}% (threshold: 10%)"
+          
+      # Alert 5: Stellar RPC Failure Rate (> 10%)
+      - alert: StellarRPCFailure
+        expr: |
+          (
+            sum(rate(stellar_bounty_stellar_rpc_failures_total[5m]))
+            /
+            (
+              sum(rate(stellar_bounty_stellar_rpc_failures_total[5m])) +
+              sum(rate(stellar_bounty_stellar_rpc_retries_total[5m]))
+            )
+          ) * 100 > 10
+        for: 2m
+        labels:
+          severity: critical
+          team: blockchain
+        annotations:
+          summary: "Stellar RPC failure rate high"
+          description: "RPC failure rate is {{ $value }}% (threshold: 10%)"
+          
+      # Alert 6: High Memory Usage (> 80% of available)
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            stellar_bounty_process_memory_bytes{type="rss"}
+            /
+            on(instance) group_left()
+            (sum by (instance) (container_memory_limit_bytes) or on(instance) (machine_memory_bytes))
+          ) * 100 > 80
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% (threshold: 80%)"
+          
+      # Alert 7: High WebSocket Connections (> 1000)
+      - alert: HighWebSocketConnections
+        expr: stellar_bounty_websocket_connections_active > 1000
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High WebSocket connections"
+          description: "WebSocket connections: {{ $value }} (threshold: 1000)"
