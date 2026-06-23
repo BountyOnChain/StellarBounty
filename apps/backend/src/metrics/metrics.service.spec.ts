@@ -22,6 +22,8 @@ describe('MetricsService', () => {
     });
     service.recordDatabaseQuery({ operation: 'SELECT', durationSeconds: 0.08 });
     service.recordDatabaseQuery({ operation: 'INSERT', durationSeconds: 0.35, failed: true });
+    service.recordStellarRpcFailure({ operation: 'getAccount', retryable: true });
+    service.recordStellarRpcRetry({ operation: 'getAccount', retryable: true });
     service.setActiveWebSocketConnections(3);
 
     const output = service.renderPrometheus();
@@ -34,6 +36,8 @@ describe('MetricsService', () => {
     expect(output).toContain('stellar_bounty_database_query_errors_total{operation="INSERT"} 1');
     expect(output).toContain('stellar_bounty_database_query_duration_seconds_count 2');
     expect(output).toContain('stellar_bounty_database_slow_queries_total 1');
+    expect(output).toContain('stellar_bounty_stellar_rpc_failures_total{operation="getAccount",retryable="true"} 1');
+    expect(output).toContain('stellar_bounty_stellar_rpc_retries_total{operation="getAccount",retryable="true"} 1');
     expect(output).toContain('stellar_bounty_websocket_connections_active 3');
   });
 

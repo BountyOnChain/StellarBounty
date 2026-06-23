@@ -15,13 +15,14 @@ describe('DeadlineAutomationService', () => {
       id: 'bounty-1',
       title: 'Build automation',
       description: 'Automate bounty deadlines.',
-      rewardAmount: '10000000',
+      rewardAmount: 10000000n,
       deadline: new Date('2026-06-10T00:00:00.000Z'),
       status: BountyStatus.OPEN,
       ownerAddress: 'GOWNER',
       submissions: [],
       createdAt: new Date('2026-06-01T00:00:00.000Z'),
       updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+      deletedAt: null,
       ...overrides,
     };
   }

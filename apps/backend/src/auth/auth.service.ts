@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,10 +9,10 @@ import { Nonce } from '../entities/nonce.entity';
 
 @Injectable()
 export class AuthService {
-  private readonly NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     @InjectRepository(Nonce)
     private readonly nonceRepository: Repository<Nonce>,
   ) {}
@@ -19,7 +20,8 @@ export class AuthService {
   async getChallenge(address: string): Promise<{ nonce: string }> {
     await this.pruneExpired();
     const nonce = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + this.NONCE_TTL_MS);
+    const nonceTtlMs = this.configService.get<number>('AUTH_NONCE_TTL_MS', 300000);
+    const expiresAt = new Date(Date.now() + nonceTtlMs);
 
     // Upsert nonce
     let nonceEntity = await this.nonceRepository.findOne({ where: { address } });
@@ -55,6 +57,31 @@ export class AuthService {
     await this.nonceRepository.delete({ address });
     const accessToken = this.jwtService.sign({ sub: address });
     return { accessToken };
+  }
+
+  // Session management — token refresh and revocation
+  private readonly tokenBlacklist = new Set<string>();
+
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      if (this.tokenBlacklist.has(refreshToken)) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+      const accessToken = this.jwtService.sign({ sub: payload.sub });
+      return { accessToken };
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async revokeToken(token: string): Promise<{ revoked: boolean }> {
+    this.tokenBlacklist.add(token);
+    return { revoked: true };
+  }
+
+  isRevoked(token: string): boolean {
+    return this.tokenBlacklist.has(token);
   }
 
   private async pruneExpired(): Promise<void> {

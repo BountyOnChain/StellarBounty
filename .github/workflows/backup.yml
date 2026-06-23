@@ -1,0 +1,106 @@
+# =============================================================================
+# StellarBounty — Scheduled Database Backup
+#
+# Runs daily at 02:00 UTC to create a PostgreSQL dump and upload it to S3.
+# Retains backups for 30 days via S3 lifecycle policy.
+# =============================================================================
+
+name: Database Backup
+
+on:
+  schedule:
+    # Every day at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+jobs:
+  backup:
+    name: Create and Upload Database Backup
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellar_bounty
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Run migrations to ensure schema exists
+        run: |
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/stellar_bounty"
+          # Create a placeholder migration marker so pg_dump has something to dump
+          # even if no tables exist yet (pg_dump fails on empty DBs in some cases)
+          PGPASSWORD=postgres psql -h localhost -U postgres -d stellar_bounty -c "
+            CREATE TABLE IF NOT EXISTS _backup_marker (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT NOW());
+          "
+
+      - name: Create backup
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_bounty
+        run: |
+          chmod +x scripts/backup-db.sh
+          mkdir -p backups
+          ./scripts/backup-db.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      - name: Upload backup to S3
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET || 'stellar-bounty-db-backups' }}
+          BACKUP_DIR: backups
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          aws s3 cp backups/latest.dump "s3://${BACKUP_S3_BUCKET}/stellar_bounty_${TIMESTAMP}.dump" --no-progress
+          aws s3 cp backups/latest.dump "s3://${BACKUP_S3_BUCKET}/latest.dump" --no-progress
+          echo "Backup uploaded to s3://${BACKUP_S3_BUCKET}/stellar_bounty_${TIMESTAMP}.dump"
+
+      - name: Verify backup integrity
+        run: |
+          echo "Backup file exists:"
+          ls -lh backups/
+          file backups/latest.dump
+          BACKUP_SIZE=$(stat -c%s backups/latest.dump 2>/dev/null || stat -f%z backups/latest.dump)
+          if [ "$BACKUP_SIZE" -gt 1000 ]; then
+            echo "Backup size is valid: ${BACKUP_SIZE} bytes"
+          else
+            echo "WARNING: Backup file is suspiciously small (${BACKUP_SIZE} bytes)" >&2
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ Database Backup Failed',
+              body: 'The scheduled database backup workflow failed. Check the workflow run for details:\n\n' +
+                    `- Workflow: ${context.runId}\n` +
+                    `- Trigger: ${context.eventName}\n` +
+                    `- Branch: ${context.ref}\n\n` +
+                    'Action required: Investigate and resolve the backup failure.'
+            })

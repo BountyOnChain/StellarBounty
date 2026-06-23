@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "../components/ThemeProvider";
 import { WalletProvider } from "../components/WalletContext";
 import { ToastProvider } from "../components/toast/ToastProvider";
 import Navbar from "./components/Navbar";
@@ -31,16 +32,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <WalletProvider>
-          <ToastProvider>
-            <div className="min-h-screen bg-slate-950 text-slate-100">
-              <Navbar />
-              {children}
-            </div>
-          </ToastProvider>
-        </WalletProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+        <ThemeProvider>
+          <WalletProvider>
+            <ToastProvider>
+              <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+                <Navbar />
+                {children}
+              </div>
+            </ToastProvider>
+          </WalletProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,13 +2,14 @@ import { ConfigService } from '@nestjs/config';
 
 let configService: ConfigService | undefined;
 
-export function setConfigService(cs: ConfigService): void {
+export function setConfigService(cs?: ConfigService): void {
   configService = cs;
 }
 
-export function getJwtSecret(): string {
-  if (configService) {
-    const secret = configService.get<string>('JWT_SECRET');
+export function getJwtSecret(config?: ConfigService): string {
+  const source = config ?? configService;
+  if (source) {
+    const secret = source.get<string>('JWT_SECRET');
     if (secret) return secret;
   }
   const secret = process.env.JWT_SECRET;
