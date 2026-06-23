@@ -3,6 +3,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
 
@@ -92,6 +93,7 @@ describe('SubmissionsService contract error handling', () => {
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      {} as unknown as StellarRpcClient,
       metrics as unknown as MetricsService,
     );
 

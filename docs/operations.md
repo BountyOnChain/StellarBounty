@@ -1,5 +1,57 @@
 # Operations Runbook
 
+## Smart Contract Operations
+
+**Critical Constraint:** Soroban contracts are immutable. Once deployed, they cannot be upgraded or modified. This affects all operational procedures involving smart contracts.
+
+### Contract Monitoring
+
+- **No Upgrade Path**: Monitor contract behavior carefully as bugs cannot be fixed post-deployment
+- **Event Logging**: Track all contract events for audit trails and debugging
+- **State Verification**: Regularly verify contract state matches expected values
+- **Address Management**: Maintain permanent records of deployed contract addresses
+
+### Incident Response
+
+If critical issues are discovered in deployed contracts:
+
+1. **Assess Impact**: Determine severity and affected users
+2. **Communication**: Notify users of the issue and any workarounds
+3. **Migration Planning**: Plan deployment of new contract instance if necessary
+4. **User Migration**: Guide users to migrate to new contract address
+5. **State Preservation**: Document existing state as it cannot be transferred
+
+### Contract Address Records
+
+Maintain a permanent record of all deployed contract addresses:
+
+| Network | Contract Address | Deployment Date | Notes |
+|---------|------------------|-----------------|-------|
+| testnet | TBD | TBD | Development testing |
+| mainnet | TBD | TBD | Production deployment |
+
+## Authentication Reliability
+
+### Nonce TTL Monitoring
+
+**Constraint:** Authentication nonce TTL is hardcoded to 5 minutes (300,000ms) by default. This can cause authentication failures for users with slow connections.
+
+#### Monitoring Metrics
+
+Track the following metrics to identify nonce expiration issues:
+
+- **Nonce expiration rate**: Percentage of authentication failures due to expired nonces
+- **Average authentication time**: Time between challenge request and verification
+- **Regional failure rates**: Authentication failures by geographic region
+- **Wallet-specific failures**: Failure rates by wallet implementation
+
+#### Operational Recommendations
+
+- **Environment Configuration**: Set `AUTH_NONCE_TTL_MS` explicitly in production (consider 10-15 minutes)
+- **Error Tracking**: Monitor logs for "Invalid or expired nonce" errors
+- **User Support**: Prepare troubleshooting guides for nonce expiration issues
+- **Performance Testing**: Regularly test authentication flows under various network conditions
+
 ## Database Backup & Restore
 
 ### Overview

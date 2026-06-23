@@ -1,4 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { CircuitState } from '../common/circuit-breaker';
+
+type CircuitStateSample = {
+  name: string;
+  state: CircuitState;
+};
 
 type RequestMetricLabels = {
   method: string;
@@ -25,22 +31,38 @@ const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.
 
 @Injectable()
 export class MetricsService {
-  private readonly startedAt = Date.now();
-  private readonly requestCounts = new Map<string, number>();
-  private readonly requestLatencyBuckets = new Map<string, number[]>();
-  private readonly requestLatencySums = new Map<string, number>();
-  private readonly databaseQueryCounts = new Map<string, number>();
-  private readonly databaseQueryErrors = new Map<string, number>();
-  private readonly databaseQueryDurations: number[] = [];
+  private startedAt = Date.now();
+  private requestCounts = new Map<string, number>();
+  private requestLatencyBuckets = new Map<string, number[]>();
+  private requestLatencySums = new Map<string, number>();
+  private databaseQueryCounts = new Map<string, number>();
+  private databaseQueryErrors = new Map<string, number>();
+  private databaseQueryDurations: number[] = [];
   private readonly stellarRpcFailures = new Map<string, number>();
   private readonly stellarRpcRetries = new Map<string, number>();
   private activeWebSocketConnections = 0;
+  private circuitStateSamples: CircuitStateSample[] = [{ name: '', state: CircuitState.CLOSED }];
+
+  reset(): void {
+    this.requestCounts = new Map();
+    this.requestLatencyBuckets = new Map();
+    this.requestLatencySums = new Map();
+    this.databaseQueryCounts = new Map();
+    this.databaseQueryErrors = new Map();
+    this.databaseQueryDurations = [];
+    this.activeWebSocketConnections = 0;
+    this.circuitStateSamples = [];
+    this.startedAt = Date.now();
+  }
+
+  recordCircuitBreakerStateChange(name: string, state: CircuitState): void {
+    this.circuitStateSamples.push({ name, state });
+  }
 
   recordHttpRequest(metric: RequestMetric): void {
     const key = this.httpKey(metric);
     this.requestCounts.set(key, (this.requestCounts.get(key) ?? 0) + 1);
     this.requestLatencySums.set(key, (this.requestLatencySums.get(key) ?? 0) + metric.durationSeconds);
-
     const buckets = this.requestLatencyBuckets.get(key) ?? LATENCY_BUCKETS_SECONDS.map(() => 0);
     LATENCY_BUCKETS_SECONDS.forEach((bucket, index) => {
       if (metric.durationSeconds <= bucket) {
@@ -52,11 +74,9 @@ export class MetricsService {
 
   recordDatabaseQuery(metric: DatabaseQueryMetric): void {
     this.databaseQueryCounts.set(metric.operation, (this.databaseQueryCounts.get(metric.operation) ?? 0) + 1);
-
     if (metric.failed) {
       this.databaseQueryErrors.set(metric.operation, (this.databaseQueryErrors.get(metric.operation) ?? 0) + 1);
     }
-
     if (metric.durationSeconds !== undefined && Number.isFinite(metric.durationSeconds) && metric.durationSeconds >= 0) {
       this.databaseQueryDurations.push(metric.durationSeconds);
     }
@@ -100,6 +120,7 @@ export class MetricsService {
     this.appendDatabaseMetrics(lines);
     this.appendStellarRpcMetrics(lines);
     this.appendWebSocketMetrics(lines);
+    this.appendCircuitMetrics(lines);
 
     return `${lines.join('\n')}\n`;
   }
@@ -114,7 +135,6 @@ export class MetricsService {
       '# HELP stellar_bounty_process_memory_bytes Process memory usage in bytes.',
       '# TYPE stellar_bounty_process_memory_bytes gauge',
     );
-
     Object.entries(memoryUsage).forEach(([type, value]) => {
       lines.push(`stellar_bounty_process_memory_bytes{type="${this.escapeLabel(type)}"} ${value}`);
     });
@@ -135,7 +155,6 @@ export class MetricsService {
       '# HELP stellar_bounty_http_requests_total Total HTTP requests by method, route, and status code.',
       '# TYPE stellar_bounty_http_requests_total counter',
     );
-
     [...this.requestCounts.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, count]) => {
       lines.push(`stellar_bounty_http_requests_total{${key}} ${count}`);
     });
@@ -144,7 +163,6 @@ export class MetricsService {
       '# HELP stellar_bounty_http_request_duration_seconds HTTP request latency in seconds.',
       '# TYPE stellar_bounty_http_request_duration_seconds histogram',
     );
-
     [...this.requestLatencyBuckets.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, counts]) => {
       counts.forEach((count, index) => {
         lines.push(`stellar_bounty_http_request_duration_seconds_bucket{${key},le="${LATENCY_BUCKETS_SECONDS[index]}"} ${count}`);
@@ -163,7 +181,6 @@ export class MetricsService {
       '# HELP stellar_bounty_database_queries_total Database queries by SQL operation.',
       '# TYPE stellar_bounty_database_queries_total counter',
     );
-
     [...this.databaseQueryCounts.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .forEach(([operation, count]) => {
@@ -174,7 +191,6 @@ export class MetricsService {
       '# HELP stellar_bounty_database_query_errors_total Database query errors by SQL operation.',
       '# TYPE stellar_bounty_database_query_errors_total counter',
     );
-
     [...this.databaseQueryErrors.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .forEach(([operation, count]) => {
@@ -189,14 +205,6 @@ export class MetricsService {
       '# HELP stellar_bounty_database_slow_queries_total Database queries slower than 250ms.',
       '# TYPE stellar_bounty_database_slow_queries_total counter',
       `stellar_bounty_database_slow_queries_total ${slowQueries}`,
-    );
-  }
-
-  private appendWebSocketMetrics(lines: string[]): void {
-    lines.push(
-      '# HELP stellar_bounty_websocket_connections_active Active WebSocket connections.',
-      '# TYPE stellar_bounty_websocket_connections_active gauge',
-      `stellar_bounty_websocket_connections_active ${this.activeWebSocketConnections}`,
     );
   }
 
@@ -222,6 +230,27 @@ export class MetricsService {
       .forEach(([key, count]) => {
         lines.push(`stellar_bounty_stellar_rpc_retries_total{${key}} ${count}`);
       });
+  }
+
+  private appendWebSocketMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_websocket_connections_active Active WebSocket connections.',
+      '# TYPE stellar_bounty_websocket_connections_active gauge',
+      `stellar_bounty_websocket_connections_active ${this.activeWebSocketConnections}`,
+    );
+  }
+
+  private appendCircuitMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_circuit_breaker_state Current circuit breaker state (0=closed, 1=open, 2=half-open).',
+      '# TYPE stellar_bounty_circuit_breaker_state gauge',
+    );
+    this.circuitStateSamples.forEach(({ name, state }) => {
+      lines.push(`stellar_bounty_circuit_breaker_state{name="${this.escapeLabel(name)}",state="${CircuitState[state]}"} ${state}`);
+    });
+    if (this.circuitStateSamples.length === 0) {
+      lines.push('stellar_bounty_circuit_breaker_state{name="",state=""} 0');
+    }
   }
 
   private httpKey(metric: RequestMetricLabels): string {

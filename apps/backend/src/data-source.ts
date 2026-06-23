@@ -12,7 +12,11 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   entities: [Bounty, Submission, Nonce],
-  migrations: [InitSchema1747657200000, AddNoncesTable1747657300000],
+  migrations: [
+    InitSchema1747657200000,
+    AddNoncesTable1747657300000,
+    AddTagsColumn1747657400000,
+  ],
   extra: createDbPoolExtraFromEnv(),
   synchronize: false,
   retryAttempts: parseInt(process.env.DB_RETRY_ATTEMPTS || '5', 10),

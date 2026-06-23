@@ -8,6 +8,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Repository } from 'typeorm';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 import { Submission, SubmissionStatus } from '../entities/submission.entity';
+import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
 
@@ -25,6 +26,12 @@ const mockTransactionBuilder = {
   build: jest.fn(),
 };
 const mockSigningKeypair = { publicKey: jest.fn() };
+const mockStellarRpcClient = {
+  initialize: jest.fn(),
+  getAccount: jest.fn(),
+  prepareTransaction: jest.fn(),
+  sendTransaction: jest.fn(),
+};
 
 jest.mock('@stellar/stellar-sdk', () => ({
   BASE_FEE: '100',
@@ -120,6 +127,7 @@ describe('SubmissionsService', () => {
       submissionRepo as unknown as Repository<Submission>,
       bountyRepo as unknown as Repository<Bounty>,
       config as unknown as ConfigService,
+      mockStellarRpcClient as unknown as StellarRpcClient,
       metrics as MetricsService,
     );
   });
