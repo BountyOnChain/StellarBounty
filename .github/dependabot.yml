@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/frontend
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: /apps/backend
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
+  - package-ecosystem: cargo
+    directory: /apps/contracts
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies

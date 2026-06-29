@@ -11,7 +11,8 @@
     "migration:run": "typeorm migration:run -d dist/data-source.js",
     "migration:revert": "typeorm migration:revert -d dist/data-source.js",
     "migration:check": "node dist/migrations/check-migration-schema.js",
-    "migration:test": "node dist/migrations/test-migration-roundtrip.js"
+    "migration:test": "node dist/migrations/test-migration-roundtrip.js",
+    "audit": "npm audit"
   },
   "jest": {
     "preset": "ts-jest",
