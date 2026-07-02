@@ -45,13 +45,13 @@ describe("BountyCard", () => {
     expect(link).toHaveAttribute("href", "/bounties/7");
   });
 
-  it("formats a numeric reward with thousands separators and the XLM suffix", () => {
-    renderCard({ id: "1", title: "x", reward: 12345 });
-    expect(screen.getByText("12,345 XLM")).toBeInTheDocument();
+  it("formats a stroop reward as XLM", () => {
+    renderCard({ id: "1", title: "x", reward: 123450000000 });
+    expect(screen.getByText("12345 XLM")).toBeInTheDocument();
   });
 
-  it("renders a string reward verbatim", () => {
-    renderCard({ id: "1", title: "x", reward: "0.5 XLM" });
+  it("formats a string stroop reward as XLM", () => {
+    renderCard({ id: "1", title: "x", reward: "5000000" });
     expect(screen.getByText("0.5 XLM")).toBeInTheDocument();
   });
 
