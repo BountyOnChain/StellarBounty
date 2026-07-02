@@ -1,4 +1,4 @@
-import { stroopsToXLM, formatRewardXLM, STROOPS_PER_XLM } from "./stellar-amount";
+import { stroopsToXLM, formatRewardXLM, STROOPS_PER_XLM } from "@/lib/stellar-amount";
 
 describe("stroopsToXLM", () => {
   it("converts whole XLM amounts", () => {

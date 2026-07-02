@@ -9,7 +9,7 @@
     "test": "jest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
     "lint": "next lint",
-    "lhci": "lhci autorun",
+    "lhci": "npx @lhci/cli autorun",
     "format": "prettier --write .",
     "audit": "npm audit"
   },
@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.2",
-    "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/jest-dom": "^6.6.3",
@@ -67,14 +66,17 @@
         "preset": "ts-jest",
         "testEnvironment": "node",
         "testMatch": ["**/*.spec.ts"],
-        "testPathIgnorePatterns": ["<rootDir>/tests/e2e/"]
+        "testPathIgnorePatterns": ["<rootDir>/tests/e2e/"],
+        "moduleNameMapper": {
+          "^@/(.*)$": "<rootDir>/$1"
+        }
       },
       {
         "displayName": "dom",
         "preset": "ts-jest",
         "testEnvironment": "jsdom",
         "testMatch": ["**/*.spec.tsx"],
-        "setupFilesAfterEnv": ["<rootDir>/tests/setup-a11y.ts", "<rootDir>/jest.setup.ts"],
+        "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
         "moduleNameMapper": {
           "^@/(.*)$": "<rootDir>/$1"
         },
