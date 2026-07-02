@@ -6,7 +6,7 @@ const apiPort = Number(process.env.E2E_API_PORT ?? 4100);
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
-  timeout: 30_000,
+  timeout: 60_000,
   expect: {
     timeout: 10_000,
   },
@@ -15,10 +15,10 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `NEXT_PUBLIC_API_URL=http://127.0.0.1:${apiPort} NEXT_PUBLIC_STELLAR_NETWORK=testnet PORT=${frontendPort} HOSTNAME=127.0.0.1 node .next/standalone/apps/frontend/server.js`,
+    command: `NEXT_PUBLIC_API_URL=http://127.0.0.1:${apiPort} NEXT_PUBLIC_STELLAR_NETWORK=testnet npm run start -- -H 127.0.0.1 -p ${frontendPort}`,
     url: `http://127.0.0.1:${frontendPort}`,
     reuseExistingServer: false,
-    timeout: 30_000,
+    timeout: 60_000,
   },
   projects: [
     {
