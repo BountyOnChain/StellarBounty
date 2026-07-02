@@ -10,7 +10,9 @@
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "build": "npm run build --workspaces --if-present",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "release:check": "npm run build --workspaces --if-present && git diff --check",
+    "version": "npm run release:check"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

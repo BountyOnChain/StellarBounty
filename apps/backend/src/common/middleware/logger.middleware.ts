@@ -1,16 +1,26 @@
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import { jsonLogger } from '../json-logger.service';
 
 @Injectable()
 export class LoggerMiddleware implements NestMiddleware {
-  private readonly logger = new Logger('HTTP');
-
   use(req: Request, res: Response, next: NextFunction) {
     const start = Date.now();
+    const requestId = (req.headers['x-request-id'] as string | undefined) ?? '-';
+    const method = req.method;
+    const path = req.originalUrl ?? req.url;
+
     res.on('finish', () => {
-      const requestId = req.headers['x-request-id'] ?? '-';
-      this.logger.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms [${requestId}]`);
+      const durationMs = Date.now() - start;
+      jsonLogger.log({
+        msg: 'request',
+        method,
+        path,
+        statusCode: res.statusCode,
+        durationMs,
+      }, 'HTTP');
     });
-    next();
+
+    jsonLogger.runWithContext({ requestId, method, path }, () => next());
   }
 }

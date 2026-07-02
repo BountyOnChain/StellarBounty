@@ -43,6 +43,24 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: stellar_bounty
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/stellar_bounty
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -65,6 +83,9 @@ jobs:
 
       - name: Build
         run: npm run build --workspace=apps/backend
+
+      - name: Test migrations (up → down → up)
+        run: npm run migration:test --workspace=apps/backend
 
   contracts:
     name: Contracts
@@ -103,3 +124,79 @@ jobs:
 
       - name: Build Soroban contract WASM
         run: cargo build --target wasm32-unknown-unknown --release
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (backend)
+        run: npm audit --workspace=apps/backend --audit-level=high
+        continue-on-error: true
+
+      - name: Run npm audit (frontend)
+        run: npm audit --workspace=apps/frontend --audit-level=high
+        continue-on-error: true
+
+      - name: Check for outdated dependencies
+        run: npm outdated --workspaces 2>&1 || true
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/frontend
+
+      - name: Run E2E tests
+        run: node tests/e2e/run-e2e.mjs
+        working-directory: apps/frontend
+        env:
+          E2E_API_PORT: 4100
+          E2E_FRONTEND_PORT: 3100

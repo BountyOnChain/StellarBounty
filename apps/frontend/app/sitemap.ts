@@ -14,7 +14,7 @@ async function getBountyRoutes(): Promise<MetadataRoute.Sitemap> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
-    const response = await fetch(`${apiUrl}/bounties`, { next: { revalidate: 300 } });
+    const response = await fetch(`${apiUrl}/api/v1/bounties`, { next: { revalidate: 300 } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
       return [];

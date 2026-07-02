@@ -14,9 +14,9 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   }, [error]);
 
   return (
-    <main className="flex min-h-[calc(100vh-73px)] flex-col items-center justify-center bg-slate-950 px-4 text-center text-slate-100">
+    <main className="flex min-h-[calc(100vh-73px)] flex-col items-center justify-center bg-slate-50 px-4 text-center text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <h1 className="text-7xl font-black tracking-tight text-red-500/50">500</h1>
-      <p className="mt-4 text-lg text-slate-300">Something went wrong</p>
+      <p className="mt-4 text-lg text-slate-700 dark:text-slate-300">Something went wrong</p>
       <p className="mt-2 max-w-md text-sm text-slate-500">
         {error.message || "An unexpected error occurred. Please try again."}
       </p>
@@ -35,7 +35,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         </button>
         <Link
           href="/"
-          className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-medium text-slate-200 transition hover:border-yellow-400 hover:text-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:border-amber-500 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-yellow-400 dark:hover:text-yellow-300"
         >
           Go home
         </Link>

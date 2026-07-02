@@ -10,7 +10,8 @@
     "test:e2e": "node tests/e2e/run-e2e.mjs",
     "lint": "next lint",
     "lhci": "lhci autorun",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "audit": "npm audit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -30,6 +31,7 @@
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.5.2",
     "@types/jest": "^29.5.14",
     "@types/jest-axe": "^3.5.9",
     "@types/node": "^20.14.2",
@@ -51,8 +53,10 @@
     "typescript": "^5.5.4"
   },
   "jest": {
+
     "testPathIgnorePatterns": [
-      "<rootDir>/tests/e2e/"
+      "<rootDir>/tests/e2e/",
+      "<rootDir>/.next/"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
@@ -70,16 +74,30 @@
         "preset": "ts-jest",
         "testEnvironment": "jsdom",
         "testMatch": ["**/*.spec.tsx"],
-        "setupFilesAfterEnv": ["<rootDir>/tests/setup-a11y.ts"],
+        "setupFilesAfterEnv": ["<rootDir>/tests/setup-a11y.ts", "<rootDir>/jest.setup.ts"],
         "moduleNameMapper": {
           "^@/(.*)$": "<rootDir>/$1"
         },
+        "transformIgnorePatterns": [
+          "node_modules/(?!(react-markdown|remark-gfm|mdast-util-.*|micromark.*|unified|bail|trough|remark-.*|rehype-.*|vfile.*|hast-.*|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities|character-reference-invalid|is-decimal|is-hexadecimal|is-alphanumerical|is-alphabetical|trim-lines|devlop|estree-util-is-identifier-name|@types/.*|unist-.*|@ungap/.*|html-void-elements|web-namespaces|zwitch|longest-streak|ccount)/)"
+        ],
         "transform": {
           "^.+\\.tsx?$": [
             "ts-jest",
             {
               "tsconfig": {
-                "jsx": "react-jsx"
+                "jsx": "react-jsx",
+                "esModuleInterop": true,
+                "allowSyntheticDefaultImports": true,
+                "module": "commonjs",
+                "target": "ES2020",
+                "lib": [
+                  "ES2020",
+                  "DOM",
+                  "DOM.Iterable"
+                ],
+                "strict": true,
+                "skipLibCheck": true
               }
             }
           ]
