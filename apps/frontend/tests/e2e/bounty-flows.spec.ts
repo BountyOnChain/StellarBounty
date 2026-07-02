@@ -91,7 +91,7 @@ test.describe("critical bounty flows", () => {
     const ownerPage = await page.context().newPage();
     await hydrateWallet(ownerPage, ownerAddress);
     await ownerPage.goto("/dashboard");
-    await ownerPage.getByRole("button", { name: "My Bounties" }).click({ force: true });
+    await ownerPage.getByRole("tab", { name: "My Bounties" }).click({ force: true });
     await expect(ownerPage.getByRole("cell", { name: "Build a wallet onboarding flow" })).toBeVisible();
     await expect(ownerPage.getByRole("cell", { name: "1", exact: true })).toBeVisible();
     await ownerPage.close();
@@ -109,7 +109,7 @@ test.describe("critical bounty flows", () => {
     await hydrateWallet(page);
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-    await page.getByRole("button", { name: "My Bounties" }).click({ force: true });
+    await page.getByRole("tab", { name: "My Bounties" }).click({ force: true });
 
     await expect(page.getByRole("cell", { name: "Build a wallet onboarding flow" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "completed" })).toBeVisible();
