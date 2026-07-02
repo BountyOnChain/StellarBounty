@@ -10,6 +10,10 @@ jest.mock("../../components/ConnectWalletButton", () => ({
   ),
 }));
 
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/bounties",
+}));
+
 describe("Navbar accessibility", () => {
   beforeAll(() => {
     Object.defineProperty(window, "matchMedia", {

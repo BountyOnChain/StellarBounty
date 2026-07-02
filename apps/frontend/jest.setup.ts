@@ -1,4 +1,7 @@
 import "@testing-library/jest-dom";
+import { toHaveNoViolations } from "jest-axe";
+
+expect.extend(toHaveNoViolations);
 
 // Polyfill fetch globals for jsdom 20 (Response/Request don't ship by default)
 // Use undici-style polyfill via the global Response if absent.
