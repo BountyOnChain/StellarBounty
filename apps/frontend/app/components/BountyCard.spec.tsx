@@ -12,14 +12,14 @@ describe("BountyCard accessibility", () => {
   };
 
   it("has no axe violations", async () => {
-    const { container } = render(<BountyCard bounty={bounty as any} />);
+    const { container } = render(<BountyCard bounty={bounty as unknown as BountyCardData} />);
     const results = await axe(container);
 
     expect(results).toHaveNoViolations();
   });
 
   it("exposes an accessible link name from the bounty title", () => {
-    render(<BountyCard bounty={bounty as any} />);
+    render(<BountyCard bounty={bounty as unknown as BountyCardData} />);
 
     expect(
       document.querySelector('a[href="/bounties/bounty-1"]'),
