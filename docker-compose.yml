@@ -1,30 +1,4 @@
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    environment:
-      DATABASE_URL: postgres://postgres:password@postgres:5432/stellar_bounty
-      JWT_SECRET: local-development-secret
-      STELLAR_NETWORK: testnet
-      CORS_ORIGIN: http://localhost:3000
-    depends_on:
-      - postgres
-    ports:
-      - '4000:4000'
-
-  frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:4000
-        NEXT_PUBLIC_STELLAR_NETWORK: testnet
-    depends_on:
-      - backend
-    ports:
-      - '3000:3000'
-
   postgres:
     image: postgres:16-alpine
     environment:
@@ -35,6 +9,87 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stellar_bounty']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  quickstart:
+    image: stellar/quickstart:latest
+    command: --testnet --enable soroban-rpc
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:8000/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev --workspace=apps/backend"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/stellar_bounty
+      JWT_SECRET: local-development-secret
+      STELLAR_NETWORK: testnet
+      STELLAR_RPC_URL: http://quickstart:8000/soroban/rpc
+      CORS_ORIGIN: http://localhost:3000
+      PORT: 4000
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - backend_root_node_modules:/app/node_modules
+      - backend_workspace_node_modules:/app/apps/backend/node_modules
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      quickstart:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/backend/src
+          target: /app/apps/backend/src
+        - action: rebuild
+          path: ./apps/backend/package.json
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev --workspace=apps/frontend -- --hostname 0.0.0.0"
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      NEXT_PUBLIC_STELLAR_NETWORK: TESTNET
+      WATCHPACK_POLLING: 'true'
+    volumes:
+      - .:/app
+      - frontend_root_node_modules:/app/node_modules
+      - frontend_workspace_node_modules:/app/apps/frontend/node_modules
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/frontend
+          target: /app/apps/frontend
+          ignore:
+            - node_modules/
+            - .next/
 
 volumes:
   postgres_data:
+  backend_root_node_modules:
+  backend_workspace_node_modules:
+  frontend_root_node_modules:
+  frontend_workspace_node_modules:

@@ -40,6 +40,39 @@ cp .env.example .env
 
 ## Development
 
+### Docker Compose (recommended)
+
+Start PostgreSQL, Stellar quickstart, backend (hot-reload), and frontend (HMR) with one command:
+
+```bash
+cp .env.example .env
+docker compose up
+```
+
+Services:
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:4000/api/v1 |
+| Stellar quickstart (Soroban RPC) | http://localhost:8000 |
+| PostgreSQL | localhost:5432 |
+
+For file-watch hot reload during development, use Docker Compose watch:
+
+```bash
+docker compose watch
+```
+
+Verify the stack:
+
+```bash
+curl http://localhost:4000/api/v1/bounties
+curl http://localhost:3000
+```
+
+### Manual setup
+
 ```bash
 # Frontend — http://localhost:3000
 npm run dev:frontend
