@@ -62,33 +62,47 @@ export class HealthService {
     }
   }
 
+  private resolveRpcUrls(): string[] {
+    const network = this.config.get<string>('STELLAR_NETWORK');
+    const primary =
+      this.config.get<string>('STELLAR_RPC_URL') ??
+      (network === 'mainnet'
+        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
+        : 'https://soroban-testnet.stellar.org');
+    const backup = this.config.get<string>('STELLAR_RPC_URL_BACKUP');
+    return backup ? [primary, backup] : [primary];
+  }
+
+  private async probeRpc(url: string): Promise<boolean> {
+    const server = new StellarSdk.rpc.Server(url);
+    await Promise.race([
+      server.getHealth(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Stellar RPC health check timed out')),
+          STELLAR_RPC_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    return true;
+  }
+
   private async getStellarRpcStatus(): Promise<
     'connected' | 'disconnected' | 'not_configured'
   > {
     const network = this.config.get<string>('STELLAR_NETWORK');
     if (!network) return 'not_configured';
 
-    const rpcUrl =
-      this.config.get<string>('STELLAR_RPC_URL') ??
-      (network === 'mainnet'
-        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
-        : 'https://soroban-testnet.stellar.org');
-
-    try {
-      const server = new StellarSdk.rpc.Server(rpcUrl);
-      await Promise.race([
-        server.getHealth(),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Stellar RPC health check timed out')),
-            STELLAR_RPC_TIMEOUT_MS,
-          ),
-        ),
-      ]);
-      return 'connected';
-    } catch {
-      return 'disconnected';
+    const urls = this.resolveRpcUrls();
+    for (const url of urls) {
+      try {
+        await this.probeRpc(url);
+        return 'connected';
+      } catch {
+        // try next backup URL
+      }
     }
+    return 'disconnected';
   }
 
   private async getContractStatus(): Promise<
@@ -98,29 +112,27 @@ export class HealthService {
     if (!contractId) return 'not_configured';
 
     const network = this.config.get<string>('STELLAR_NETWORK');
-    const rpcUrl =
-      this.config.get<string>('STELLAR_RPC_URL') ??
-      (network === 'mainnet'
-        ? 'https://mainnet.stellar.validationcloud.io/v1/rpc'
-        : 'https://soroban-testnet.stellar.org');
-
-    try {
-      const server = new StellarSdk.rpc.Server(rpcUrl);
-      await Promise.race([
-        server.getContractData(
-          contractId,
-          StellarSdk.nativeToScVal('STATUS', { type: 'symbol' }),
-        ),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Contract health check timed out')),
-            STELLAR_RPC_TIMEOUT_MS,
+    const urls = this.resolveRpcUrls();
+    for (const url of urls) {
+      try {
+        const server = new StellarSdk.rpc.Server(url);
+        await Promise.race([
+          server.getContractData(
+            contractId,
+            StellarSdk.nativeToScVal('STATUS', { type: 'symbol' }),
           ),
-        ),
-      ]);
-      return 'reachable';
-    } catch {
-      return 'unreachable';
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Contract health check timed out')),
+              STELLAR_RPC_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        return 'reachable';
+      } catch {
+        // try next backup URL
+      }
     }
+    return 'unreachable';
   }
 }
