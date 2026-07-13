@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { axe } from "jest-axe";
 import BountyCard, { type BountyCardData } from "./BountyCard";
 
 function renderCard(bounty: Partial<BountyCardData>) {
@@ -19,13 +20,13 @@ describe("BountyCard", () => {
     expect(link).toHaveAttribute("href", "/bounties/7");
   });
 
-  it("formats a numeric reward with thousands separators and the XLM suffix", () => {
-    renderCard({ id: "1", title: "x", reward: 12345 });
-    expect(screen.getByText("12,345 XLM")).toBeInTheDocument();
+  it("formats a stroop reward as XLM", () => {
+    renderCard({ id: "1", title: "x", reward: "123450000000" });
+    expect(screen.getByText("12345 XLM")).toBeInTheDocument();
   });
 
-  it("renders a string reward verbatim", () => {
-    renderCard({ id: "1", title: "x", reward: "0.5 XLM" });
+  it("formats a stroop string reward as XLM", () => {
+    renderCard({ id: "1", title: "x", reward: "5000000" });
     expect(screen.getByText("0.5 XLM")).toBeInTheDocument();
   });
 
@@ -71,5 +72,10 @@ describe("BountyCard", () => {
   it("renders the provided status and replaces underscores with spaces", () => {
     renderCard({ id: "1", title: "x", status: "in_progress" });
     expect(screen.getByText(/in progress/i)).toBeInTheDocument();
+  });
+
+  it("has no detectable a11y violations", async () => {
+    const { container } = renderCard({ id: "1", title: "Accessible bounty card" });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

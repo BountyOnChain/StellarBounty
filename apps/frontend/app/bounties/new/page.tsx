@@ -190,7 +190,7 @@ export default function CreateBountyPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Description (supports Markdown)
             </label>
 
@@ -221,6 +221,7 @@ export default function CreateBountyPage() {
 
             {activeTab === "write" ? (
               <textarea
+                id="description"
                 rows={12}
                 {...register("description")}
                 className="min-h-64 w-full resize-y rounded-b-lg border border-slate-300 bg-white p-4 font-mono text-sm text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"

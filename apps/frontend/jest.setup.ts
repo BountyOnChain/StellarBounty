@@ -1,13 +1,29 @@
 import "@testing-library/jest-dom";
+import { toHaveNoViolations } from "jest-axe";
 
-// Polyfill fetch globals for jsdom 20 (Response/Request don't ship by default)
-// Use undici-style polyfill via the global Response if absent.
+expect.extend(toHaveNoViolations);
+
+if (typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: jest.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+}
+
 if (typeof globalThis.Response === "undefined") {
-  // Minimal Response polyfill for our test use (status + json()).
   class TestResponse {
-    body: any;
+    body: unknown;
     status: number;
-    constructor(body: any, init?: { status?: number }) {
+    constructor(body: unknown, init?: { status?: number }) {
       this.body = body;
       this.status = init?.status ?? 200;
     }

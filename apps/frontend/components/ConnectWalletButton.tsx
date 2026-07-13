@@ -27,7 +27,8 @@ export function ConnectWalletButton() {
         <button
           type="button"
           onClick={disconnect}
-          className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-900"
+          aria-label="Disconnect wallet"
+          className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-900"
         >
           Disconnect
         </button>
@@ -42,7 +43,8 @@ export function ConnectWalletButton() {
         type="button"
         onClick={connect}
         disabled={isConnecting}
-        className="min-h-11 rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-70"
+        aria-label={isConnecting ? "Connecting wallet" : "Connect wallet"}
+        className="min-h-11 rounded-md bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isConnecting ? "Connecting..." : "Connect wallet"}
       </button>

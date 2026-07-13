@@ -3,8 +3,8 @@ import { stroopsToXLM, formatRewardXLM, STROOPS_PER_XLM } from "@/lib/stellar-am
 describe("stroopsToXLM", () => {
   it("converts whole XLM amounts", () => {
     expect(stroopsToXLM(STROOPS_PER_XLM.toString())).toBe("1");
-    expect(stroopsToXLM((STROOPS_PER_XLM * 100n).toString())).toBe("100");
-    expect(stroopsToXLM((STROOPS_PER_XLM * 1000n).toString())).toBe("1000");
+    expect(stroopsToXLM((BigInt(STROOPS_PER_XLM) * 100n).toString())).toBe("100");
+    expect(stroopsToXLM((BigInt(STROOPS_PER_XLM) * 1000n).toString())).toBe("1000");
   });
 
   it("converts fractional XLM amounts and trims trailing zeros", () => {
@@ -28,7 +28,7 @@ describe("stroopsToXLM", () => {
 
   it("accepts number and bigint inputs", () => {
     expect(stroopsToXLM(STROOPS_PER_XLM)).toBe("1");
-    expect(stroopsToXLM(STROOPS_PER_XLM * 5n)).toBe("5");
+    expect(stroopsToXLM(BigInt(STROOPS_PER_XLM) * 5n)).toBe("5");
   });
 
   it("returns '0' on invalid input", () => {
@@ -46,7 +46,7 @@ describe("formatRewardXLM", () => {
   it("formats whole XLM amounts with unit", () => {
     expect(formatRewardXLM("10000000")).toBe("1 XLM");
     expect(formatRewardXLM("15000000")).toBe("1.5 XLM");
-    expect(formatRewardXLM(STROOPS_PER_XLM * 250n)).toBe("250 XLM");
+    expect(formatRewardXLM(BigInt(STROOPS_PER_XLM) * 250n)).toBe("250 XLM");
   });
 
   it("returns 'Reward TBD' for null or undefined", () => {

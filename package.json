@@ -12,9 +12,11 @@
     "build": "npm run build --workspaces --if-present",
     "install:all": "npm install",
     "release:check": "npm run build --workspaces --if-present && git diff --check",
-    "version": "npm run release:check"
+    "version": "npm run release:check",
+    "lhci": "lhci autorun"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
     "typescript": "^5.5.4"
   }
 }
