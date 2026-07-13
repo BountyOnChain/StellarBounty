@@ -5,9 +5,9 @@ import "@testing-library/jest-dom";
 if (typeof globalThis.Response === "undefined") {
   // Minimal Response polyfill for our test use (status + json()).
   class TestResponse {
-    body: any;
+    body: unknown;
     status: number;
-    constructor(body: any, init?: { status?: number }) {
+    constructor(body: unknown, init?: { status?: number }) {
       this.body = body;
       this.status = init?.status ?? 200;
     }

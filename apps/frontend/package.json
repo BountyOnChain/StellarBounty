@@ -9,6 +9,7 @@
     "test": "jest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "audit": "npm audit"
   },
