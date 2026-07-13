@@ -26,6 +26,29 @@ npm install
 cp .env.example .env
 ```
 
+
+## Pre-commit Hooks
+
+This repo uses [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) so code-quality checks run before every commit.
+
+- `pre-commit` runs `lint-staged` (Prettier + ESLint on staged files).
+- `pre-push` runs `npm run build --workspaces --if-present`.
+
+To enable hooks after cloning:
+
+```bash
+npm install
+npm run prepare
+```
+
+This creates `.husky/_` and registers the hooks. Hooks are opt-in — skip with `git commit --no-verify`.
+
+If you need to run the staged checks manually:
+
+```bash
+npx lint-staged
+```
+
 Install contract tooling when working under `apps/contracts`:
 
 ```bash

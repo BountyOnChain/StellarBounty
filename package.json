@@ -12,9 +12,23 @@
     "build": "npm run build --workspaces --if-present",
     "install:all": "npm install",
     "release:check": "npm run build --workspaces --if-present && git diff --check",
-    "version": "npm run release:check"
+    "version": "npm run release:check",
+    "prepare": "husky",
+    "lint-staged": "lint-staged"
   },
   "devDependencies": {
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.4.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
