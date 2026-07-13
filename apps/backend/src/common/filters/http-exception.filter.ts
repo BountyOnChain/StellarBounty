@@ -21,6 +21,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ? ((exception.getResponse() as any)?.message ?? exception.message)
       : 'Internal server error';
 
+    // Include requestId for client-side debugging / support correlation
+    const requestId = (req.headers['x-request-id'] as string | undefined) ?? undefined;
+
     if (!isHttp) {
       jsonLogger.mergeContext({ method: req.method, path: req.originalUrl ?? req.url });
       jsonLogger.error(
@@ -32,6 +35,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     res.status(statusCode).json({
       error: { code: HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR', message, statusCode },
+      ...(requestId ? { requestId } : {}),
     });
   }
 }
