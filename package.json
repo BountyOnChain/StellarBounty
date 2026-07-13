@@ -11,10 +11,24 @@
     "dev:backend": "npm run dev --workspace=apps/backend",
     "build": "npm run build --workspaces --if-present",
     "install:all": "npm install",
+    "docker:up": "docker compose up",
+    "docker:watch": "docker compose watch",
+    "prepare": "husky",
     "release:check": "npm run build --workspaces --if-present && git diff --check",
     "version": "npm run release:check"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
     "typescript": "^5.5.4"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

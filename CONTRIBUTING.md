@@ -134,6 +134,15 @@ cargo build --target wasm32-unknown-unknown --release
 
 Always include `git diff --check` output for changes that touch Markdown, JSON, scripts, or generated examples.
 
+## Git Hooks
+
+This repository uses [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged):
+
+- **pre-commit** — runs ESLint and Prettier on staged JS/TS/JSON/Markdown files.
+- **pre-push** — runs workspace unit tests before push.
+
+After `npm install`, hooks are installed via the `prepare` script. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify` (sparingly).
+
 ## Versioning
 
 StellarBounty uses Semantic Versioning:
