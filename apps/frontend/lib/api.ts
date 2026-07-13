@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { signMessage } from "@stellar/freighter-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
+const TOKEN_STORAGE_KEY = "stellar_bounty_access_token";
 
 type AuthTokenResponse = {
   accessToken: string;
@@ -14,21 +14,47 @@ type JwtPayload = {
   sub?: unknown;
 };
 
-export async function getAccessToken(publicKey: string): Promise<string> {
+export function useAbortController(enabled = true) {
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    controllerRef.current = new AbortController();
+    return () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
+    };
+  }, [enabled]);
+
+  return {
+    get signal() {
+      return controllerRef.current?.signal ?? new AbortController().signal;
+    },
+    abort: () => controllerRef.current?.abort(),
+  };
+}
+
+export async function getAccessToken(
+  publicKey: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const savedToken =
-    typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+    typeof window !== "undefined"
+      ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
+      : null;
 
   if (savedToken) {
     if (isTokenForPublicKey(savedToken, publicKey)) {
       return savedToken;
     }
-
     clearAuthToken();
   }
 
-  const challengeResponse = await fetch(
-    `${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`,
-  );
+  const challengeResponse = await fetch(`${API_URL}/api/v1/auth/challenge?address=${encodeURIComponent(publicKey)}`, {
+    signal,
+  });
   if (!challengeResponse.ok) {
     throw new Error("Failed to request wallet challenge.");
   }
@@ -51,6 +77,7 @@ export async function getAccessToken(publicKey: string): Promise<string> {
       signature: signed.signedMessage,
       nonce,
     }),
+    signal,
   });
 
   if (!verifyResponse.ok) {
@@ -67,10 +94,7 @@ export async function getAccessToken(publicKey: string): Promise<string> {
 }
 
 export function clearAuthToken(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
+  if (typeof window === "undefined") return;
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
@@ -81,13 +105,14 @@ function isTokenForPublicKey(token: string, publicKey: string): boolean {
 
 function decodeJwtPayload(token: string): JwtPayload | null {
   const [, encodedPayload] = token.split(".");
-  if (!encodedPayload || typeof globalThis.atob !== "function") {
-    return null;
-  }
+  if (!encodedPayload || typeof globalThis.atob !== "function") return null;
 
   try {
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "="
+    );
     return JSON.parse(globalThis.atob(padded)) as JwtPayload;
   } catch {
     return null;
@@ -96,15 +121,16 @@ function decodeJwtPayload(token: string): JwtPayload | null {
 
 export function useAuth() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const { signal, abort } = useAbortController();
 
   const getToken = useCallback(async (publicKey: string): Promise<string> => {
     setIsAuthenticating(true);
     try {
-      return await getAccessToken(publicKey);
+      return await getAccessToken(publicKey, signal);
     } finally {
       setIsAuthenticating(false);
     }
-  }, []);
+  }, [signal]);
 
   return useMemo(
     () => ({
@@ -112,7 +138,8 @@ export function useAuth() {
       clearToken: clearAuthToken,
       isAuthenticating,
       apiUrl: API_URL,
+      abortAuth: abort,
     }),
-    [getToken, isAuthenticating],
+    [getToken, abort]
   );
 }
