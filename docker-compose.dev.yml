@@ -1,0 +1,103 @@
+# =============================================================================
+# StellarBounty — Full-stack Docker Compose for local development
+# =============================================================================
+#
+# One command to start every service:
+#   docker compose -f docker-compose.dev.yml up
+#
+# Services:
+#   postgres      — PostgreSQL 16 (with init SQL)
+#   backend-dev   — NestJS API with hot-reload
+#   frontend-dev  — Next.js frontend with hot-reload
+#   contracts     — Rust toolchain (optional, on-demand)
+#
+# Ports:
+#   Frontend  → http://localhost:3000
+#   Backend   → http://localhost:4000
+#   Postgres  → localhost:5432
+#
+# Hot-reload:
+#   Source code is bind-mounted so edits in your editor are reflected
+#   immediately (NestJS watch mode + Next.js fast refresh).
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: stellar_bounty
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [stellar]
+
+  backend-dev:
+    image: node:20-alpine
+    working_dir: /app
+    env_file: .env.docker
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/stellar_bounty
+      CORS_ORIGIN: http://localhost:3000
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - /app/node_modules   # keep container node_modules separate from host
+    ports:
+      - "4000:4000"
+    command: >
+      sh -c "
+        npm install --workspace=apps/backend --include-workspace-root &&
+        npm run dev --workspace=apps/backend
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [stellar]
+
+  frontend-dev:
+    image: node:20-alpine
+    working_dir: /app
+    env_file: .env.docker
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      NEXT_PUBLIC_STELLAR_NETWORK: TESTNET
+    volumes:
+      - ./apps/frontend:/app/apps/frontend
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "
+        npm install --workspace=apps/frontend --include-workspace-root &&
+        npm run dev --workspace=apps/frontend
+      "
+    depends_on:
+      - backend-dev
+    networks: [stellar]
+
+  contracts:
+    image: rust:1.75-slim-bookworm
+    working_dir: /work
+    volumes:
+      - ./apps/contracts:/work
+    profiles: ["contracts"]   # excluded from `up` by default
+    networks: [stellar]
+
+volumes:
+  postgres_data:
+
+networks:
+  stellar:
+    driver: bridge
