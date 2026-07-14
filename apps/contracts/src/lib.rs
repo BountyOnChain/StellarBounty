@@ -463,7 +463,26 @@ mod tests {
         Address, Env,
     };
 
+    fn assert_model_status(client: &EscrowContractClient<'static>, expected: BountyStatus) {
+        let actual = client.get_status();
+        assert_eq!(actual, expected);
+    }
+
     fn setup() -> (
+        Env,
+        EscrowContractClient<'static>,
+        Address,
+        Address,
+        Address,
+        Address,
+        i128,
+    ) {
+        setup_with_amount(1000)
+    }
+
+    fn setup_with_amount(
+        amount: i128,
+    ) -> (
         Env,
         EscrowContractClient<'static>,
         Address,
@@ -485,7 +504,6 @@ mod tests {
 
         let owner = Address::generate(&env);
         let arbitrator = Address::generate(&env);
-        let amount: i128 = 1000;
 
         token_admin_client.mint(&owner, &amount);
 
@@ -913,5 +931,47 @@ mod tests {
             client.try_resolve(&arbitrator, &contributor),
             Err(Ok(ContractError::InvalidStatus))
         );
+    }
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn prop_happy_path_completes_with_correct_funds(amount in 1_i128..=1_000_000_000_i128) {
+            let env = Env::default();
+            env.mock_all_auths();
+
+            let token_admin = Address::generate(&env);
+            let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+            let token_address = token_id.address();
+            let token_admin_client = StellarAssetClient::new(&env, &token_address);
+
+            let owner = Address::generate(&env);
+            let arbitrator = Address::generate(&env);
+            let contract_id = env.register_contract(None, EscrowContract);
+            let client = EscrowContractClient::new(&env, &contract_id);
+            let contract_address = Address::from_contract_id(contract_id);
+            let amount = amount;
+
+            token_admin_client.mint(&contract_address, &amount);
+            client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
+            client.fund(&owner);
+
+            let contributor = Address::generate(&env);
+            client.start_work(&contributor);
+            client.submit(&contributor);
+            client.approve(&owner);
+
+            let token = TokenClient::new(&env, &token_address);
+            assert_eq!(client.get_status(), BountyStatus::Completed);
+            assert_eq!(token.balance(&contributor), amount);
+            assert_eq!(token.balance(&contract_id), 0);
+        }
     }
 }

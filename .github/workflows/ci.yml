@@ -75,6 +75,9 @@ jobs:
       - name: Test
         run: npm run test --workspace=apps/backend
 
+      - name: Property-based tests
+        run: npm run test:property --workspace=apps/backend
+
       - name: Build
         run: npm run build --workspace=apps/backend
 

@@ -12,7 +12,8 @@
     "migration:revert": "typeorm migration:revert -d dist/data-source.js",
     "migration:check": "node dist/migrations/check-migration-schema.js",
     "migration:test": "node dist/migrations/test-migration-roundtrip.js",
-    "audit": "npm audit"
+    "audit": "npm audit",
+    "test:property": "jest --testPathPattern=property.spec"
   },
   "jest": {
     "preset": "ts-jest",
@@ -59,6 +60,7 @@
     "eslint": "^8.57.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.4.10",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "fast-check": "^3.4.0"
   }
 }
