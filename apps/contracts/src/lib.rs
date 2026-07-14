@@ -99,6 +99,8 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
+        env.events()
+            .publish((symbol_short!("initialize"), owner), ());
         Ok(())
     }
 
@@ -122,6 +124,8 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
+        env.events()
+            .publish((symbol_short!("fund"), owner), ());
         Ok(())
     }
 
@@ -133,6 +137,8 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
+        env.events()
+            .publish((symbol_short!("start_work"), contributor), ());
         Ok(())
     }
 
@@ -144,6 +150,8 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
+        env.events()
+            .publish((symbol_short!("submit"), contributor), ());
         Ok(())
     }
 
@@ -153,7 +161,9 @@ impl EscrowContract {
         Self::assert_owner(&env, &owner)?;
         Self::assert_status(&env, BountyStatus::UnderReview)?;
 
-        Self::queue_operation(&env, &owner, TimelockOperation::Approve)
+        Self::queue_operation(&env, &owner, TimelockOperation::Approve);
+        env.events()
+            .publish((symbol_short!("approve"), owner), ());
     }
 
     /// Execute a queued approval after the time-lock expires.
@@ -189,7 +199,9 @@ impl EscrowContract {
             return Err(ContractError::InvalidStatus);
         }
 
-        Self::queue_operation(&env, &owner, TimelockOperation::Cancel)
+        Self::queue_operation(&env, &owner, TimelockOperation::Cancel);
+        env.events()
+            .publish((symbol_short!("cancel"), owner), ());
     }
 
     /// Execute a queued cancellation after the time-lock expires.
