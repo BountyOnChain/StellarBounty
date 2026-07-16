@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min, IsString } from 'class-validator';
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 20;
@@ -8,8 +8,6 @@ export const MAX_PAGE_SIZE = 100;
 
 /**
  * Generic query DTO for paginated list endpoints.
- *
- * Page numbering is 1-based. The response wrapper is {@link PaginatedResponse}.
  */
 export class PaginationQueryDto {
   @ApiPropertyOptional({
@@ -35,32 +33,37 @@ export class PaginationQueryDto {
   @Min(1)
   @Max(MAX_PAGE_SIZE)
   limit?: number = DEFAULT_PAGE_SIZE;
+
+  // ────── Filters for #373 and #374 ──────
+  @ApiPropertyOptional({ description: 'Filter by bounty owner public key' })
+  @IsOptional()
+  @IsString()
+  owner?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by contributor public key' })
+  @IsOptional()
+  @IsString()
+  contributor?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by bounty status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
 
-/**
- * Compute the 0-based offset for a 1-based page number.
- */
+/** Keep everything below unchanged (toSkip, toTotalPages, PaginatedResponse) */
 export function toSkip(page: number | undefined, limit: number | undefined): number {
   const safePage = page ?? DEFAULT_PAGE;
   const safeLimit = limit ?? DEFAULT_PAGE_SIZE;
   return (safePage - 1) * safeLimit;
 }
 
-/**
- * Compute totalPages from total + limit.
- */
 export function toTotalPages(total: number, limit: number | undefined): number {
   const safeLimit = limit ?? DEFAULT_PAGE_SIZE;
   if (safeLimit <= 0) return 0;
   return Math.max(1, Math.ceil(total / safeLimit));
 }
 
-/**
- * Generic paginated response wrapper.
- *
- * Use the static {@link PaginatedResponse.of} helper to build instances so the
- * metadata is computed consistently.
- */
 export class PaginatedResponse<T> {
   @ApiProperty({ description: 'Items in the current page.', isArray: true })
   data!: T[];
