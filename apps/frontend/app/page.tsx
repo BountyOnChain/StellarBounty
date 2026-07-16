@@ -24,8 +24,15 @@ export const metadata: Metadata = {
   },
 };
 
-type SortOption = "newest" | "highest_reward" | "closest_deadline";
-type StatusFilter = "all" | "open" | "in_progress" | "completed";
+type SortOption =
+  | "newest"
+  | "oldest"
+  | "highest_reward"
+  | "lowest_reward"
+  | "closest_deadline"
+  | "farthest_deadline"
+  | "relevance";
+type StatusFilter = "all" | "open" | "in_progress" | "completed" | "cancelled";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -33,6 +40,10 @@ type SearchParams = {
   sort?: string;
   status?: string;
   search?: string;
+  q?: string;
+  tags?: string;
+  minReward?: string;
+  maxReward?: string;
   page?: string;
   limit?: string;
 };
@@ -70,31 +81,45 @@ function normalizePage(value: string | undefined): number {
 function normalizeLimit(value: string | undefined): number {
   const n = Number.parseInt(value ?? `${DEFAULT_PAGE_SIZE}`, 10);
   if (!Number.isFinite(n) || n < 1) return DEFAULT_PAGE_SIZE;
-  // Cap at 100 to match the backend's MAX_PAGE_SIZE.
   return Math.min(100, n);
 }
 
-async function getBounties(
-  page: number,
-  limit: number,
-): Promise<LoadedBounties> {
+type BountyQuery = {
+  page: number;
+  limit: number;
+  q?: string;
+  status?: string;
+  tags?: string;
+  minReward?: string;
+  maxReward?: string;
+  sort?: SortOption;
+};
+
+async function getBounties(query: BountyQuery): Promise<LoadedBounties> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   try {
     const url = new URL(`${apiUrl}/api/v1/bounties`);
-    url.searchParams.set("page", String(page));
-    url.searchParams.set("limit", String(limit));
+    url.searchParams.set("page", String(query.page));
+    url.searchParams.set("limit", String(query.limit));
+    if (query.q) url.searchParams.set("q", query.q);
+    if (query.status && query.status !== "all") url.searchParams.set("status", query.status);
+    if (query.tags) url.searchParams.set("tags", query.tags);
+    if (query.minReward) url.searchParams.set("minReward", query.minReward);
+    if (query.maxReward) url.searchParams.set("maxReward", query.maxReward);
+    if (query.sort && query.sort !== "newest") url.searchParams.set("sort", query.sort);
+
     const response = await fetch(url, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
+      return { bounties: [], total: 0, page: query.page, pageSize: query.limit, totalPages: 1 };
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
     const data = Array.isArray(payload) ? payload : payload.data ?? [];
     const total = Array.isArray(payload) ? data.length : payload.total ?? data.length;
-    const respPage = Array.isArray(payload) ? 1 : payload.page ?? page;
-    const respPageSize = Array.isArray(payload) ? data.length : payload.pageSize ?? limit;
+    const respPage = Array.isArray(payload) ? 1 : payload.page ?? query.page;
+    const respPageSize = Array.isArray(payload) ? data.length : payload.pageSize ?? query.limit;
     const totalPages = Array.isArray(payload)
       ? 1
       : payload.totalPages ?? Math.max(1, Math.ceil(total / Math.max(1, respPageSize)));
@@ -109,73 +134,34 @@ async function getBounties(
 
     return { bounties, total, page: respPage, pageSize: respPageSize, totalPages };
   } catch {
-    return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
+    return { bounties: [], total: 0, page: query.page, pageSize: query.limit, totalPages: 1 };
   }
-}
-
-function getRewardValue(reward: BountyCardData["reward"]) {
-  if (typeof reward === "number") {
-    return reward;
-  }
-
-  if (typeof reward === "string") {
-    const numericValue = Number.parseFloat(reward.replace(/[^0-9.]/g, ""));
-    return Number.isFinite(numericValue) ? numericValue : -1;
-  }
-
-  return -1;
-}
-
-function getDeadlineValue(deadline: BountyCardData["deadline"]) {
-  if (!deadline) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const timestamp = new Date(deadline).getTime();
-  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
 }
 
 function normalizeSort(sort?: string): SortOption {
-  if (sort === "highest_reward" || sort === "closest_deadline") {
+  if (
+    sort === "highest_reward" ||
+    sort === "lowest_reward" ||
+    sort === "closest_deadline" ||
+    sort === "farthest_deadline" ||
+    sort === "oldest" ||
+    sort === "relevance"
+  ) {
     return sort;
   }
-
   return "newest";
 }
 
 function normalizeStatus(status?: string): StatusFilter {
-  if (status === "open" || status === "in_progress" || status === "completed") {
+  if (
+    status === "open" ||
+    status === "in_progress" ||
+    status === "completed" ||
+    status === "cancelled"
+  ) {
     return status;
   }
-
   return "all";
-}
-
-function applyListingControls(
-  bounties: BountyCardData[],
-  { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
-) {
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filtered = bounties.filter((bounty) => {
-    const matchesStatus = status === "all" ? true : (bounty.status ?? "open") === status;
-    const matchesSearch =
-      normalizedSearch.length === 0 ? true : bounty.title.toLowerCase().includes(normalizedSearch);
-
-    return matchesStatus && matchesSearch;
-  });
-
-  return filtered.sort((left, right) => {
-    if (sort === "highest_reward") {
-      return getRewardValue(right.reward) - getRewardValue(left.reward);
-    }
-
-    if (sort === "closest_deadline") {
-      return getDeadlineValue(left.deadline) - getDeadlineValue(right.deadline);
-    }
-
-    return 0;
-  });
 }
 
 function buildPageHref(
@@ -188,7 +174,11 @@ function buildPageHref(
   if (sort !== "newest") params.set("sort", sort);
   const status = normalizeStatus(searchParams.status);
   if (status !== "all") params.set("status", status);
-  if (searchParams.search) params.set("search", searchParams.search);
+  const q = searchParams.q ?? searchParams.search;
+  if (q) params.set("q", q);
+  if (searchParams.tags) params.set("tags", searchParams.tags);
+  if (searchParams.minReward) params.set("minReward", searchParams.minReward);
+  if (searchParams.maxReward) params.set("maxReward", searchParams.maxReward);
   if (nextLimit !== DEFAULT_PAGE_SIZE) params.set("limit", String(nextLimit));
   if (nextPage > 1) params.set("page", String(nextPage));
   const qs = params.toString();
@@ -254,11 +244,24 @@ function PaginationControls({
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const page = normalizePage(searchParams?.page);
   const pageSize = normalizeLimit(searchParams?.limit);
-  const { bounties: pageBounties, total, totalPages } = await getBounties(page, pageSize);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
-  const search = searchParams?.search ?? "";
-  const bounties = applyListingControls(pageBounties, { sort, status, search });
+  // q takes precedence over legacy search param
+  const q = (searchParams?.q ?? searchParams?.search ?? "").trim();
+  const tags = searchParams?.tags?.trim();
+  const minReward = searchParams?.minReward?.trim();
+  const maxReward = searchParams?.maxReward?.trim();
+
+  const { bounties, total, totalPages } = await getBounties({
+    page,
+    limit: pageSize,
+    q: q || undefined,
+    status,
+    tags: tags || undefined,
+    minReward: minReward || undefined,
+    maxReward: maxReward || undefined,
+    sort,
+  });
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
@@ -271,6 +274,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400">
               Browse funded work, compare rewards and deadlines, then jump into a task that matches your skills.
+              Search now uses full-text matching across all pages.
             </p>
           </div>
           <Link
@@ -282,14 +286,14 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </section>
 
         <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:p-6">
-          <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
+          <form className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,0.7fr)_minmax(180px,0.8fr)_minmax(0,1fr)_auto] lg:items-end">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Search title</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Search (full-text)</span>
               <input
                 type="search"
-                name="search"
-                defaultValue={search}
-                placeholder="Search bounty titles"
+                name="q"
+                defaultValue={q}
+                placeholder="stellar payment – searches title + description"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               />
             </label>
@@ -305,6 +309,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 <option value="open">Open</option>
                 <option value="in_progress">In progress</option>
                 <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </label>
 
@@ -316,9 +321,40 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               >
                 <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
                 <option value="highest_reward">Highest reward</option>
+                <option value="lowest_reward">Lowest reward</option>
                 <option value="closest_deadline">Closest deadline</option>
+                <option value="farthest_deadline">Farthest deadline</option>
+                <option value="relevance">Relevance (when searching)</option>
               </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Tags / Rewards</span>
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  name="tags"
+                  defaultValue={tags}
+                  placeholder="tags csv"
+                  className="col-span-3 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <input
+                  type="text"
+                  name="minReward"
+                  defaultValue={minReward}
+                  placeholder="min reward"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <input
+                  type="text"
+                  name="maxReward"
+                  defaultValue={maxReward}
+                  placeholder="max reward"
+                  className="col-span-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </div>
             </label>
 
             <div className="flex flex-wrap gap-3">
@@ -341,6 +377,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             <p>
               Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-200">{total}</span> bounties
+              {q ? (
+                <>
+                  {" "}
+                  for <span className="font-semibold text-amber-600 dark:text-yellow-400">&quot;{q}&quot;</span>
+                </>
+              ) : null}
               {totalPages > 1 ? (
                 <>
                   {" "}· page <span className="font-semibold text-slate-900 dark:text-slate-200">{page}</span> of{" "}
@@ -348,7 +390,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 </>
               ) : null}
             </p>
-            <p className="text-slate-500 dark:text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
+            <p className="text-slate-500 dark:text-slate-500">Server-side filtered • URL shareable • Full-text via Postgres tsvector</p>
           </div>
         </section>
 
@@ -360,13 +402,13 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           </section>
         ) : (
           <section className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center transition-colors dark:border-slate-700 dark:bg-slate-900/50">
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-200">No bounties available yet.</p>
-            <p className="mt-2 text-slate-600 dark:text-slate-400">Create the first bounty and bring new work onto Stellar.</p>
+            <p className="text-lg font-semibold text-slate-900 dark:text-slate-200">No bounties match your search.</p>
+            <p className="mt-2 text-slate-600 dark:text-slate-400">Try adjusting full-text query, tags, or reward range.</p>
             <Link
-              href="/bounties/new"
+              href="/"
               className="mt-6 inline-flex rounded-xl border border-slate-300 px-5 py-3 font-medium text-slate-700 transition hover:border-amber-500 hover:text-amber-700 dark:border-slate-700 dark:text-slate-200 dark:hover:border-yellow-400 dark:hover:text-yellow-300"
             >
-              Post a bounty
+              Clear filters
             </Link>
           </section>
         )}

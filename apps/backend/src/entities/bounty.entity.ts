@@ -40,6 +40,9 @@ export class Bounty {
   @Column()
   ownerAddress!: string;
 
+  @Column('text', { array: true, nullable: true })
+  tags?: string[] | null;
+
   @OneToMany(() => Submission, (submission) => submission.bounty)
   submissions!: Submission[];
 

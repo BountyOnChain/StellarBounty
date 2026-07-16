@@ -13,7 +13,8 @@ import { ApiBadRequestResponse,
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
-import { PaginationQueryDto, PaginatedResponse } from './common/pagination.dto';
+import { BountyFilterDto } from './bounties/dto/filter-bounties.dto';
+import { PaginatedResponse } from './common/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
 
 @ApiTags('v1: bounties')
@@ -49,8 +50,8 @@ export class BountiesController {
   })
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get()
-  findAll(@Query() pagination: PaginationQueryDto): Promise<PaginatedResponse<Bounty>> {
-    return this.bountiesService.findAll(pagination);
+  findAll(@Query() filter: BountyFilterDto): Promise<PaginatedResponse<Bounty>> {
+    return this.bountiesService.findAll(filter);
   }
 
   @ApiOperation({ summary: 'Get a single bounty by ID' })
