@@ -302,6 +302,23 @@ impl EscrowContract {
         Ok(())
     }
 
+    /// Rotate the dispute arbitrator. Only the bounty owner can change this key.
+    pub fn rotate_arbitrator(
+        env: Env,
+        caller: Address,
+        new_arbitrator: Address,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        Self::assert_owner(&env, &caller)?;
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("ARBITRATR"), &new_arbitrator);
+        env.events()
+            .publish((symbol_short!("rotarb"), caller), new_arbitrator);
+        Ok(())
+    }
+
     pub fn get_owner(env: Env) -> Result<Address, ContractError> {
         Self::read_owner(&env)
     }
@@ -777,6 +794,45 @@ mod tests {
         let (_, client, _, _, _, _, contributor, _) = setup_under_review();
         client.dispute(&contributor);
         assert_eq!(client.get_status(), BountyStatus::Disputed);
+    }
+
+    #[test]
+    fn test_owner_can_rotate_arbitrator() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
+
+        let new_arbitrator = Address::generate(&env);
+        client.rotate_arbitrator(&owner, &new_arbitrator);
+
+        assert_eq!(client.get_arbitrator(), new_arbitrator);
+    }
+
+    #[test]
+    fn test_rotate_arbitrator_by_non_owner_errs() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
+
+        let stranger = Address::generate(&env);
+        let new_arbitrator = Address::generate(&env);
+        assert_eq!(
+            client.try_rotate_arbitrator(&stranger, &new_arbitrator),
+            Err(Ok(ContractError::Unauthorized))
+        );
+        assert_eq!(client.get_arbitrator(), arbitrator);
+    }
+
+    #[test]
+    fn test_rotated_arbitrator_controls_dispute_resolution() {
+        let (env, client, owner, _, _, old_arbitrator, contributor, _) = setup_under_review();
+        let new_arbitrator = Address::generate(&env);
+        client.rotate_arbitrator(&owner, &new_arbitrator);
+        client.dispute(&contributor);
+
+        assert_eq!(
+            client.try_resolve(&old_arbitrator, &contributor),
+            Err(Ok(ContractError::Unauthorized))
+        );
+        client.resolve(&new_arbitrator, &contributor);
     }
 
     #[test]
