@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
+import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
 export const revalidate = 60;
@@ -25,11 +26,12 @@ export const metadata: Metadata = {
 };
 
 type SortOption = "newest" | "highest_reward" | "closest_deadline";
-type StatusFilter = "all" | "open" | "in_progress" | "completed";
+type StatusFilter = "all" | "open" | "in_progress" | "completed" | "cancelled";
 
 const DEFAULT_PAGE_SIZE = 20;
 
 type SearchParams = {
+  q?: string;
   sort?: string;
   status?: string;
   search?: string;
@@ -144,11 +146,24 @@ function normalizeSort(sort?: string): SortOption {
 }
 
 function normalizeStatus(status?: string): StatusFilter {
-  if (status === "open" || status === "in_progress" || status === "completed") {
+  if (status === "open" || status === "in_progress" || status === "completed" || status === "cancelled") {
     return status;
   }
 
   return "all";
+}
+
+function getStatusCounts(bounties: BountyCardData[], search: string): BountyStatusCounts {
+  const normalizedSearch = search.trim().toLowerCase();
+  const counts: BountyStatusCounts = { open: 0, in_progress: 0, completed: 0, cancelled: 0 };
+
+  for (const bounty of bounties) {
+    if (normalizedSearch && !bounty.title.toLowerCase().includes(normalizedSearch)) continue;
+    const status = bounty.status ?? "open";
+    if (status in counts) counts[status as keyof BountyStatusCounts] += 1;
+  }
+
+  return counts;
 }
 
 function applyListingControls(
@@ -188,7 +203,8 @@ function buildPageHref(
   if (sort !== "newest") params.set("sort", sort);
   const status = normalizeStatus(searchParams.status);
   if (status !== "all") params.set("status", status);
-  if (searchParams.search) params.set("search", searchParams.search);
+  const search = searchParams.q ?? searchParams.search;
+  if (search) params.set("q", search);
   if (nextLimit !== DEFAULT_PAGE_SIZE) params.set("limit", String(nextLimit));
   if (nextPage > 1) params.set("page", String(nextPage));
   const qs = params.toString();
@@ -257,7 +273,8 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const { bounties: pageBounties, total, totalPages } = await getBounties(page, pageSize);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
-  const search = searchParams?.search ?? "";
+  const search = searchParams?.q ?? searchParams?.search ?? "";
+  const statusCounts = getStatusCounts(pageBounties, search);
   const bounties = applyListingControls(pageBounties, { sort, status, search });
 
   return (
@@ -283,16 +300,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
         <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:p-6">
           <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Search title</span>
-              <input
-                type="search"
-                name="search"
-                defaultValue={search}
-                placeholder="Search bounty titles"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
-              />
-            </label>
+            <BountySearchInput initialSearch={search} statusCounts={statusCounts} />
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
@@ -305,6 +313,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 <option value="open">Open</option>
                 <option value="in_progress">In progress</option>
                 <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </label>
 
