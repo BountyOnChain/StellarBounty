@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -71,7 +72,14 @@ export class SubmissionsService {
     submission.status = SubmissionStatus.APPROVED;
     bounty.status = BountyStatus.COMPLETED;
     await this.bountyRepo.save(bounty);
-    return this.submissionRepo.save(submission);
+    try {
+      return await this.submissionRepo.save(submission);
+    } catch (err: any) {
+      if (err.code === '23505' || err.message?.includes('idx_submissions_one_approved_per_bounty')) {
+        throw new ConflictException('A submission is already approved for this bounty');
+      }
+      throw err;
+    }
   }
 
   async reject(bountyId: string, subId: string, ownerAddress: string) {

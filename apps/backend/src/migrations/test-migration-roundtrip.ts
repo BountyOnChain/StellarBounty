@@ -1,7 +1,7 @@
 import { AppDataSource } from '../data-source';
 
 const APP_TABLES = ['bounties', 'nonces', 'submissions'];
-const MIGRATION_COUNT = 3;
+const MIGRATION_COUNT = 5;
 
 async function getAppTables(): Promise<string[]> {
   const rows: { table_name: string }[] = await AppDataSource.query(
