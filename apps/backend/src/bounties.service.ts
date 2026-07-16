@@ -32,7 +32,35 @@ export class BountiesService {
     });
     return this.bounties.save(bounty);
   }
+async findAll(pagination: PaginationQueryDto = {}): Promise<PaginatedResponse<Bounty>> {
+  const { page = 1, limit = 20, owner, contributor, status } = pagination;
 
+  const query: any = {};
+
+  // Support owner filter - this fixes the main issue
+  if (owner) {
+    query.owner = owner;
+  }
+
+  // Support contributor filter
+  if (contributor) {
+    query['submissions.contributor'] = contributor;
+  }
+
+  // Support status filter
+  if (status) {
+    query.status = status;
+  }
+
+  const [data, total] = await this.bounties.findAndCount({
+    where: query,
+    order: { createdAt: 'DESC' },
+    skip: (page - 1) * limit,
+    take: limit,
+  });
+
+  return PaginatedResponse.of(data, total, page, limit);
+}
   /**
    * List bounties with server-side pagination.
    *
