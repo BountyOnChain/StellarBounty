@@ -303,19 +303,14 @@ impl EscrowContract {
     }
 
     /// Rotate the dispute arbitrator. Only the bounty owner can change this key.
-    pub fn rotate_arbitrator(
-        env: Env,
-        caller: Address,
-        new_arbitrator: Address,
-    ) -> Result<(), ContractError> {
+    pub fn rotate_arbitrator(env: Env, caller: Address, new_arbitrator: Address) -> Result<(), ContractError> {
         caller.require_auth();
         Self::assert_owner(&env, &caller)?;
 
         env.storage()
             .instance()
             .set(&symbol_short!("ARBITRATR"), &new_arbitrator);
-        env.events()
-            .publish((symbol_short!("rotarb"), caller), new_arbitrator);
+        env.events().publish((symbol_short!("rotarb"), caller), new_arbitrator);
         Ok(())
     }
 
