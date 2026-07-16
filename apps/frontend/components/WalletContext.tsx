@@ -9,8 +9,12 @@ type WalletState = {
   targetNetwork: string;
   isConnecting: boolean;
   error: string | null;
+  /** Monotonically increasing version. Increments on every connect and
+   *  disconnect so dashboard components can key their data-fetches on it
+   *  and automatically refetch after a wallet change. */
+  dashboardVersion: number;
   connect: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 };
 
 type FreighterApi = typeof import("@stellar/freighter-api");
@@ -40,6 +44,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [freighterNetwork, setFreighterNetwork] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardVersion, setDashboardVersion] = useState(0);
 
   const targetNetwork = normalizeNetwork(process.env.NEXT_PUBLIC_STELLAR_NETWORK);
 
@@ -54,11 +59,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setFreighterNetwork(savedWallet.freighterNetwork);
   }, []);
 
-  const disconnect = useCallback(() => {
-    clearStoredWalletSession();
+  const disconnect = useCallback(async () => {
+    await clearStoredWalletSession();
     setPublicKey(null);
     setFreighterNetwork(null);
     setError(null);
+    // Bump dashboardVersion so consumers know to invalidate their caches.
+    setDashboardVersion((v) => v + 1);
   }, []);
 
   const connect = useCallback(async () => {
@@ -93,6 +100,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPublicKey(access.address);
       setFreighterNetwork(activeNetwork);
       saveStoredWallet({ publicKey: access.address, freighterNetwork: activeNetwork });
+      // Bump dashboardVersion so all auth-bound data hooks know to refetch.
+      setDashboardVersion((v) => v + 1);
 
       if (activeNetwork !== targetNetwork) {
         setError(`Freighter is on ${activeNetwork}. This app is configured for ${targetNetwork}.`);
@@ -111,10 +120,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       targetNetwork,
       isConnecting,
       error,
+      dashboardVersion,
       connect,
       disconnect,
     }),
-    [connect, disconnect, error, freighterNetwork, isConnecting, publicKey, targetNetwork],
+    [connect, disconnect, dashboardVersion, error, freighterNetwork, isConnecting, publicKey, targetNetwork],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

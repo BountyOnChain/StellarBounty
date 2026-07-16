@@ -21,6 +21,7 @@ function TestConsumer() {
         targetNetwork: ctx.targetNetwork,
         isConnecting: ctx.isConnecting,
         error: ctx.error,
+        dashboardVersion: ctx.dashboardVersion,
         hasConnect: typeof ctx.connect === "function",
         hasDisconnect: typeof ctx.disconnect === "function",
       })}
@@ -55,6 +56,7 @@ describe("WalletContext — basic state", () => {
       expect(s.targetNetwork).toBe("TESTNET");
       expect(s.isConnecting).toBe(false);
       expect(s.error).toBeNull();
+      expect(s.dashboardVersion).toBe(0);
       expect(s.hasConnect).toBe(true);
       expect(s.hasDisconnect).toBe(true);
     });
