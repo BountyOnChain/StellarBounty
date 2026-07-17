@@ -11,7 +11,7 @@ import { ThemeToggle } from "../../components/ThemeToggle";
 const NAV_LINKS = [
     { label: "Bounties", href: "/bounties" },
     { label: "Dashboard", href: "/dashboard" },
-    { label: "Saved", href: "/saved" },
+    { label: "Saved", href: "/bounties/saved" },
 ];
 
 export default function Navbar() {

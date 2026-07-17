@@ -1,6 +1,6 @@
 "use client";
 
-import SavedBountiesList from "../components/SavedBountiesList";
+import SavedBountiesList from "../../components/SavedBountiesList";
 
 export default function SavedPage() {
   return (
