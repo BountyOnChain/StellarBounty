@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/components/WalletContext";
 import { useAuth } from "@/lib/api";
 import BountyCard, { type BountyCardData } from "./BountyCard";
@@ -13,12 +13,10 @@ export default function BountyGrid({ bounties }: BountyGridProps) {
   const { publicKey, dashboardVersion } = useWallet();
   const { getToken, apiUrl } = useAuth();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const fetchedRef = useRef(false);
 
   const fetchSaved = useCallback(async () => {
     if (!publicKey) {
       setSavedIds(new Set());
-      fetchedRef.current = false;
       return;
     }
 

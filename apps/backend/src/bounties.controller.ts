@@ -102,7 +102,7 @@ export class BountiesController {
   restore(@Param('id') id: string) {
     return this.bountiesService.restore(id);
   }
-    @ApiBearerAuth('access-token')
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Save a bounty to your saved list' })
   @ApiParam({ name: 'id', description: 'Bounty UUID' })
   @ApiCreatedResponse({ description: 'Bounty saved.' })

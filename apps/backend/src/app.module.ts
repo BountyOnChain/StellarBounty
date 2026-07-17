@@ -37,8 +37,8 @@ import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
 import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
- 
- @Module({
+
+@Module({
    imports: [
      ConfigModule.forRoot({
        isGlobal: true,

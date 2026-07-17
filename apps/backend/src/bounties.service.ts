@@ -100,7 +100,7 @@ export class BountiesService {
     return this.findOne(id);
   }
 
-    async saveBounty(address: string, bountyId: string) {
+  async saveBounty(address: string, bountyId: string) {
     const bounty = await this.bounties.findOne({ where: { id: bountyId } });
     if (!bounty) throw new NotFoundException('Bounty not found');
 
