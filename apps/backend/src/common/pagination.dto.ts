@@ -34,7 +34,7 @@ export class PaginationQueryDto {
   @Max(MAX_PAGE_SIZE)
   limit?: number = DEFAULT_PAGE_SIZE;
 
-  // ────── Filters for #373 and #374 ──────
+  // ────── New filter fields ──────
   @ApiPropertyOptional({ description: 'Filter by bounty owner public key' })
   @IsOptional()
   @IsString()

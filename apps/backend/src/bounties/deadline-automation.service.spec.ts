@@ -1,12 +1,34 @@
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { DeadlineAutomationService } from './deadline-automation.service';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
+function createMockDataSource(acquired = true) {
+  const queryRunner = {
+    connect: jest.fn(),
+    query: jest.fn(async (sql: string) => {
+      if (sql.includes('pg_try_advisory_lock')) {
+        return [{ acquired }];
+      }
+      if (sql.includes('pg_advisory_unlock')) {
+        return [{ pg_advisory_unlock: true }];
+      }
+      return [];
+    }),
+    release: jest.fn(),
+  };
+
+  return {
+    createQueryRunner: jest.fn(() => queryRunner),
+    queryRunner,
+  } as unknown as DataSource & { queryRunner: typeof queryRunner };
+}
+
 describe('DeadlineAutomationService', () => {
   let repository: MockRepository<Bounty>;
+  let dataSource: DataSource;
   let service: DeadlineAutomationService;
   const now = new Date('2026-06-13T00:00:00.000Z');
 
@@ -32,8 +54,10 @@ describe('DeadlineAutomationService', () => {
       find: jest.fn(),
       save: jest.fn(async (input) => input),
     };
+    dataSource = createMockDataSource(true);
     service = new DeadlineAutomationService(
       repository as unknown as Repository<Bounty>,
+      dataSource,
       new ConfigService({
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: false,
         BOUNTY_DEADLINE_GRACE_PERIOD_MS: 24 * 60 * 60 * 1000,
@@ -86,10 +110,37 @@ describe('DeadlineAutomationService', () => {
     });
   });
 
+  it('skips work when the advisory lock is held by another replica', async () => {
+    const lockedDataSource = createMockDataSource(false);
+    service = new DeadlineAutomationService(
+      repository as unknown as Repository<Bounty>,
+      lockedDataSource,
+      new ConfigService({
+        BOUNTY_DEADLINE_GRACE_PERIOD_MS: 24 * 60 * 60 * 1000,
+        BOUNTY_DEADLINE_REMINDER_WINDOW_MS: 48 * 60 * 60 * 1000,
+      }),
+    );
+
+    const result = await service.runDeadlineAutomation(now);
+
+    expect(repository.find).not.toHaveBeenCalled();
+    expect(lockedDataSource.queryRunner.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('pg_advisory_unlock'),
+      expect.anything(),
+    );
+    expect(result).toEqual({
+      checkedAt: now,
+      autoClosed: 0,
+      remindersQueued: 0,
+      escrowExpiriesFlagged: 0,
+    });
+  });
+
   it('starts and clears a background interval when enabled', () => {
     jest.useFakeTimers();
     const enabledService = new DeadlineAutomationService(
       repository as unknown as Repository<Bounty>,
+      dataSource,
       new ConfigService({
         BOUNTY_DEADLINE_AUTOMATION_ENABLED: true,
         BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: 60000,

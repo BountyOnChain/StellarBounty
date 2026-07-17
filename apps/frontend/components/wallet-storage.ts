@@ -1,4 +1,4 @@
-import { clearAuthToken } from "../lib/api";
+import { revokeAuthToken } from "../lib/api";
 
 export const WALLET_STORAGE_KEY = "stellar-bounty.wallet";
 
@@ -27,7 +27,7 @@ export function saveStoredWallet(wallet: StoredWallet): void {
   window.localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(wallet));
 }
 
-export function clearStoredWalletSession(): void {
+export async function clearStoredWalletSession(): Promise<void> {
   window.localStorage.removeItem(WALLET_STORAGE_KEY);
-  clearAuthToken();
+  await revokeAuthToken();
 }
