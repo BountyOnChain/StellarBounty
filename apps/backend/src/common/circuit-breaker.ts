@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
 export enum CircuitState {
   CLOSED = 0,
@@ -24,7 +24,7 @@ export class CircuitBreaker {
   private lastFailureTime = 0;
   private state: CircuitState = CircuitState.CLOSED;
 
-  constructor(options: Partial<CircuitBreakerOptions> = {}) {
+  constructor(@Optional() options: Partial<CircuitBreakerOptions> = {}) {
     this.options = {
       failureThreshold: options.failureThreshold ?? 5,
       failureWindowMs: options.failureWindowMs ?? 60_000,
