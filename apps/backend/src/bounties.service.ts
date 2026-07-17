@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
@@ -9,12 +9,15 @@ import {
   toSkip,
 } from './common/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
+import { SavedBounty } from './entities/saved-bounty.entity';
 
 @Injectable()
 export class BountiesService {
   constructor(
     @InjectRepository(Bounty)
     private readonly bounties: Repository<Bounty>,
+    @InjectRepository(SavedBounty)
+    private readonly savedBounties: Repository<SavedBounty>,
   ) {}
 
   async create(dto: CreateBountyDto) {
@@ -95,5 +98,30 @@ export class BountiesService {
     }
     await this.bounties.restore(id);
     return this.findOne(id);
+  }
+
+    async saveBounty(address: string, bountyId: string) {
+    const bounty = await this.bounties.findOne({ where: { id: bountyId } });
+    if (!bounty) throw new NotFoundException('Bounty not found');
+
+    const existing = await this.savedBounties.findOne({ where: { address, bountyId } });
+    if (existing) return existing;
+
+    try {
+      const saved = this.savedBounties.create({ address, bountyId });
+      return await this.savedBounties.save(saved);
+    } catch (err: any) {
+      if (err.code === '23505') {
+        throw new ConflictException('Bounty already saved');
+      }
+      throw err;
+    }
+  }
+
+  async unsaveBounty(address: string, bountyId: string) {
+    const saved = await this.savedBounties.findOne({ where: { address, bountyId } });
+    if (!saved) throw new NotFoundException('Saved bounty not found');
+    await this.savedBounties.remove(saved);
+    return { deleted: true };
   }
 }

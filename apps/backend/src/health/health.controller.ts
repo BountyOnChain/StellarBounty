@@ -4,7 +4,7 @@ import { HealthService } from './health.service';
 import { HealthResponseDto } from './dto/health.dto';
 
 @ApiTags('v1: health')
-@Controller('api/v1/health')
+@Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
