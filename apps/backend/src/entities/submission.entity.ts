@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -14,6 +15,10 @@ export enum SubmissionStatus {
 }
 
 @Entity('submissions')
+@Index('idx_submissions_one_approved_per_bounty', ['bountyId'], {
+  unique: true,
+  where: `"status" = 'approved'`,
+})
 export class Submission {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
