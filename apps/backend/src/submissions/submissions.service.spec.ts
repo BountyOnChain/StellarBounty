@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -215,6 +216,25 @@ describe('SubmissionsService', () => {
         BadRequestException,
       );
       expect(bountyRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('maps concurrent approval database unique constraint violation to ConflictException', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+
+      const dbError = Object.assign(new Error('duplicate key value violates unique constraint'), {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "idx_submissions_one_approved_per_bounty"',
+      });
+      submissionRepo.save!.mockRejectedValueOnce(dbError);
+
+      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('throws NotFoundException when the target submission is missing', async () => {

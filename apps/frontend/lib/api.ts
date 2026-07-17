@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { signMessage } from "@stellar/freighter-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
+export const TOKEN_STORAGE_KEY = "stellar-bounty.auth-token";
 
 type AuthTokenResponse = {
   accessToken: string;
@@ -74,6 +74,39 @@ export function clearAuthToken(): void {
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
+/**
+ * Revoke the current auth token server-side, then clear it from localStorage.
+ *
+ * Calling this on disconnect ensures the token cannot be re-used after expiry
+ * even on a shared device. The network request is fire-and-forget — local
+ * state is always cleared regardless of whether the server call succeeds.
+ */
+export async function revokeAuthToken(): Promise<void> {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const token = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+
+  // Always clear the local token first so the UI is immediately logged out.
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+
+  if (!token) {
+    return;
+  }
+
+  try {
+    await fetch(`${API_URL}/api/v1/auth/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // Network errors are intentionally swallowed — the local token has
+    // already been removed so the user is considered logged out.
+  }
+}
+
 function isTokenForPublicKey(token: string, publicKey: string): boolean {
   const payload = decodeJwtPayload(token);
   return payload?.sub === publicKey;
@@ -110,6 +143,7 @@ export function useAuth() {
     () => ({
       getToken,
       clearToken: clearAuthToken,
+      revokeToken: revokeAuthToken,
       isAuthenticating,
       apiUrl: API_URL,
     }),
