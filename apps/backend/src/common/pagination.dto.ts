@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min, IsString } from 'class-validator';
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 20;
@@ -35,6 +35,22 @@ export class PaginationQueryDto {
   @Min(1)
   @Max(MAX_PAGE_SIZE)
   limit?: number = DEFAULT_PAGE_SIZE;
+
+  // ────── New filter fields ──────
+  @ApiPropertyOptional({ description: 'Filter by bounty owner public key' })
+  @IsOptional()
+  @IsString()
+  owner?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by contributor public key' })
+  @IsOptional()
+  @IsString()
+  contributor?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by bounty status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
 
 /**
@@ -57,9 +73,6 @@ export function toTotalPages(total: number, limit: number | undefined): number {
 
 /**
  * Generic paginated response wrapper.
- *
- * Use the static {@link PaginatedResponse.of} helper to build instances so the
- * metadata is computed consistently.
  */
 export class PaginatedResponse<T> {
   @ApiProperty({ description: 'Items in the current page.', isArray: true })
