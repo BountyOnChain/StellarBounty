@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { DataSource, In, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { BOUNTY_AUTOMATION_LOCK_ID } from './bounty-automation-lock.constants';
 import { Bounty, BountyStatus } from '../entities/bounty.entity';
 
 type DeadlineAutomationResult = {
@@ -19,6 +20,7 @@ export class DeadlineAutomationService implements OnModuleInit, OnModuleDestroy 
   constructor(
     @InjectRepository(Bounty)
     private readonly bounties: Repository<Bounty>,
+    private readonly dataSource: DataSource,
     private readonly config: ConfigService,
   ) {}
 
@@ -44,21 +46,47 @@ export class DeadlineAutomationService implements OnModuleInit, OnModuleDestroy 
   }
 
   async runDeadlineAutomation(now = new Date()): Promise<DeadlineAutomationResult> {
-    const gracePeriodMs = this.config.get<number>('BOUNTY_DEADLINE_GRACE_PERIOD_MS', 24 * 60 * 60 * 1000);
-    const reminderWindowMs = this.config.get<number>('BOUNTY_DEADLINE_REMINDER_WINDOW_MS', 48 * 60 * 60 * 1000);
-    const closeBefore = new Date(now.getTime() - gracePeriodMs);
-    const remindBefore = new Date(now.getTime() + reminderWindowMs);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    let lockAcquired = false;
 
-    const autoClosed = await this.autoCloseExpiredBounties(closeBefore);
-    const remindersQueued = await this.queueDeadlineReminders(now, remindBefore);
-    const escrowExpiriesFlagged = await this.flagEscrowExpiries(closeBefore);
+    try {
+      const lockRows: { acquired: boolean }[] = await queryRunner.query(
+        'SELECT pg_try_advisory_lock($1) AS acquired',
+        [BOUNTY_AUTOMATION_LOCK_ID],
+      );
+      lockAcquired = lockRows[0]?.acquired === true;
+      if (!lockAcquired) {
+        this.logger.debug('Deadline automation skipped; another replica holds the lock.');
+        return {
+          checkedAt: now,
+          autoClosed: 0,
+          remindersQueued: 0,
+          escrowExpiriesFlagged: 0,
+        };
+      }
 
-    return {
-      checkedAt: now,
-      autoClosed,
-      remindersQueued,
-      escrowExpiriesFlagged,
-    };
+      const gracePeriodMs = this.config.get<number>('BOUNTY_DEADLINE_GRACE_PERIOD_MS', 24 * 60 * 60 * 1000);
+      const reminderWindowMs = this.config.get<number>('BOUNTY_DEADLINE_REMINDER_WINDOW_MS', 48 * 60 * 60 * 1000);
+      const closeBefore = new Date(now.getTime() - gracePeriodMs);
+      const remindBefore = new Date(now.getTime() + reminderWindowMs);
+
+      const autoClosed = await this.autoCloseExpiredBounties(closeBefore);
+      const remindersQueued = await this.queueDeadlineReminders(now, remindBefore);
+      const escrowExpiriesFlagged = await this.flagEscrowExpiries(closeBefore);
+
+      return {
+        checkedAt: now,
+        autoClosed,
+        remindersQueued,
+        escrowExpiriesFlagged,
+      };
+    } finally {
+      if (lockAcquired) {
+        await queryRunner.query('SELECT pg_advisory_unlock($1)', [BOUNTY_AUTOMATION_LOCK_ID]);
+      }
+      await queryRunner.release();
+    }
   }
 
   private async autoCloseExpiredBounties(closeBefore: Date): Promise<number> {
