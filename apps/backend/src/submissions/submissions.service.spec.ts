@@ -12,6 +12,7 @@ import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
+import { ContractRegistryService } from './contract-registry.service';
 
 const mockPreparedTransaction = { sign: jest.fn() };
 const mockServer = {
@@ -58,6 +59,7 @@ describe('SubmissionsService', () => {
   let submissionRepo: MockRepository<Submission>;
   let bountyRepo: MockRepository<Bounty>;
   let config: { get: jest.Mock };
+  let contractRegistryService: { findContractFor: jest.Mock };
   let metrics: Pick<MetricsService, 'recordStellarRpcFailure' | 'recordStellarRpcRetry'>;
 
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
@@ -119,6 +121,9 @@ describe('SubmissionsService', () => {
     config = {
       get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     };
+    contractRegistryService = {
+      findContractFor: jest.fn().mockResolvedValue(null),
+    };
     metrics = {
       recordStellarRpcFailure: jest.fn(),
       recordStellarRpcRetry: jest.fn(),
@@ -130,6 +135,7 @@ describe('SubmissionsService', () => {
       config as unknown as ConfigService,
       mockStellarRpcClient as unknown as StellarRpcClient,
       metrics as MetricsService,
+      contractRegistryService as unknown as ContractRegistryService,
     );
   });
 
@@ -253,9 +259,9 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
+      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_NETWORK: 'mainnet',
           STELLAR_RPC_URL: 'https://rpc.example.com',
           STELLAR_SIGNING_SECRET: 'secret',
@@ -280,9 +286,9 @@ describe('SubmissionsService', () => {
       mockServer.simulateTransaction.mockResolvedValueOnce({
         error: 'Contract error: bounty not open',
       });
+      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_NETWORK: 'mainnet',
           STELLAR_RPC_URL: 'https://rpc.example.com',
           STELLAR_SIGNING_SECRET: 'secret',
@@ -305,9 +311,9 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
+      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_NETWORK: 'mainnet',
           STELLAR_RPC_URL: 'https://rpc.example.com',
         };
@@ -328,9 +334,9 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
+      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string | number> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_RPC_URL: 'https://rpc.example.com',
           STELLAR_RPC_RETRY_BASE_DELAY_MS: 0,
         };
@@ -360,9 +366,9 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
+      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string | number> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
           STELLAR_RPC_URL: 'https://rpc.example.com',
           STELLAR_RPC_RETRY_BASE_DELAY_MS: 0,
         };

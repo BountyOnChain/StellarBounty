@@ -16,6 +16,7 @@ import { MetricsService } from '../metrics/metrics.service';
 import { withStellarRpcRetry } from '../common/stellar-rpc-retry';
 import { CreateSubmissionDto } from './submissions.dto';
 import { StellarRpcClient } from '../common/stellar-rpc-client';
+import { ContractRegistryService } from './contract-registry.service';
 
 @Injectable()
 export class SubmissionsService {
@@ -31,6 +32,7 @@ export class SubmissionsService {
     private readonly config: ConfigService,
     private readonly stellarRpcClient: StellarRpcClient,
     private readonly metrics: MetricsService,
+    private readonly contractRegistryService: ContractRegistryService,
   ) {}
 
   async create(bountyId: string, dto: CreateSubmissionDto, contributorAddress: string) {
@@ -129,12 +131,9 @@ export class SubmissionsService {
   }
 
   private async callContractApprove(bountyId: string, ownerAddress: string): Promise<void> {
-    const contractId =
-      this.config.get<string>(`SOROBAN_CONTRACT_${bountyId.toUpperCase()}`) ??
-      this.config.get<string>('SOROBAN_CONTRACT_ID');
-    if (!contractId) return;
-
     const network = this.config.get<string>('STELLAR_NETWORK', 'testnet');
+    const contractId = await this.contractRegistryService.findContractFor(bountyId, network);
+    if (!contractId) return;
     const rpcUrls = this.resolveRpcUrls(network);
     const networkPassphrase =
       network === 'mainnet' ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;

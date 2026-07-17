@@ -6,6 +6,7 @@ import { Submission, SubmissionStatus } from '../entities/submission.entity';
 import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { MetricsService } from '../metrics/metrics.service';
 import { SubmissionsService } from './submissions.service';
+import { ContractRegistryService } from './contract-registry.service';
 
 const mockServer = {
   getAccount: jest.fn(),
@@ -74,14 +75,16 @@ describe('SubmissionsService contract error handling', () => {
     };
     const config = {
       get: jest.fn((key: string, defaultValue?: unknown) => {
-        const values: Record<string, string> = {
-          SOROBAN_CONTRACT_BOUNTY1: 'contract-id',
+        const values: Record<string, string | number> = {
           STELLAR_NETWORK: 'testnet',
           STELLAR_RPC_URL: 'https://rpc.example.com',
           STELLAR_RPC_RETRY_BASE_DELAY_MS: '0',
         };
         return values[key] ?? defaultValue;
       }),
+    };
+    const contractRegistryService = {
+      findContractFor: jest.fn().mockResolvedValue('contract-id'),
     };
     const metrics = {
       recordStellarRpcFailure: jest.fn(),
@@ -95,6 +98,7 @@ describe('SubmissionsService contract error handling', () => {
       config as unknown as ConfigService,
       {} as unknown as StellarRpcClient,
       metrics as unknown as MetricsService,
+      contractRegistryService as unknown as ContractRegistryService,
     );
 
     await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow('rpc unavailable');
