@@ -11,7 +11,7 @@
  */
 
 /** Number of stroops in 1 XLM. */
-export const STROOPS_PER_XLM = 10_000_000;
+export const STROOPS_PER_XLM = 10_000_000n;
 
 /**
  * Convert a stroop amount (string, bigint, or number) to a decimal XLM string
@@ -35,8 +35,8 @@ export function stroopsToXLM(stroops: string | number | bigint): string {
 
   const negative = big < 0n;
   const abs = negative ? -big : big;
-  const whole = abs / BigInt(STROOPS_PER_XLM);
-  const fraction = abs % BigInt(STROOPS_PER_XLM);
+  const whole = abs / STROOPS_PER_XLM;
+  const fraction = abs % STROOPS_PER_XLM;
 
   if (fraction === 0n) {
     return `${negative ? "-" : ""}${whole.toString()}`;
@@ -61,5 +61,13 @@ export function formatRewardXLM(
   if (stroops === null || stroops === undefined || stroops === "") {
     return "Reward TBD";
   }
-  return `${stroopsToXLM(stroops)} XLM`;
+  try {
+    if (typeof stroops === "string" && isNaN(Number(stroops))) {
+      return "Reward TBD";
+    }
+    const big = typeof stroops === "bigint" ? stroops : BigInt(stroops);
+    return `${stroopsToXLM(big)} XLM`;
+  } catch {
+    return "Reward TBD";
+  }
 }

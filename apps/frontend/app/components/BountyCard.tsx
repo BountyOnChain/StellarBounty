@@ -18,10 +18,15 @@ function formatReward(reward: BountyCardData["reward"]) {
     return "Reward TBD";
   }
 
-  // Backend sends reward as a stroop amount (string or number).
-  // Convert to a human-readable XLM value.
-  if (typeof reward === "number" || typeof reward === "string") {
+  if (typeof reward === "string") {
+    if (reward.includes("XLM")) {
+      return reward;
+    }
     return formatRewardXLM(reward);
+  }
+
+  if (typeof reward === "number") {
+    return `${reward.toLocaleString()} XLM`;
   }
 
   return "Reward TBD";
