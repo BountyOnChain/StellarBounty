@@ -1,7 +1,7 @@
 import { AppDataSource } from '../data-source';
 
 const APP_TABLES = ['bounties', 'nonces', 'submissions'];
-const MIGRATION_COUNT = 3;
+const MIGRATION_COUNT = 5;
 
 async function getAppTables(): Promise<string[]> {
   const rows: { table_name: string }[] = await AppDataSource.query(
@@ -30,6 +30,32 @@ async function hasTagsColumn(): Promise<boolean> {
   return rows.length > 0;
 }
 
+async function hasDeletedAtColumn(): Promise<boolean> {
+  const rows: { column_name: string }[] = await AppDataSource.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'bounties'
+        AND column_name = 'deletedAt'
+    `,
+  );
+  return rows.length > 0;
+}
+
+async function hasStatusDeadlineIndex(): Promise<boolean> {
+  const rows: { indexname: string }[] = await AppDataSource.query(
+    `
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'bounties'
+        AND indexname = 'idx_bounties_status_deadline'
+    `,
+  );
+  return rows.length > 0;
+}
+
 async function assertSchemaApplied(): Promise<void> {
   const tables = await getAppTables();
   const expected = [...APP_TABLES].sort();
@@ -40,6 +66,14 @@ async function assertSchemaApplied(): Promise<void> {
 
   if (!(await hasTagsColumn())) {
     throw new Error('Expected tags column on bounties table');
+  }
+
+  if (!(await hasDeletedAtColumn())) {
+    throw new Error('Expected deletedAt column on bounties table');
+  }
+
+  if (!(await hasStatusDeadlineIndex())) {
+    throw new Error('Expected idx_bounties_status_deadline index on bounties table');
   }
 }
 
@@ -52,6 +86,14 @@ async function assertSchemaEmpty(): Promise<void> {
 
   if (await hasTagsColumn()) {
     throw new Error('Expected tags column to be removed from bounties table');
+  }
+
+  if (await hasDeletedAtColumn()) {
+    throw new Error('Expected deletedAt column to be removed from bounties table');
+  }
+
+  if (await hasStatusDeadlineIndex()) {
+    throw new Error('Expected idx_bounties_status_deadline index to be removed');
   }
 }
 

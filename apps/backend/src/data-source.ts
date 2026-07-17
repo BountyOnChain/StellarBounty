@@ -7,6 +7,8 @@ import { createDbPoolExtraFromEnv } from './db-pool.config';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { AddTagsColumn1747657400000 } from './migrations/1747657400000-AddTagsColumn';
+import { AddDeletedAtToBounties1747657500000 } from './migrations/1747657500000-AddDeletedAtToBounties';
+import { AddBountiesStatusDeadlineIndex1747657600000 } from './migrations/1747657600000-AddBountiesStatusDeadlineIndex';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -16,6 +18,8 @@ export const AppDataSource = new DataSource({
     InitSchema1747657200000,
     AddNoncesTable1747657300000,
     AddTagsColumn1747657400000,
+    AddDeletedAtToBounties1747657500000,
+    AddBountiesStatusDeadlineIndex1747657600000,
   ],
   extra: createDbPoolExtraFromEnv(),
   synchronize: false,
