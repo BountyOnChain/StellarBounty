@@ -4,12 +4,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BountiesService } from './bounties.service';
 import { Bounty, BountyStatus } from './entities/bounty.entity';
+import { SavedBounty } from './entities/saved-bounty.entity';
 
 type MockRepository<T extends object = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 describe('BountiesService', () => {
   let service: BountiesService;
   let repository: MockRepository<Bounty>;
+  let savedRepository: MockRepository<SavedBounty>;
 
   const createdAt = new Date('2026-01-01T00:00:00.000Z');
   const updatedAt = new Date('2026-01-02T00:00:00.000Z');
@@ -43,12 +45,24 @@ describe('BountiesService', () => {
       remove: jest.fn(),
     };
 
+    savedRepository = {
+      create: jest.fn((input) => input),
+      save: jest.fn(async (input) => input),
+      findOne: jest.fn(),
+      find: jest.fn(),
+      remove: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         BountiesService,
         {
           provide: getRepositoryToken(Bounty),
           useValue: repository,
+        },
+        {
+          provide: getRepositoryToken(SavedBounty),
+          useValue: savedRepository,
         },
       ],
     }).compile();
