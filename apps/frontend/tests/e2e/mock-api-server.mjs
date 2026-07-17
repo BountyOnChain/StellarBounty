@@ -32,7 +32,7 @@ function resetState() {
       reward: "250 XLM",
       deadline: "2026-08-01T00:00:00.000Z",
       status: "in_progress",
-      ownerAddress: "GOTHEROWNERTESTWALLET000000000000000000000000000000000",
+      ownerAddress: "GOTHEROWNERTESTWALLET000000000000000000000000000000000000",
       openSubmissionCount: 0,
     },
   ];
@@ -85,22 +85,40 @@ function readJson(request) {
 }
 
 function visibleBounties(searchParams) {
+  let result = [...bounties];
+
   const owner = searchParams.get("owner");
   if (owner) {
-    return bounties
-      .filter((bounty) => bounty.ownerAddress === owner)
-      .map((bounty) => ({
-        id: bounty.id,
-        title: bounty.title,
-        rewardAmount: bounty.rewardAmount,
-        openSubmissionCount: submissions.filter(
-          (submission) => submission.bountyId === bounty.id && submission.status === "pending",
-        ).length,
-        status: bounty.status,
-      }));
+    result = result.filter((bounty) => bounty.ownerAddress === owner);
   }
 
-  return bounties;
+  const q = (searchParams.get("q") ?? searchParams.get("search") ?? "").trim().toLowerCase();
+  if (q) {
+    result = result.filter(
+      (bounty) =>
+        bounty.title.toLowerCase().includes(q) ||
+        (bounty.description && bounty.description.toLowerCase().includes(q)),
+    );
+  }
+
+  const status = searchParams.get("status");
+  if (status && status !== "all") {
+    result = result.filter((bounty) => bounty.status === status);
+  }
+
+  if (owner) {
+    return result.map((bounty) => ({
+      id: bounty.id,
+      title: bounty.title,
+      rewardAmount: bounty.rewardAmount,
+      openSubmissionCount: submissions.filter(
+        (submission) => submission.bountyId === bounty.id && submission.status === "pending",
+      ).length,
+      status: bounty.status,
+    }));
+  }
+
+  return result;
 }
 
 const server = http.createServer(async (request, response) => {
@@ -110,15 +128,6 @@ const server = http.createServer(async (request, response) => {
   }
 
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
-  // The real backend applies a global prefix of "api/v1" via
-  // `app.setGlobalPrefix('api/v1')` (see apps/backend/src/main.ts), so all
-  // routes the frontend calls land under `/api/v1/...`. Strip that prefix
-  // here so this mock mirrors the same routing shape used in production and
-  // existing route matchers (`/bounties`, `/submissions`, etc.) still apply.
-  // `(?=\/|$)` anchors the strip to a segment boundary so that hypothetical
-  // paths like `/api/v10` or `/api/v1bounties` (no slash) aren't accidentally
-  // rewritten; NestJS's `setGlobalPrefix('api/v1')` also only mounts at the
-  // segment boundary.
   const pathname = url.pathname.replace(/^\/api\/v1(?=\/|$)/, "") || "/";
 
   if (pathname === "/health") {
@@ -231,9 +240,10 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  sendJson(response, 404, { message: "Not found" });
-});
+      sendJson(response, 404, { message: "Not found" });
+    });
 
 server.listen(port, "127.0.0.1", () => {
   console.log(`Mock API listening on http://127.0.0.1:${port}`);
 });
+// E2E mock server search filtering enabled
