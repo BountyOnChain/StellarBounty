@@ -11,7 +11,14 @@ import { CircuitBreaker } from '../common/circuit-breaker';
 @Module({
   imports: [TypeOrmModule.forFeature([Submission, Bounty]), MetricsModule],
   controllers: [SubmissionsController],
-  providers: [SubmissionsService, StellarRpcClient, CircuitBreaker],
+  providers: [
+    SubmissionsService,
+    StellarRpcClient,
+    // CircuitBreaker's constructor takes a plain options object, which erases to
+    // `Object` in decorator metadata and cannot be auto-resolved by Nest DI.
+    // Provide it via factory so it is constructed with its built-in defaults.
+    { provide: CircuitBreaker, useFactory: () => new CircuitBreaker() },
+  ],
   exports: [StellarRpcClient],
 })
 export class SubmissionsModule {}

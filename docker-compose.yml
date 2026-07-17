@@ -8,6 +8,7 @@ services:
       JWT_SECRET: local-development-secret
       STELLAR_NETWORK: testnet
       CORS_ORIGIN: http://localhost:3000
+      SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       - postgres
     ports:
@@ -20,6 +21,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:4000
         NEXT_PUBLIC_STELLAR_NETWORK: testnet
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     depends_on:
       - backend
     ports:

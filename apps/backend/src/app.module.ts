@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SentryModule } from '@sentry/nestjs/setup';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -37,6 +38,7 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
  
  @Module({
    imports: [
+     SentryModule.forRoot(),
      ConfigModule.forRoot({
        isGlobal: true,
        validationSchema: Joi.object({
@@ -70,6 +72,8 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
          STELLAR_RPC_RETRY_MAX_RETRIES: Joi.number().integer().min(0).default(3),
          STELLAR_RPC_RETRY_BASE_DELAY_MS: Joi.number().integer().min(0).default(1000),
          PORT: Joi.number().default(4000),
+         SENTRY_DSN: Joi.string().uri().optional().allow(''),
+         SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.1),
          LOG_LEVEL: Joi.string()
            .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
            .default('log'),

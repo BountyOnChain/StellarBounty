@@ -1,3 +1,5 @@
+// Sentry instrumentation must be the very first import — see instrument.ts.
+import './instrument';
 import 'reflect-metadata';
 import { randomUUID } from 'crypto';
 import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';

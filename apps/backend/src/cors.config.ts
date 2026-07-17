@@ -27,6 +27,7 @@ export function createCorsOptions(config: ConfigService) {
       callback(new Error('Not allowed by CORS'), false);
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // sentry-trace / baggage carry distributed-tracing context from the frontend
+    allowedHeaders: ['Content-Type', 'Authorization', 'sentry-trace', 'baggage'],
   };
 }

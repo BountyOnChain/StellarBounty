@@ -5,11 +5,15 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 import { Request, Response } from 'express';
 import { jsonLogger } from '../json-logger.service';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  // Forwards non-HttpException (i.e. unhandled) exceptions to Sentry before
+  // the filter formats the response; HttpExceptions are treated as expected.
+  @SentryExceptionCaptured()
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();

@@ -50,10 +50,15 @@ describe('CORS configuration', () => {
     expect(callback.mock.calls[0][1]).toBe(false);
   });
 
-  it('allows standard API methods and JWT authorization headers', () => {
+  it('allows standard API methods, JWT authorization and Sentry tracing headers', () => {
     const options = createCorsOptions(createConfig());
 
     expect(options.methods).toEqual(['GET', 'POST', 'PATCH', 'DELETE']);
-    expect(options.allowedHeaders).toEqual(['Content-Type', 'Authorization']);
+    expect(options.allowedHeaders).toEqual([
+      'Content-Type',
+      'Authorization',
+      'sentry-trace',
+      'baggage',
+    ]);
   });
 });
