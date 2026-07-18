@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse,
   ApiBearerAuth,
@@ -14,6 +14,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { BountiesService } from './bounties.service';
 import { BountyResponseDto, CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
 import { PaginationQueryDto, PaginatedResponse } from './common/pagination.dto';
+import { IdempotencyKeyInterceptor } from './common/interceptors/idempotency-key.interceptor';
 import { Bounty } from './entities/bounty.entity';
 
 @ApiTags('v1: bounties')
@@ -27,6 +28,7 @@ export class BountiesController {
   @ApiBadRequestResponse({ description: 'Invalid bounty payload.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(IdempotencyKeyInterceptor)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post()
   create(@Body() dto: CreateBountyDto) {

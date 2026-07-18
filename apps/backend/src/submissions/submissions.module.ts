@@ -7,11 +7,13 @@ import { SubmissionsController } from './submissions.controller';
 import { SubmissionsService } from './submissions.service';
 import { StellarRpcClient } from '../common/stellar-rpc-client';
 import { CircuitBreaker } from '../common/circuit-breaker';
+import { IdempotencyRecord } from '../entities/idempotency-record.entity';
+import { IdempotencyKeyInterceptor } from '../common/interceptors/idempotency-key.interceptor';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Submission, Bounty]), MetricsModule],
+  imports: [TypeOrmModule.forFeature([Submission, Bounty, IdempotencyRecord]), MetricsModule],
   controllers: [SubmissionsController],
-  providers: [SubmissionsService, StellarRpcClient, CircuitBreaker],
+  providers: [SubmissionsService, StellarRpcClient, CircuitBreaker, IdempotencyKeyInterceptor],
   exports: [StellarRpcClient],
 })
 export class SubmissionsModule {}

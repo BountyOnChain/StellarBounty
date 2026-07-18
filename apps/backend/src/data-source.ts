@@ -3,23 +3,26 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { Bounty } from './entities/bounty.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
+import { IdempotencyRecord } from './entities/idempotency-record.entity';
 import { createDbPoolExtraFromEnv } from './db-pool.config';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { AddTagsColumn1747657400000 } from './migrations/1747657400000-AddTagsColumn';
 import { AddDeletedAtToBounties1747657500000 } from './migrations/1747657500000-AddDeletedAtToBounties';
 import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657600000-AddOneApprovedSubmissionIndex';
+import { AddIdempotencyRecordsTable1747657700000 } from './migrations/1747657700000-AddIdempotencyRecordsTable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Bounty, Submission, Nonce],
+  entities: [Bounty, Submission, Nonce, IdempotencyRecord],
   migrations: [
     InitSchema1747657200000,
     AddNoncesTable1747657300000,
     AddTagsColumn1747657400000,
     AddDeletedAtToBounties1747657500000,
     AddOneApprovedSubmissionIndex1747657600000,
+    AddIdempotencyRecordsTable1747657700000,
   ],
   extra: createDbPoolExtraFromEnv(),
   synchronize: false,
