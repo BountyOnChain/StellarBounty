@@ -17,8 +17,7 @@ import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Bounty, SavedBounty, Submission, Nonce],
-  entities: [Bounty, BountyContract, Submission, Nonce],
+  entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce],
   migrations: [
     InitSchema1747657200000,
     AddNoncesTable1747657300000,
