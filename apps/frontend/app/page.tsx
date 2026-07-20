@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
+import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
 export const revalidate = 60;
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 type SortOption =
   | "newest"
   | "oldest"
@@ -32,11 +34,15 @@ type SortOption =
   | "closest_deadline"
   | "farthest_deadline"
   | "relevance";
+
+type SortOption = "newest" | "highest_reward" | "closest_deadline";
+
 type StatusFilter = "all" | "open" | "in_progress" | "completed" | "cancelled";
 
 const DEFAULT_PAGE_SIZE = 20;
 
 type SearchParams = {
+  q?: string;
   sort?: string;
   status?: string;
   search?: string;
@@ -153,16 +159,63 @@ function normalizeSort(sort?: string): SortOption {
 }
 
 function normalizeStatus(status?: string): StatusFilter {
+
   if (
     status === "open" ||
     status === "in_progress" ||
     status === "completed" ||
     status === "cancelled"
   ) {
+
+  if (status === "open" || status === "in_progress" || status === "completed" || status === "cancelled") {
+
     return status;
   }
   return "all";
 }
+
+
+
+function getStatusCounts(bounties: BountyCardData[], search: string): BountyStatusCounts {
+  const normalizedSearch = search.trim().toLowerCase();
+  const counts: BountyStatusCounts = { open: 0, in_progress: 0, completed: 0, cancelled: 0 };
+
+  for (const bounty of bounties) {
+    if (normalizedSearch && !bounty.title.toLowerCase().includes(normalizedSearch)) continue;
+    const status = bounty.status ?? "open";
+    if (status in counts) counts[status as keyof BountyStatusCounts] += 1;
+  }
+
+  return counts;
+}
+
+function applyListingControls(
+  bounties: BountyCardData[],
+  { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
+) {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filtered = bounties.filter((bounty) => {
+    const matchesStatus = status === "all" ? true : (bounty.status ?? "open") === status;
+    const matchesSearch =
+      normalizedSearch.length === 0 ? true : bounty.title.toLowerCase().includes(normalizedSearch);
+
+    return matchesStatus && matchesSearch;
+  });
+
+  return filtered.sort((left, right) => {
+    if (sort === "highest_reward") {
+      return getRewardValue(right.reward) - getRewardValue(left.reward);
+    }
+
+    if (sort === "closest_deadline") {
+      return getDeadlineValue(left.deadline) - getDeadlineValue(right.deadline);
+    }
+
+    return 0;
+  });
+}
+
 
 function buildPageHref(
   searchParams: SearchParams,
@@ -174,11 +227,16 @@ function buildPageHref(
   if (sort !== "newest") params.set("sort", sort);
   const status = normalizeStatus(searchParams.status);
   if (status !== "all") params.set("status", status);
+
   const q = searchParams.q ?? searchParams.search;
   if (q) params.set("q", q);
   if (searchParams.tags) params.set("tags", searchParams.tags);
   if (searchParams.minReward) params.set("minReward", searchParams.minReward);
   if (searchParams.maxReward) params.set("maxReward", searchParams.maxReward);
+
+  const search = searchParams.q ?? searchParams.search;
+  if (search) params.set("q", search);
+
   if (nextLimit !== DEFAULT_PAGE_SIZE) params.set("limit", String(nextLimit));
   if (nextPage > 1) params.set("page", String(nextPage));
   const qs = params.toString();
@@ -246,6 +304,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const pageSize = normalizeLimit(searchParams?.limit);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
+
   // q takes precedence over legacy search param
   const q = (searchParams?.q ?? searchParams?.search ?? "").trim();
   const tags = searchParams?.tags?.trim();
@@ -262,6 +321,11 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
     maxReward: maxReward || undefined,
     sort,
   });
+
+  const search = searchParams?.q ?? searchParams?.search ?? "";
+  const statusCounts = getStatusCounts(pageBounties, search);
+  const bounties = applyListingControls(pageBounties, { sort, status, search });
+
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
@@ -286,6 +350,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </section>
 
         <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:p-6">
+
           <form className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,0.7fr)_minmax(180px,0.8fr)_minmax(0,1fr)_auto] lg:items-end">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Search (full-text)</span>
@@ -297,6 +362,10 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-amber-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-yellow-400"
               />
             </label>
+
+          <form className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto] md:items-end">
+            <BountySearchInput initialSearch={search} statusCounts={statusCounts} />
+
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>

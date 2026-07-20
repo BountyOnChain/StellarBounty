@@ -56,7 +56,7 @@ Track the following metrics to identify nonce expiration issues:
 
 ### Overview
 
-This document describes the database backup and restore procedures for StellarBounty. Automated backups run daily via GitHub Actions, and a weekly verification workflow ensures backups are restorable.
+This document describes the database backup and restore procedures for StellarBounty. Automated backups run daily via GitHub Actions, and a daily verification workflow ensures backups are restorable.
 
 **Backend database:** PostgreSQL (16+)
 
@@ -67,7 +67,7 @@ This document describes the database backup and restore procedures for StellarBo
 | Schedule | Type | Storage | Retention |
 |----------|------|---------|-----------|
 | Daily at 02:00 UTC | Full `pg_dump` (custom format, compressed) | S3 object storage | 30 days |
-| Weekly on Sunday at 04:00 UTC | Verification (restore + integrity check) | Ephemeral (CI) | — |
+| Daily at 04:00 UTC | Verification (latest, 14-day, and WAL-PITR-style restore checks) | Ephemeral (CI) | — |
 
 ---
 
@@ -185,16 +185,19 @@ npm run migration:run
 
 #### 2. Backup Verification (`backup-verify.yml`)
 
-- **Trigger:** Weekly on Sunday at 04:00 UTC + on push to `main` that modifies backup scripts + manual dispatch
+- **Trigger:** Daily at 04:00 UTC + on push to `main` that modifies backup scripts + manual dispatch
 - **Steps:**
   1. Start a PostgreSQL service container
   2. Create test tables with sample data (bounties, nonces, submissions)
   3. Run `scripts/backup-db.sh`
   4. Verify backup file exists and is a valid custom-format dump
-  5. Create a fresh database and restore the backup into it
-  6. Verify data integrity (row counts, content checks)
+  5. Run three restore verifications:
+     - Latest backup restore
+     - 14-day-old backup restore
+     - WAL-PITR-style restore at a -3h snapshot
+  6. Verify each restore's data integrity and produce a diff on mismatch
   7. Clean up test databases
-  8. Create GitHub Issue on failure
+  8. Create a high-priority infrastructure GitHub Issue on failure
 
 ---
 

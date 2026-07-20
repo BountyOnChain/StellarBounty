@@ -35,6 +35,7 @@ export class BountiesService {
   }
 
   /**
+
    * List bounties with server-side filtering, full-text search, and pagination.
    *
    * Query params supported:
@@ -44,10 +45,14 @@ export class BountiesService {
    * - minReward / maxReward: bigint range
    * - sort: newest, oldest, highest_reward, lowest_reward, closest_deadline, farthest_deadline, relevance
    * - page, limit
+
+   * List bounties with server-side pagination and filters (owner, contributor, status).
+
    */
   async findAll(
     filter: BountyFilterDto | PaginationQueryDto = {},
   ): Promise<PaginatedResponse<Bounty>> {
+
     const pagination = filter as BountyFilterDto;
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
@@ -149,6 +154,28 @@ export class BountiesService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    const { page = 1, limit = 20, owner, contributor, status } = pagination;
+
+    const query: any = {};
+
+    if (owner) {
+      query.owner = owner;
+    }
+    if (contributor) {
+      query['submissions.contributor'] = contributor;
+    }
+    if (status) {
+      query.status = status;
+    }
+
+    const [data, total] = await this.bounties.findAndCount({
+      where: Object.keys(query).length > 0 ? query : undefined,
+      order: { createdAt: 'DESC' },
+      skip: toSkip(page, limit),
+      take: limit,
+    });
+
+
     return PaginatedResponse.of(data, total, page, limit);
   }
 
@@ -178,7 +205,6 @@ export class BountiesService {
   }
 
   async restore(id: string) {
-    // softRemove sets deletedAt, restore unsets it
     const bounty = await this.bounties.findOne({
       where: { id },
       withDeleted: true,
@@ -192,4 +218,4 @@ export class BountiesService {
     await this.bounties.restore(id);
     return this.findOne(id);
   }
-}
+      }
