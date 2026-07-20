@@ -130,5 +130,4 @@ export class BountiesService {
     await this.savedBounties.remove(saved);
     return { deleted: true };
   }
-}
       }
