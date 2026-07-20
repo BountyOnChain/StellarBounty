@@ -34,25 +34,32 @@ export class BountiesService {
   }
 
   /**
-   * List bounties with server-side pagination.
-   *
-   * Uses `findAndCount` so we can return total metadata without a second
-   * query. Backward compatible: when called with no arguments, the response
-   * still contains a `data` array (wrapped) but the shape differs from a bare
-   * array — controllers that need the bare array should call this with a
-   * small helper. The default page size is 20, max 100 (enforced by the
-   * PaginationQueryDto via class-validator).
+   * List bounties with server-side pagination and filters (owner, contributor, status).
    */
   async findAll(
     pagination: PaginationQueryDto = {},
   ): Promise<PaginatedResponse<Bounty>> {
-    const page = pagination.page ?? 1;
-    const limit = pagination.limit ?? 20;
+    const { page = 1, limit = 20, owner, contributor, status } = pagination;
+
+    const query: any = {};
+
+    if (owner) {
+      query.owner = owner;
+    }
+    if (contributor) {
+      query['submissions.contributor'] = contributor;
+    }
+    if (status) {
+      query.status = status;
+    }
+
     const [data, total] = await this.bounties.findAndCount({
+      where: Object.keys(query).length > 0 ? query : undefined,
       order: { createdAt: 'DESC' },
       skip: toSkip(page, limit),
       take: limit,
     });
+
     return PaginatedResponse.of(data, total, page, limit);
   }
 
@@ -82,7 +89,6 @@ export class BountiesService {
   }
 
   async restore(id: string) {
-    // softRemove sets deletedAt, restore unsets it
     const bounty = await this.bounties.findOne({
       where: { id },
       withDeleted: true,
@@ -96,4 +102,4 @@ export class BountiesService {
     await this.bounties.restore(id);
     return this.findOne(id);
   }
-}
+      }
