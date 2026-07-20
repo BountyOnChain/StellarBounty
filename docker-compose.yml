@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://postgres:password@postgres:5432/stellar_bounty
       JWT_SECRET: local-development-secret
