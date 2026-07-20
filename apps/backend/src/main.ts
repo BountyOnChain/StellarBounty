@@ -3,11 +3,9 @@ import { randomUUID } from 'crypto';
 import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const compression = require('compression');
-import * as express from 'express';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const helmet = require('helmet');
+import compression from 'compression';
+import express from 'express';
+import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
