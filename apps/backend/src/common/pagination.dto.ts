@@ -8,8 +8,6 @@ export const MAX_PAGE_SIZE = 100;
 
 /**
  * Generic query DTO for paginated list endpoints.
- *
- * Page numbering is 1-based. The response wrapper is {@link PaginatedResponse}.
  */
 export class PaginationQueryDto {
   @ApiPropertyOptional({
@@ -53,27 +51,19 @@ export class PaginationQueryDto {
   status?: string;
 }
 
-/**
- * Compute the 0-based offset for a 1-based page number.
- */
+/** Keep everything below unchanged (toSkip, toTotalPages, PaginatedResponse) */
 export function toSkip(page: number | undefined, limit: number | undefined): number {
   const safePage = page ?? DEFAULT_PAGE;
   const safeLimit = limit ?? DEFAULT_PAGE_SIZE;
   return (safePage - 1) * safeLimit;
 }
 
-/**
- * Compute totalPages from total + limit.
- */
 export function toTotalPages(total: number, limit: number | undefined): number {
   const safeLimit = limit ?? DEFAULT_PAGE_SIZE;
   if (safeLimit <= 0) return 0;
   return Math.max(1, Math.ceil(total / safeLimit));
 }
 
-/**
- * Generic paginated response wrapper.
- */
 export class PaginatedResponse<T> {
   @ApiProperty({ description: 'Items in the current page.', isArray: true })
   data!: T[];
