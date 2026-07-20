@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { type BountyCardData } from "@/app/components/BountyCard";
 import BountyGrid from "@/app/components/BountyGrid";
-import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
 import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
