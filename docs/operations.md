@@ -96,9 +96,11 @@ export DATABASE_URL="postgresql://user:password@host:5432/stellar_bounty"
 | `BACKUP_DIR` | `./backups` | No | Local backup directory |
 | `BACKUP_S3_BUCKET` | `stellar-bounty-db-backups` | No | S3 bucket for remote storage |
 | `BACKUP_RETENTION_DAYS` | `7` | No | Local backup retention period |
-| `AWS_ACCESS_KEY_ID` | — | For S3 | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | — | For S3 | AWS secret key |
 | `AWS_DEFAULT_REGION` | `us-east-1` | No | AWS region |
+
+> AWS credentials are obtained automatically via OIDC; static
+> `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are no longer required
+> for CI. See "AWS OIDC Trust" below.
 
 #### Output
 
@@ -148,9 +150,11 @@ export CONFIRM_DESTROY=yes
 | `BACKUP_DIR` | `./backups` | No | Local backup directory |
 | `BACKUP_S3_BUCKET` | `stellar-bounty-db-backups` | No | S3 bucket for remote download |
 | `CONFIRM_DESTROY` | — | No | Set to `yes` to skip destructive warning |
-| `AWS_ACCESS_KEY_ID` | — | For S3 | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | — | For S3 | AWS secret key |
 | `AWS_DEFAULT_REGION` | `us-east-1` | No | AWS region |
+
+> AWS credentials are obtained automatically via OIDC; static
+> `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are no longer required
+> for CI. See "AWS OIDC Trust" below.
 
 #### ⚠️  Important
 
@@ -178,10 +182,12 @@ npm run migration:run
   6. Verify backup file integrity
   7. Create GitHub Issue on failure
 
-- **Required Secrets:**
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-  - `BACKUP_S3_BUCKET` (optional — defaults to `stellar-bounty-db-backups`)
+- **Required variables / secrets** (no AWS access keys):
+  - `AWS_ACCOUNT_ID`            (variable — your AWS account id)
+  - `AWS_DEFAULT_REGION`        (variable, defaults to `us-east-1`)
+  - `BACKUP_S3_BUCKET`          (variable — defaults to `stellar-bounty-db-backups`)
+
+AWS credentials are obtained via OIDC; see "AWS OIDC Trust" below.
 
 #### 2. Backup Verification (`backup-verify.yml`)
 
@@ -268,13 +274,12 @@ In the event of a database failure, follow these steps:
    ./scripts/restore-db.sh backups/latest.dump
    ```
 
-   Or restore from S3 if local backups are unavailable:
+  Or restore from S3 if local backups are unavailable (OIDC works for
+  self-hosted dev too — use `aws sso login` or an AWS profile):
 
-   ```bash
-   export AWS_ACCESS_KEY_ID="..."
-   export AWS_SECRET_ACCESS_KEY="..."
-   ./scripts/restore-db.sh --s3 latest.dump
-   ```
+  ```bash
+  ./scripts/restore-db.sh --s3 latest.dump
+  ```
 
 3. **Run migrations:**
 
@@ -324,9 +329,138 @@ Select the desired backup file and restore:
 ### Security Considerations
 
 - **Backup files contain sensitive data** (user information, authentication nonces). Ensure S3 bucket policy restricts access appropriately.
-- Use IAM roles (OIDC) for GitHub Actions instead of long-lived access keys where possible.
 - Backups should be encrypted at rest (S3 server-side encryption is enabled by default).
 - Never commit backup files to the Git repository. The `backups/` directory is included in `.gitignore`.
+- Static AWS access keys are no longer used in CI — see "AWS OIDC Trust" below.
+
+---
+
+### AWS OIDC Trust (replaces long-lived IAM access keys)
+
+CI workflows authenticate to AWS via **OIDC federation** instead of
+long-lived IAM access keys stored in GitHub secrets. Eliminates a
+whole class of credential-leak risk.
+
+#### Why
+
+- **No static secrets in GitHub.** No `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` ever sit in repo secrets.
+- **Short-lived credentials.** `aws-actions/configure-aws-credentials@v4`
+  mints a session that expires within ~1 hour.
+- **Scoped trust.** The trust policy on the IAM role restricts which
+  refs / GitHub-Actions environments can assume it via the OIDC JWT
+  `sub` claim.
+- **Auditable.** Every AWS API call is attributed to a GitHub Actions
+  run id via `role-session-name`.
+
+#### One-time bootstrap
+
+Run `scripts/setup-aws-oidc.sh` once per AWS account. The script is
+idempotent and prints the role ARN at the end.
+
+```bash
+export AWS_ACCOUNT_ID=123456789012              # your AWS account id
+export GITHUB_REPO=BountyOnChain/StellarBounty  # owner/repo
+export BACKUP_S3_BUCKET=stellar-bounty-db-backups
+export AWS_REGION=us-east-1
+
+./scripts/setup-aws-oidc.sh
+# Optional: print commands without executing
+DRY_RUN=1 ./scripts/setup-aws-oidc.sh
+```
+
+The script will (or skip-if-exists):
+
+1. Create an IAM OIDC provider for `token.actions.githubusercontent.com`.
+2. Create the `github-actions-role` IAM role with a trust policy
+   that restricts JWT `sub` claims to:
+   - `repo:BountyOnChain/StellarBounty:ref:refs/heads/main`
+   - `repo:BountyOnChain/StellarBounty:ref:refs/tags/v*`
+   - `repo:BountyOnChain/StellarBounty:environment:*`
+3. Attach the inline policy `github-actions-s3-backup` scoped to
+   `s3:PutObject` / `s3:GetObject` / `s3:ListBucket` / `s3:GetBucketLocation`
+   on the backup bucket only, plus minimal ECR push permissions.
+4. Print the role ARN. Save the output.
+
+#### GitHub repo configuration
+
+In **Settings → Secrets and variables → Actions**:
+
+Variables:
+
+| Variable | Required | Example | Description |
+|----------|----------|---------|-------------|
+| `AWS_ACCOUNT_ID`     | yes | `123456789012`   | AWS account hosting the role |
+| `AWS_DEFAULT_REGION` | yes | `us-east-1`      | Region for S3 + ECR |
+| `BACKUP_S3_BUCKET`   | yes | `stellar-bounty-db-backups` | Override of the default backup bucket |
+| `BACKEND_URL`        | opt | `https://api.stellarbounty.example` | Override smoke-test target |
+| `FRONTEND_URL`       | opt | `https://stellarbounty.example`    | Override smoke-test target |
+
+Secrets (still needed — no AWS keys!):
+
+| Secret | Description |
+|--------|-------------|
+| `PAGERDUTY_ROUTING_KEY` | PagerDuty Events API v2 routing key. Required by `infrastructure/alertmanager/alertmanager.yml`. |
+| `SLACK_WEBHOOK_URL`     | Slack incoming webhook URL for Alertmanager (`#alerts-critical`, `#alerts-warnings`, `#alerts-general`). |
+
+#### After the workflow migration is verified
+
+You may DELETE from GitHub secrets:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+(Retain them in your password manager / AWS account in case the
+decommission encounters a regression — but they are no longer used
+by this repo.)
+
+#### Workflow snippet
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+steps:
+  - uses: actions/checkout@v4
+  - uses: aws-actions/configure-aws-credentials@v4
+    with:
+      role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-role
+      role-session-name: stellarbounty-${{ github.run_id }}
+      aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
+```
+
+The `id-token: write` permission is mandatory — without it GitHub does
+not mint an OIDC token and `configure-aws-credentials` fails with
+`No OIDC token found`.
+
+#### OIDC backout / troubleshooting
+
+If a workflow fails with `Error: Could not assume role with OIDC` or
+`Error: No OIDC token found`:
+
+1. Confirm the workflow declares `permissions: id-token: write` (and
+   `contents: read`).
+2. Confirm `vars.AWS_ACCOUNT_ID` is set; the role ARN is
+   `arn:aws:iam::${AWS_ACCOUNT_ID}:role/github-actions-role`.
+3. Re-run `scripts/setup-aws-oidc.sh` (idempotent) and verify the
+   role's trust policy contains
+   `repo:BountyOnChain/StellarBounty:ref:refs/heads/main`
+   (or whichever `sub` pattern matches the failing workflow).
+4. Decode the failing JWT (`$_ACTIONS_ID_TOKEN_REQUEST_TOKEN`) and
+   confirm the `sub` claim matches the trust policy's `StringLike`.
+   Use `jq -R 'split(".") | .[1] | @base64d | fromjson'`.
+5. If the JWT's `aud` is not `sts.amazonaws.com`, your GitHub Actions
+   setup is mismatched — confirm `OIDC_AUDIENCE` in
+   `scripts/setup-aws-oidc.sh` is `sts.amazonaws.com`.
+
+#### Rotating the role
+
+To rotate the IAM role:
+
+1. Run `./scripts/setup-aws-oidc.sh` with `ROLE_NAME=github-actions-role-v2`.
+2. Update the `role-to-assume` line in each workflow.
+3. After verification, delete the old IAM role via
+   `aws iam delete-role --role-name github-actions-role`.
 
 ---
 
