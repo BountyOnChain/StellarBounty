@@ -22,6 +22,11 @@ function formatReward(reward: BountyCardData["reward"]) {
     return "Reward TBD";
   }
 
+  // Pass through already-formatted XLM strings (e.g. "0.5 XLM") verbatim.
+  if (typeof reward === "string" && reward.includes("XLM")) {
+    return reward;
+  }
+
   if (typeof reward === "number" || typeof reward === "string") {
     return formatRewardXLM(reward);
   }

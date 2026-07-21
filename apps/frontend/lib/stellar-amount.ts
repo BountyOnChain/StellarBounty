@@ -61,5 +61,15 @@ export function formatRewardXLM(
   if (stroops === null || stroops === undefined || stroops === "") {
     return "Reward TBD";
   }
-  return `${stroopsToXLM(stroops)} XLM`;
+
+  // Reject non-numeric strings (e.g. "not-a-number") instead of silently rendering "0 XLM"
+  if (typeof stroops === "string" && !/^-?\d+$/.test(stroops.trim())) {
+    return "Reward TBD";
+  }
+
+  const xlm = stroopsToXLM(stroops);
+  const parts = xlm.split(".");
+  // Add thousands separators to the whole part
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${parts.join(".")} XLM`;
 }

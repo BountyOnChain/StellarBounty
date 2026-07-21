@@ -20,7 +20,8 @@ describe("BountyCard", () => {
   });
 
   it("formats a numeric reward with thousands separators and the XLM suffix", () => {
-    renderCard({ id: "1", title: "x", reward: 12345 });
+    // The card receives the reward from the API in stroops (12345 XLM = 123_450_000_000 stroops).
+    renderCard({ id: "1", title: "x", reward: 123450000000 });
     expect(screen.getByText("12,345 XLM")).toBeInTheDocument();
   });
 
