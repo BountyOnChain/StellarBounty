@@ -18,6 +18,11 @@ jobs:
   backup:
     name: Create and Upload Database Backup
     runs-on: ubuntu-latest
+    # AWS credentials are obtained via OIDC, not via static secrets — see
+    # docs/operations.md → "AWS OIDC trust" and scripts/setup-aws-oidc.sh.
+    permissions:
+      contents: read
+      id-token: write
 
     services:
       postgres:
@@ -60,11 +65,15 @@ jobs:
           mkdir -p backups
           ./scripts/backup-db.sh
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
+        # Exchanges the GitHub Actions OIDC token for short-lived AWS
+        # credentials via the `github-actions-role` IAM role. Eliminates
+        # the need for AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets.
+        # Run scripts/setup-aws-oidc.sh once per AWS account to bootstrap.
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: stellarbounty-backup-${{ github.run_id }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
 
       - name: Upload backup to S3
