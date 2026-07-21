@@ -59,15 +59,16 @@ function getBountyDescription(bounty: Bounty) {
     `Review the ${bounty.title} bounty on StellarBounty.`;
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const bounty = await getBounty(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const bounty = await getBounty(id);
 
   if (!bounty) {
     return {
       title: "Bounty Unavailable",
       description: "This StellarBounty listing could not be loaded.",
       alternates: {
-        canonical: absoluteUrl(`/bounties/${params.id}`),
+        canonical: absoluteUrl(`/bounties/${id}`),
       },
     };
   }
@@ -112,8 +113,9 @@ export async function generateStaticParams() {
   }
 }
 
-export default async function BountyDetailPage({ params }: { params: { id: string } }) {
-  const bounty = await getBounty(params.id);
+export default async function BountyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const bounty = await getBounty(id);
 
   if (!bounty) {
     return (

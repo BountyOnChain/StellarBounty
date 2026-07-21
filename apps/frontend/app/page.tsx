@@ -198,13 +198,14 @@ function applyListingControls(
   });
 }
 
-export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
-  const page = normalizePage(searchParams?.page);
-  const pageSize = normalizeLimit(searchParams?.limit);
+export default async function Home({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const page = normalizePage(resolvedSearchParams.page);
+  const pageSize = normalizeLimit(resolvedSearchParams.limit);
   const { bounties: pageBounties, total, nextCursor } = await getBounties(page, pageSize);
-  const sort = normalizeSort(searchParams?.sort);
-  const status = normalizeStatus(searchParams?.status);
-  const search = searchParams?.q ?? searchParams?.search ?? "";
+  const sort = normalizeSort(resolvedSearchParams.sort);
+  const status = normalizeStatus(resolvedSearchParams.status);
+  const search = resolvedSearchParams.q ?? resolvedSearchParams.search ?? "";
   const statusCounts = getStatusCounts(pageBounties, search);
   const bounties = applyListingControls(pageBounties, { sort, status, search });
 
