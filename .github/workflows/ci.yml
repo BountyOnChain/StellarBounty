@@ -81,9 +81,6 @@ jobs:
       - name: Test migrations (up → down → up)
         run: npm run migration:test --workspace=apps/backend
 
-      - name: Install PostgreSQL client tools
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Check migration schema drift
         run: |
           chmod +x scripts/migration-check.sh
