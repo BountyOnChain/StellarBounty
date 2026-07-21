@@ -81,6 +81,11 @@ jobs:
       - name: Test migrations (up → down → up)
         run: npm run migration:test --workspace=apps/backend
 
+      - name: Check migration schema drift
+        run: |
+          chmod +x scripts/migration-check.sh
+          ./scripts/migration-check.sh
+
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
