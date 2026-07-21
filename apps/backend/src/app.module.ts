@@ -18,6 +18,7 @@ import {
   DEFAULT_DB_RETRY_DELAY_MS,
 } from './db-pool.config';
 import { Bounty } from './entities/bounty.entity';
+import { SavedBounty } from './entities/saved-bounty.entity';
 import { BountyContract } from './entities/bounty-contract.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
@@ -27,6 +28,7 @@ import { AddTagsColumn1747657400000 } from './migrations/1747657400000-AddTagsCo
 import { AddDeletedAtToBounties1747657500000 } from './migrations/1747657500000-AddDeletedAtToBounties';
 import { AddFullTextSearchIndex1747657600000 } from './migrations/1747657600000-AddFullTextSearchIndex';
 import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657600000-AddOneApprovedSubmissionIndex';
+import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-AddSavedBountiesTable';
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CspReportController } from './csp-report.controller';
@@ -37,6 +39,7 @@ import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+
 
 
 @Module({
@@ -111,6 +114,11 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
 
  
  @Module({
+
+import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
+
+@Module({
+
    imports: [
      ConfigModule.forRoot({
        isGlobal: true,
@@ -163,22 +171,25 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
      SubmissionsModule,
      HealthModule,
      MetricsModule,
-      TypeOrmModule.forFeature([Bounty, BountyContract, Nonce]),
+      SavedBountiesModule,
+      TypeOrmModule.forFeature([Bounty, SavedBounty, BountyContract, Nonce]),
       TypeOrmModule.forRootAsync({
         imports: [ConfigModule, MetricsModule],
         inject: [ConfigService, MetricsService],
         useFactory: (config: ConfigService, metrics: MetricsService) => ({
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [Bounty, BountyContract, Submission, Nonce],
+          entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce],
           migrations: [
             InitSchema1747657200000,
             AddNoncesTable1747657300000,
             AddTagsColumn1747657400000,
             AddDeletedAtToBounties1747657500000,
             AddOneApprovedSubmissionIndex1747657600000,
+            AddSavedBountiesTable1747657700000,
             AddBountyContractsTable1747700000000,
           ],
+
 
         logger: new TypeOrmMetricsLogger(metrics),
         extra: createDbPoolExtra(config),
@@ -189,6 +200,17 @@ import { DeadlineAutomationService } from './bounties/deadline-automation.servic
       } as import('typeorm').DataSourceOptions),
     }),
   ],
+
+          logger: new TypeOrmMetricsLogger(metrics),
+          extra: createDbPoolExtra(config),
+          retryAttempts: config.get<number>('DB_RETRY_ATTEMPTS', DEFAULT_DB_RETRY_ATTEMPTS),
+          retryDelay: config.get<number>('DB_RETRY_DELAY_MS', DEFAULT_DB_RETRY_DELAY_MS),
+          maxQueryExecutionTime: 250,
+          synchronize: false,
+        } as import('typeorm').DataSourceOptions),
+      }),
+    ],
+
   controllers: [AppController, BountiesController, CspReportController],
   providers: [AppService, BountiesService, DeadlineAutomationService],
 })

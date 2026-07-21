@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import BountyCard, { type BountyCardData } from "@/app/components/BountyCard";
+import { type BountyCardData } from "@/app/components/BountyCard";
+import BountyGrid from "@/app/components/BountyGrid";
 import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
+
 
 export const revalidate = 60;
 
@@ -275,22 +277,20 @@ function PaginationControls({
         <Link
           href={prevHref}
           aria-disabled={!hasPrev}
-          className={`inline-flex min-w-24 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium transition ${
-            hasPrev
+          className={`inline-flex min-w-24 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium transition ${hasPrev
               ? "border-slate-300 text-slate-700 hover:border-slate-500 hover:text-slate-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
               : "pointer-events-none cursor-not-allowed border-slate-200 text-slate-400 opacity-50 dark:border-slate-800 dark:text-slate-600"
-          }`}
+            }`}
         >
           ← Previous
         </Link>
         <Link
           href={nextHref}
           aria-disabled={!hasNext}
-          className={`inline-flex min-w-24 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-            hasNext
+          className={`inline-flex min-w-24 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition ${hasNext
               ? "bg-yellow-400 text-slate-950 hover:bg-yellow-300"
               : "pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-600"
-          }`}
+            }`}
         >
           Next →
         </Link>
@@ -463,6 +463,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           </div>
         </section>
 
+
         {bounties.length > 0 ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {bounties.map((bounty) => (
@@ -481,6 +482,9 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             </Link>
           </section>
         )}
+
+        <BountyGrid bounties={bounties} />
+
 
         <PaginationControls
           currentPage={page}

@@ -4,17 +4,42 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { useWallet } from "../../components/WalletContext";
+import { useAuth } from "../../lib/api";
 import { ThemeToggle } from "../../components/ThemeToggle";
 
 const NAV_LINKS = [
     { label: "Bounties", href: "/bounties" },
     { label: "Dashboard", href: "/dashboard" },
+    { label: "Saved", href: "/bounties/saved" },
 ];
 
 export default function Navbar() {
     const pathname = usePathname();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const { publicKey } = useWallet();
+    const { getToken, apiUrl } = useAuth();
+    const [savedCount, setSavedCount] = useState<number | null>(null);
+
+
+    useEffect(() => {
+        if (!publicKey) { setSavedCount(null); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const token = await getToken(publicKey);
+                const res = await fetch(`${apiUrl}/api/v1/me/saved-bounties`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!cancelled && res.ok) {
+                    const data = await res.json();
+                    setSavedCount(Array.isArray(data) ? data.length : 0);
+                }
+            } catch { if (!cancelled) setSavedCount(null); }
+        })();
+        return () => { cancelled = true; };
+    }, [publicKey, getToken, apiUrl]);
 
     useEffect(() => {
         setDrawerOpen(false);
@@ -75,6 +100,11 @@ export default function Navbar() {
                                     aria-current={isActive(href) ? "page" : undefined}
                                 >
                                     {label}
+                                    {label === "Saved" && savedCount !== null && savedCount > 0 && (
+  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+    {savedCount}
+  </span>
+)}
                                     {isActive(href) && (
                                         <span className="absolute bottom-0.5 left-4 right-4 h-[2px] rounded-full bg-indigo-600 dark:bg-indigo-500" />
                                     )}
@@ -153,6 +183,11 @@ export default function Navbar() {
                                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                                         )}
                                         {label}
+                                        {label === "Saved" && savedCount !== null && savedCount > 0 && (
+  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+    {savedCount}
+  </span>
+)}
                                     </Link>
                                 </li>
                             ))}
