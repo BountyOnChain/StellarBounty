@@ -27,7 +27,14 @@ type StellarRpcMetric = {
   retryable?: boolean;
 };
 
+type DynamicFeeMetric = {
+  operation: string;
+  network: string;
+  feeStroops: number;
+};
+
 const LATENCY_BUCKETS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const FEE_STROOPS_BUCKETS = [100, 500, 1000, 2000, 5000, 10000, 50000, 100000];
 
 @Injectable()
 export class MetricsService {
@@ -44,6 +51,9 @@ export class MetricsService {
   private circuitStateSamples: CircuitStateSample[] = [{ name: '', state: CircuitState.CLOSED }];
   private rpcLimiterActiveCount = 0;
   private rpcLimiterQueueLength = 0;
+  private readonly dynamicFeeBuckets = new Map<string, number[]>();
+  private readonly dynamicFeeSums = new Map<string, number>();
+  private readonly dynamicFeeCounts = new Map<string, number>();
 
   reset(): void {
     this.requestCounts = new Map();
@@ -56,6 +66,9 @@ export class MetricsService {
     this.circuitStateSamples = [];
     this.rpcLimiterActiveCount = 0;
     this.rpcLimiterQueueLength = 0;
+    this.dynamicFeeBuckets.clear();
+    this.dynamicFeeSums.clear();
+    this.dynamicFeeCounts.clear();
     this.startedAt = Date.now();
   }
 
@@ -100,6 +113,23 @@ export class MetricsService {
     this.stellarRpcRetries.set(key, (this.stellarRpcRetries.get(key) ?? 0) + 1);
   }
 
+  recordDynamicFee(metric: DynamicFeeMetric): void {
+    const key = `operation="${this.escapeLabel(metric.operation)}",network="${this.escapeLabel(metric.network)}"`;
+    const currentSum = this.dynamicFeeSums.get(key) ?? 0;
+    const currentCount = this.dynamicFeeCounts.get(key) ?? 0;
+    const buckets = this.dynamicFeeBuckets.get(key) ?? FEE_STROOPS_BUCKETS.map(() => 0);
+
+    FEE_STROOPS_BUCKETS.forEach((bucket, index) => {
+      if (metric.feeStroops <= bucket) {
+        buckets[index] += 1;
+      }
+    });
+
+    this.dynamicFeeBuckets.set(key, buckets);
+    this.dynamicFeeSums.set(key, currentSum + metric.feeStroops);
+    this.dynamicFeeCounts.set(key, currentCount + 1);
+  }
+
   incrementActiveWebSocketConnections(): void {
     this.activeWebSocketConnections += 1;
   }
@@ -131,6 +161,7 @@ export class MetricsService {
     this.appendWebSocketMetrics(lines);
     this.appendCircuitMetrics(lines);
     this.appendRpcLimiterMetrics(lines);
+    this.appendDynamicFeeMetrics(lines);
 
     return `${lines.join('\n')}\n`;
   }
@@ -272,6 +303,23 @@ export class MetricsService {
       '# TYPE stellar_bounty_rpc_limiter_queue_length gauge',
       `stellar_bounty_rpc_limiter_queue_length ${this.rpcLimiterQueueLength}`,
     );
+  }
+
+  private appendDynamicFeeMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_dynamic_fee_stroops Dynamic fee in stroops returned by getFeeStats().',
+      '# TYPE stellar_bounty_dynamic_fee_stroops histogram',
+    );
+    [...this.dynamicFeeBuckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, counts]) => {
+        counts.forEach((count, index) => {
+          lines.push(`stellar_bounty_dynamic_fee_stroops_bucket{${key},le="${FEE_STROOPS_BUCKETS[index]}"} ${count}`);
+        });
+        lines.push(`stellar_bounty_dynamic_fee_stroops_bucket{${key},le="+Inf"} ${this.dynamicFeeCounts.get(key) ?? 0}`);
+        lines.push(`stellar_bounty_dynamic_fee_stroops_sum{${key}} ${this.formatNumber(this.dynamicFeeSums.get(key) ?? 0)}`);
+        lines.push(`stellar_bounty_dynamic_fee_stroops_count{${key}} ${this.dynamicFeeCounts.get(key) ?? 0}`);
+      });
   }
 
   private httpKey(metric: RequestMetricLabels): string {
