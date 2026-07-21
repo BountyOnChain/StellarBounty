@@ -1,0 +1,88 @@
+# =============================================================================
+# StellarBounty — Smoke Test
+#
+# Closes #426: post-deploy smoke tests run automatically against the
+# deployed stack. This workflow runs on a schedule (every 30 min) and is
+# also dispatchable on demand.
+#
+# Pipeline:
+#   1. checkout
+#   2. chmod +x smoke-test.sh
+#   3. invoke scripts/smoke-test.sh against vars.BACKEND_URL/FRONTEND_URL
+#   4. on failure, open a high-priority GitHub issue
+#
+# Required GitHub repository variables (Settings → Actions):
+#   - BACKEND_URL    default: http://localhost:4000
+#   - FRONTEND_URL   default: http://localhost:3000
+# Optional:
+#   - SMOKE_TIMEOUT, SMOKE_RETRIES, SMOKE_BACKOFF
+# =============================================================================
+
+name: Smoke Test
+
+on:
+  schedule:
+    # Every 30 minutes — keeps awareness high without burning CI minutes.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Override BACKEND_URL for this run'
+        required: false
+      frontend_url:
+        description: 'Override FRONTEND_URL for this run'
+        required: false
+
+concurrency:
+  group: smoke-test
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Probe live stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      BACKEND_URL: ${{ github.event.inputs.backend_url || vars.BACKEND_URL || 'http://localhost:4000' }}
+      FRONTEND_URL: ${{ github.event.inputs.frontend_url || vars.FRONTEND_URL || 'http://localhost:3000' }}
+      SMOKE_TIMEOUT_SECONDS: ${{ vars.SMOKE_TIMEOUT || 5 }}
+      SMOKE_RETRIES: ${{ vars.SMOKE_RETRIES || 6 }}
+      SMOKE_BACKOFF_SECONDS: ${{ vars.SMOKE_BACKOFF || 10 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make smoke-test.sh executable
+        run: chmod +x scripts/smoke-test.sh
+
+      - name: Run smoke tests
+        # BACKEND_URL / FRONTEND_URL / SMOKE_* are inherited from the
+        # job-level env: block above. See scripts/smoke-test.sh for
+        # probe semantics.
+        run: ./scripts/smoke-test.sh
+
+      - name: Open high-priority issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Smoke test failed against live stack',
+              body: [
+                '- Workflow run: ' + runUrl,
+                '- Trigger: ' + context.eventName,
+                '- Branch: ' + context.ref,
+                '- Status: ' + context.job.status,
+                '',
+                'The smoke test is failing against the production stack. Investigate:',
+                '- Backend `/api/v1/health` returns `ok` or `degraded`?',
+                '- Frontend index page reachable?',
+                '- Recent deploy or DB migration in the same window?',
+              ].join('\n'),
+              labels: ['infrastructure', 'reliability', 'priority:high'],
+            });
