@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# migration-check.sh — Verify schema.dump is present and that
-# all migrations apply cleanly.
+# migration-check.sh — Verify schema.dump is present and the database
+# schema is in sync with the entities (no pending migrations needed).
 #
 # Usage:
 #   DATABASE_URL=postgresql://... ./scripts/migration-check.sh
 #
-# Exits non-zero if schema.dump is missing or migrations fail.
+# Exits non-zero if schema.dump is missing or schema is out of sync.
 
 set -euo pipefail
 
@@ -28,22 +28,31 @@ fi
 cd "$REPO_ROOT"
 
 echo "Building backend..."
-npx tsc -p apps/backend/tsconfig.json --outDir apps/backend/dist
+npm run build --workspace=apps/backend
 
-echo "Running all migrations..."
-npx typeorm migration:run -d apps/backend/dist/data-source.js
+echo "Running migrations..."
+npm run migration:run --workspace=apps/backend
 
-echo "Checking for pending migrations..."
-SHOW_OUTPUT=$(npx typeorm migration:show -d apps/backend/dist/data-source.js 2>&1 || true)
-echo "$SHOW_OUTPUT"
+echo "Verifying schema is up to date (no ungenerated migrations)..."
+cd apps/backend
+npx typeorm migration:generate -d dist/data-source.js --check dummy 2>&1
+RESULT=$?
+cd "$REPO_ROOT"
 
-if echo "$SHOW_OUTPUT" | grep -qi "pending"; then
+if [ "$RESULT" -ne 0 ]; then
   echo ""
-  echo "✗ PENDING MIGRATIONS DETECTED after running all migrations."
-  echo "  This means some migrations are not being applied."
+  echo "✗ SCHEMA DRIFT DETECTED"
+  echo ""
+  echo "The database schema is out of sync with the entities."
+  echo "This usually means a migration was added or modified without"
+  echo "being properly applied."
+  echo ""
+  echo "To fix:"
+  echo "  1. Run 'npm run migration:run --workspace=apps/backend'"
+  echo "  2. Run 'npm run migration:dump --workspace=apps/backend'"
+  echo "  3. Commit the updated migration files and schema.dump"
   exit 1
 fi
 
-echo ""
-echo "✓ All migrations applied successfully."
+echo "✓ Schema is in sync — no drift detected."
 exit 0
