@@ -42,6 +42,8 @@ export class MetricsService {
   private readonly stellarRpcRetries = new Map<string, number>();
   private activeWebSocketConnections = 0;
   private circuitStateSamples: CircuitStateSample[] = [{ name: '', state: CircuitState.CLOSED }];
+  private rpcLimiterActiveCount = 0;
+  private rpcLimiterQueueLength = 0;
 
   reset(): void {
     this.requestCounts = new Map();
@@ -52,6 +54,8 @@ export class MetricsService {
     this.databaseQueryDurations = [];
     this.activeWebSocketConnections = 0;
     this.circuitStateSamples = [];
+    this.rpcLimiterActiveCount = 0;
+    this.rpcLimiterQueueLength = 0;
     this.startedAt = Date.now();
   }
 
@@ -104,6 +108,11 @@ export class MetricsService {
     this.activeWebSocketConnections = Math.max(0, this.activeWebSocketConnections - 1);
   }
 
+  updateRpcLimiterMetrics(activeCount: number, queueLength: number): void {
+    this.rpcLimiterActiveCount = activeCount;
+    this.rpcLimiterQueueLength = queueLength;
+  }
+
   renderPrometheus(): string {
     const lines: string[] = [
       '# HELP stellar_bounty_process_uptime_seconds Process uptime in seconds.',
@@ -121,6 +130,7 @@ export class MetricsService {
     this.appendStellarRpcMetrics(lines);
     this.appendWebSocketMetrics(lines);
     this.appendCircuitMetrics(lines);
+    this.appendRpcLimiterMetrics(lines);
 
     return `${lines.join('\n')}\n`;
   }
@@ -251,6 +261,17 @@ export class MetricsService {
     if (this.circuitStateSamples.length === 0) {
       lines.push('stellar_bounty_circuit_breaker_state{name="",state=""} 0');
     }
+  }
+
+  private appendRpcLimiterMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_rpc_limiter_active Currently active RPC calls through the concurrency limiter.',
+      '# TYPE stellar_bounty_rpc_limiter_active gauge',
+      `stellar_bounty_rpc_limiter_active ${this.rpcLimiterActiveCount}`,
+      '# HELP stellar_bounty_rpc_limiter_queue_length Number of RPC calls waiting in the concurrency limiter queue.',
+      '# TYPE stellar_bounty_rpc_limiter_queue_length gauge',
+      `stellar_bounty_rpc_limiter_queue_length ${this.rpcLimiterQueueLength}`,
+    );
   }
 
   private httpKey(metric: RequestMetricLabels): string {
