@@ -12,8 +12,11 @@
 # ============================================================================
 
 [graph]
-# Skip dev-only crates so cargo-deny focuses on production deps.
-all-features = false
+# cargo-deny v0.16+ uses `feature-depth` (depth of the feature graph to
+# evaluate) instead of the old `all-features` boolean. Setting it to 1
+# keeps the check focused on the resolved production deps without
+# walking every optional feature path.
+feature-depth = 1
 
 [output]
 # Quiet terminal output; CI logs are the source of truth.

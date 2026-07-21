@@ -170,6 +170,7 @@ jobs:
 
       - name: Convert npm audit JSON to SARIF and upload
         if: always()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -210,9 +211,9 @@ jobs:
               }]
             };
             fs.writeFileSync('npm-audit-backend.sarif', JSON.stringify(sarif, null, 2));
-            await github.codeScanning.uploadSarif({
-              sarifFile: 'npm-audit-backend.sarif',
-              commitSha: context.payload.pull_request?.head.sha
+            await github.rest.codeScanning.uploadSarif({
+              sarif_file: 'npm-audit-backend.sarif',
+              commit_sha: context.payload.pull_request?.head.sha
                          ?? context.sha
             });
 
@@ -247,6 +248,7 @@ jobs:
 
       - name: Convert npm audit JSON to SARIF and upload
         if: always()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -286,9 +288,9 @@ jobs:
               }]
             };
             fs.writeFileSync('npm-audit-frontend.sarif', JSON.stringify(sarif, null, 2));
-            await github.codeScanning.uploadSarif({
-              sarifFile: 'npm-audit-frontend.sarif',
-              commitSha: context.payload.pull_request?.head.sha
+            await github.rest.codeScanning.uploadSarif({
+              sarif_file: 'npm-audit-frontend.sarif',
+              commit_sha: context.payload.pull_request?.head.sha
                          ?? context.sha
             });
 
@@ -328,6 +330,7 @@ jobs:
 
       - name: Upload cargo-deny SARIF
         if: always()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -344,9 +347,9 @@ jobs:
               }]
             };
             require('fs').writeFileSync('cargo-deny.sarif', JSON.stringify(sarif, null, 2));
-            await github.codeScanning.uploadSarif({
-              sarifFile: 'cargo-deny.sarif',
-              commitSha: context.payload.pull_request?.head.sha
+            await github.rest.codeScanning.uploadSarif({
+              sarif_file: 'cargo-deny.sarif',
+              commit_sha: context.payload.pull_request?.head.sha
                          ?? context.sha
             });
 
