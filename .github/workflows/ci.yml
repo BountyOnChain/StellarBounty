@@ -363,21 +363,21 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-    # Trivy is intentionally `exit-code: 0` (informational). The three
-    # dedicated audit jobs above are the ones that act as CI gates.
-    # We do NOT upload the SARIF: GitHub Code Scanning auto-creates a
-    # separate required check from any uploaded SARIF, which would
-    # contradict the "informational" intent by failing the PR on every
-    # HIGH finding. Trivy prints a readable table to stdout (visible in
-    # the Actions job logs) instead, so HIGH/CRITICAL findings remain
-    # observable without blocking CI.
-    - name: Run Trivy vulnerability scanner (filesystem)
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        severity: 'CRITICAL,HIGH'
-        exit-code: '0'
+      # Trivy is intentionally `exit-code: 0` (informational). The three
+      # dedicated audit jobs above are the ones that act as CI gates.
+      # We do NOT upload the SARIF: GitHub Code Scanning auto-creates a
+      # separate required check from any uploaded SARIF, which would
+      # contradict the "informational" intent by failing the PR on every
+      # HIGH finding. Trivy prints a readable table to stdout (visible in
+      # the Actions job logs) instead, so HIGH/CRITICAL findings remain
+      # observable without blocking CI.
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
 
   e2e:
     name: E2E Tests
