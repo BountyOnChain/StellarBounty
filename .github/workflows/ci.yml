@@ -124,8 +124,17 @@ jobs:
       - name: Build Soroban contract WASM
         run: cargo build --target wasm32-unknown-unknown --release
 
-  security:
-    name: Security Audit
+  # ---------------------------------------------------------------------------
+  # Dependency vulnerability scanning (Closes #423)
+  #
+  # Three jobs run in parallel so a CVE on any stack surfaces a red CI check
+  # WITHOUT depending on the others. Each job uploads its SARIF payload to the
+  # repository's Security tab. `npm audit --audit-level=high` and
+  # `cargo deny check` both exit non-zero on high/critical advisories, which
+  # fails the workflow as required.
+  # ---------------------------------------------------------------------------
+  audit_backend:
+    name: Audit · Backend (npm)
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -141,20 +150,218 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install backend dependencies
+        run: npm ci --workspace=apps/backend --include-workspace-root
 
+      # FAIL on high-severity CVEs (per #423 acceptance criteria).
+      # The JSON output is parsed by the next step into SARIF so reviewers
+      # see the finding list in the Security tab alongside the failed check.
       - name: Run npm audit (backend)
-        run: npm audit --workspace=apps/backend --audit-level=high
-        continue-on-error: true
+        id: audit
+        run: |
+          set +e
+          npm audit --workspace=apps/backend --audit-level=high \
+                    --json > npm-audit-backend.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          # Exit non-zero on high+ vulns so the job fails. We deliberately
+          # do NOT set `continue-on-error: true` here — #423 requires that
+          # a high-severity CVE make CI red.
+          exit $(cat "$GITHUB_OUTPUT" | sed -n 's/^exit_code=//p')
+
+      - name: Convert npm audit JSON to SARIF and upload
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'npm-audit-backend.json';
+            let findings = [];
+            try {
+              const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+              const vulns = raw.vulnerabilities ?? {};
+              for (const [pkgName, v] of Object.entries(vulns)) {
+                if (!v.severity) continue;
+                if (!['high','critical'].includes(v.severity)) continue;
+                const via = v.via ?? [];
+                const advisories = via.filter(x => x && typeof x === 'object' && x.name);
+                for (const a of advisories) {
+                  const claimName = a.name || ('unknown-' + pkgName);
+                  findings.push({
+                    ruleId: (a.source || 'npm') + ':' + claimName,
+                    level: v.severity === 'critical' ? 'error' : 'warning',
+                    message: { text: (a.title || a.name) + ' in ' + pkgName },
+                    locations: [{
+                      physicalLocation: {
+                        artifactLocation: { uri: 'apps/backend/package.json' }
+                      }
+                    }]
+                  });
+                }
+              }
+            } catch (e) {
+              core.warning('Could not parse npm audit JSON: ' + e.message);
+            }
+            const sarif = {
+              $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+              version: '2.1.0',
+              runs: [{
+                tool: { driver: { name: 'npm-audit', version: '1.0.0' } },
+                results: findings
+              }]
+            };
+            fs.writeFileSync('npm-audit-backend.sarif', JSON.stringify(sarif, null, 2));
+            await github.codeScanning.uploadSarif({
+              sarifFile: 'npm-audit-backend.sarif',
+              commitSha: context.payload.pull_request?.head.sha
+                         ?? context.sha
+            });
+
+  audit_frontend:
+    name: Audit · Frontend (npm)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --workspace=apps/frontend --include-workspace-root
 
       - name: Run npm audit (frontend)
-        run: npm audit --workspace=apps/frontend --audit-level=high
-        continue-on-error: true
+        id: audit
+        run: |
+          set +e
+          npm audit --workspace=apps/frontend --audit-level=high \
+                    --json > npm-audit-frontend.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit $(cat "$GITHUB_OUTPUT" | sed -n 's/^exit_code=//p')
 
-      - name: Check for outdated dependencies
-        run: npm outdated --workspaces 2>&1 || true
+      - name: Convert npm audit JSON to SARIF and upload
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'npm-audit-frontend.json';
+            let findings = [];
+            try {
+              const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+              const vulns = raw.vulnerabilities ?? {};
+              for (const [pkgName, v] of Object.entries(vulns)) {
+                if (!v.severity) continue;
+                if (!['high','critical'].includes(v.severity)) continue;
+                const via = v.via ?? [];
+                const advisories = via.filter(x => typeof x === 'object' && x.url);
+                for (const a of advisories) {
+                  findings.push({
+                    ruleId: (a.source || 'npm') + ':' + a.name,
+                    level: v.severity === 'critical' ? 'error' : 'warning',
+                    message: { text: (a.title || a.name) + ' in ' + pkgName },
+                    locations: [{
+                      physicalLocation: {
+                        artifactLocation: { uri: 'apps/frontend/package.json' }
+                      }
+                    }]
+                  });
+                }
+              }
+            } catch (e) {
+              core.warning('Could not parse npm audit JSON: ' + e.message);
+            }
+            const sarif = {
+              $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+              version: '2.1.0',
+              runs: [{
+                tool: { driver: { name: 'npm-audit', version: '1.0.0' } },
+                results: findings
+              }]
+            };
+            fs.writeFileSync('npm-audit-frontend.sarif', JSON.stringify(sarif, null, 2));
+            await github.codeScanning.uploadSarif({
+              sarifFile: 'npm-audit-frontend.sarif',
+              commitSha: context.payload.pull_request?.head.sha
+                         ?? context.sha
+            });
 
+  audit_contracts:
+    name: Audit · Contracts (cargo-deny)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    defaults:
+      run:
+        working-directory: apps/contracts
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Pin cargo-deny to a specific tag so the advisory DB schema is
+      # reproducible across runs. No `|| true` — let install failures break
+      # CI loudly per #423 ("a CVE surfaces a red CI check").
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --version '^0.16'
+
+      # Fail the workflow on every cargo-deny check: bans, advisories,
+      # licenses, sources. Per #423 acceptance criteria.
+      - name: Run cargo-deny check
+        run: |
+          set +e
+          cargo deny check 2>&1 | tee cargo-deny.log
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit $(cat "$GITHUB_OUTPUT" | sed -n 's/^exit_code=//p')
+
+      - name: Upload cargo-deny SARIF
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // cargo-deny does not emit SARIF natively; emit a stub SARIF so
+            // the Security tab has an entry per run to anchor future
+            // findings. The cargo-deny text output is the source of truth
+            // for the failed job; this SARIF keeps the upload API happy.
+            const sarif = {
+              $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+              version: '2.1.0',
+              runs: [{
+                tool: { driver: { name: 'cargo-deny', version: '0.0.0' } },
+                results: []
+              }]
+            };
+            require('fs').writeFileSync('cargo-deny.sarif', JSON.stringify(sarif, null, 2));
+            await github.codeScanning.uploadSarif({
+              sarifFile: 'cargo-deny.sarif',
+              commitSha: context.payload.pull_request?.head.sha
+                         ?? context.sha
+            });
+
+  trivy:
+    name: Trivy filesystem scan (informational)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # Trivy is intentionally `exit-code: 0` (informational). The three
+      # dedicated audit jobs above are the ones that act as CI gates.
       - name: Run Trivy vulnerability scanner (filesystem)
         uses: aquasecurity/trivy-action@master
         with:

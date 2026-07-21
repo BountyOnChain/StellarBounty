@@ -1,0 +1,80 @@
+# =============================================================================
+# Promtail — ships docker container JSON logs into loki
+#
+# The backend JsonLoggerService writes one JSON object per line with the
+# schema (see apps/backend/src/common/json-logger.service.ts):
+#   { "timestamp", "level", "service", "env", "requestId", "context",
+#     "message", ... }
+#
+# Promtail's `docker` stage unpacks the per-line JSON envelope written by
+# docker's json-file driver:
+#   { "log": "<original line>", "stream": "stdout", "time": "..." }
+# After Docker stage, the line is a flat string, so we use regex (NOT a
+# second json stage) to pull level/service/env into Loki labels so LogQL
+# queries can filter by them efficiently:
+#   {service="stellar-bounty-backend"} |~ "level\":\"error\""
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 10s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=stellar-bounty"]
+
+    relabel_configs:
+      # Drop anything that is not a docker-compose service in our project.
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+
+    pipeline_stages:
+      # 1. Unwrap the docker json-file envelope to expose `log`, `stream`,
+      #    `time` as parsed fields. After this stage, the log line is
+      #    effectively a string we can regex-parse.
+      - docker: {}
+
+      # 2. Only process logs from our compose project. Other services on
+      #    the daemon flow into Loki with stream/compose_service labels
+      #    but no level/service — queryable but not pre-aggregated.
+      - match:
+          selector: '{compose_service=~".+"}'
+          stages:
+            - timestamp:
+                source: time
+                format: RFC3339Nano
+
+            # JsonLoggerService emits pretty-printed multi-line JSON when
+            # LOG_FORMAT=pretty OR single-line JSON when LOG_FORMAT=json.
+            # The two regex variants below cover both shapes so level,
+            # service, env are lifted into Loki labels either way.
+            - regex:
+                expression: '"level"\s*:\s*"(?P<level>[^"]+)"'
+            - regex:
+                expression: '"service"\s*:\s*"(?P<service>[^"]+)"'
+            - regex:
+                expression: '"env"\s*:\s*"(?P<env>[^"]+)"'
+
+            - labels:
+                level:
+                service:
+                env:

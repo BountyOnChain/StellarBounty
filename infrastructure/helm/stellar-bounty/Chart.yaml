@@ -1,0 +1,30 @@
+# ============================================================================
+# infrastructure/helm/stellar-bounty/Chart.yaml
+#
+# Helm chart for the full StellarBounty stack (#425). API v2 is required
+# because we use `dependencies` / `type: application`.
+# ============================================================================
+apiVersion: v2
+name: stellar-bounty
+description: |
+  Kubernetes Helm chart for the StellarBounty stack: NestJS API,
+  Next.js frontend, Postgres 16, Promtail log shipper, ingress,
+  HPA, PDB, and NetworkPolicy.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - stellar
+  - bounty
+  - nestjs
+  - nextjs
+  - postgres
+  - soroban
+home: https://github.com/BountyOnChain/StellarBounty
+sources:
+  - https://github.com/BountyOnChain/StellarBounty
+maintainers:
+  - name: Taylor-Kay
+    email: devops@stellar-bounty.example
+icon: https://raw.githubusercontent.com/BountyOnChain/StellarBounty/main/docs/architecture.md
+kubeVersion: ">=1.25.0-0"

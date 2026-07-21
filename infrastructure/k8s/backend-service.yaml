@@ -1,0 +1,23 @@
+# ============================================================================
+# infrastructure/k8s/backend-service.yaml — NestJS API ClusterIP
+#
+# ClusterIP-only: the ingress terminates TLS and proxies /api/* to this
+# service. Direct pod exposure is intentionally avoided.
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+      protocol: TCP

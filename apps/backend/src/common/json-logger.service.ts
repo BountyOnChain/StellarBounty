@@ -2,6 +2,20 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { Injectable, LoggerService, LogLevel } from '@nestjs/common';
 
 /**
+ * Map raw LOG_FORMAT env values to internal LogFormat.
+ * Accepts: 'json' (single-line), 'pretty' (multi-line indented for humans),
+ * and uses the production-auto fallback when unset.
+ */
+const LOG_FORMAT_ALIASES: Record<string, LogFormat> = {
+  json: 'json',
+  single: 'json',
+  oneline: 'json',
+  pretty: 'pretty',
+  dev: 'pretty',
+  human: 'pretty',
+};
+
+/**
  * Allowed application log levels in increasing order of severity.
  * A logger configured at level X will emit logs at level >= X.
  */
@@ -55,7 +69,15 @@ export class JsonLoggerService implements LoggerService {
     this.minLevel = LEVEL_ORDER[resolved];
     this.serviceName = options.serviceName ?? process.env.SERVICE_NAME ?? 'stellar-bounty-backend';
     this.env = options.env ?? process.env.NODE_ENV ?? 'development';
-    this.format = options.format ?? (this.env === 'production' ? 'json' : 'pretty');
+    // Resolve LOG_FORMAT purely from process.env first so docker-compose
+    // (Closes #421) can force single-line JSON without flipping NODE_ENV.
+    // Falls back to the production-auto heuristic (NODE_ENV=production → json)
+    // when neither explicit constructor option nor LOG_FORMAT is set.
+    const envFormat = LOG_FORMAT_ALIASES[(process.env.LOG_FORMAT ?? '').toLowerCase()];
+    this.format =
+      options.format ??
+      envFormat ??
+      (this.env === 'production' ? 'json' : 'pretty');
   }
 
   /** Run `fn` with a request-scoped log context. */

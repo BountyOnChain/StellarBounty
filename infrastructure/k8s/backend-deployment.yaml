@@ -1,0 +1,105 @@
+# ============================================================================
+# infrastructure/k8s/backend-deployment.yaml — NestJS API
+#
+# Notes:
+# - Health probes hit /api/v1/health (set via global prefix in main.ts).
+#   Readiness uses `readinessProbe` only — we deliberately separate liveness
+#   (restart if dead) from readiness (remove from service if not yet warm)
+#   so the rolling restart doesn't trip the API circuit-breaker (#50).
+#
+# Apply with:
+#   kubectl apply -f infrastructure/k8s/backend-deployment.yaml
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: stellar-bounty
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  strategy:
+    # Block traffic from a pod that is still warming up so DB-pool init
+    # and circuit-breaker warm-up don't catch a stale request.
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: stellar-bounty
+        app.kubernetes.io/component: api
+    spec:
+      # Run as non-root (matches backend Dockerfile's `USER node` → uid 1000).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: stellar-bounty/backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4000
+          # Liveness: restart if the process itself can't speak HTTP after
+          # the warm-up grace period. Conservative so a temporary DB
+          # outage does not flap pods.
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness: route traffic only after this returns 2xx. Drives
+          # the rolling-restart "no traffic until healthy" property.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          # Tighten per-container security context.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend

@@ -1,0 +1,85 @@
+{{- if .Values.promtail.enabled -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "stellar-bounty.fullname" . }}-promtail
+  labels:
+    {{- include "stellar-bounty.componentLabels" (dict "ctx" . "component" "promtail") | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "stellar-bounty.componentSelectorLabels" (dict "ctx" . "component" "promtail") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stellar-bounty.componentLabels" (dict "ctx" . "component" "promtail") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "stellar-bounty.fullname" . }}-promtail
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: promtail
+          image: "{{ .Values.image.promtail.repository }}:{{ .Values.image.promtail.tag }}"
+          imagePullPolicy: {{ .Values.image.promtail.pullPolicy }}
+          args:
+            - -config.file=/etc/promtail/config.yaml
+          ports:
+            - name: http
+              containerPort: 9080
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/promtail
+              readOnly: true
+            - name: var-log
+              mountPath: /var/log
+              readOnly: true
+            - name: var-lib-docker-containers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: run
+              mountPath: /var/run
+              readOnly: true
+            - name: pods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "stellar-bounty.fullname" . }}-promtail-config
+        - name: var-log
+          hostPath:
+            path: /var/log
+        - name: var-lib-docker-containers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: run
+          hostPath:
+            path: /var/run
+        - name: pods
+          hostPath:
+            path: /var/log/pods
+        - name: tmp
+          emptyDir: {}
+{{- end }}

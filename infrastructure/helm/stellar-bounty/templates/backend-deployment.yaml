@@ -1,0 +1,66 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stellar-bounty.fullname" . }}-backend
+  labels:
+    {{- include "stellar-bounty.componentLabels" (dict "ctx" . "component" "backend") | nindent 4 }}
+spec:
+  {{- if not .Values.backend.hpa.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  strategy:
+    type: {{ .Values.backend.updateStrategy.type }}
+    rollingUpdate:
+      maxSurge: {{ .Values.backend.updateStrategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.backend.updateStrategy.rollingUpdate.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "stellar-bounty.componentSelectorLabels" (dict "ctx" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stellar-bounty.componentLabels" (dict "ctx" . "component" "backend") | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+      containers:
+        - name: backend
+          image: "{{ .Values.image.backend.repository }}:{{ .Values.image.backend.tag }}"
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.port }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "stellar-bounty.fullname" . }}-backend-config
+            - secretRef:
+                name: {{ include "stellar-bounty.secretName" (dict "secret" .Values.secrets.backend) }}
+          securityContext:
+            {{- toYaml .Values.backend.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "stellar-bounty.componentSelectorLabels" (dict "ctx" . "component" "backend") | nindent 14 }}
+{{- end }}

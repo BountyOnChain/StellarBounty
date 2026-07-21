@@ -1,0 +1,94 @@
+# ============================================================================
+# infrastructure/k8s/postgres-statefulset.yaml — Postgres 16
+#
+# StatefulSet (not Deployment) so the PVC follows the pod across reschedules.
+# Headless Service gives a stable DNS name (postgres-0.postgres-headless).
+# Volumes are NOT clustered for kind — we run a single replica for dev.
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: stellar-bounty
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999        # postgres image uid
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 8Gi

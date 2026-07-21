@@ -1,0 +1,16 @@
+# ============================================================================
+# infrastructure/k8s/namespace.yaml
+#
+# Part of the raw k8s manifests (#425). Apply with:
+#   kubectl apply -f infrastructure/k8s/namespace.yaml
+# ============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stellar-bounty
+  labels:
+    name: stellar-bounty
+    app.kubernetes.io/part-of: stellar-bounty
+    # NetworkPolicy in this ns only allows pods carrying this label.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted

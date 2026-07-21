@@ -1,0 +1,22 @@
+{{- /* Backend ConfigMap — non-secret runtime config. */ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stellar-bounty.fullname" . }}-backend-config
+  labels:
+    {{- include "stellar-bounty.labels" . | nindent 4 }}
+data:
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  PORT: {{ .Values.config.port | quote }}
+  STELLAR_NETWORK: {{ .Values.config.stellarNetwork | quote }}
+  STELLAR_RPC_URL: {{ .Values.config.stellarRpcUrl | quote }}
+  NEXT_PUBLIC_API_URL: {{ .Values.frontend.env.NEXT_PUBLIC_API_URL | quote }}
+  NEXT_PUBLIC_STELLAR_NETWORK: {{ .Values.frontend.env.NEXT_PUBLIC_STELLAR_NETWORK | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  SERVICE_NAME: {{ .Values.config.serviceName | quote }}
+  {{- if .Values.config.corsOrigin }}
+  CORS_ORIGIN: {{ .Values.config.corsOrigin | quote }}
+  {{- end }}
+  TRUST_PROXY: {{ .Values.config.trustProxy | quote }}
+{{- /* Secret placeholders are NOT created here — values.secrets.{...}.existingSecret
+       points to a Secret that must be created out-of-band. */ -}}

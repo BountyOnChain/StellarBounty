@@ -1,0 +1,36 @@
+# ============================================================================
+# infrastructure/k8s/kustomization.yaml
+#
+# Aggregates every raw manifest in this directory so you can apply the
+# whole stack with `kubectl apply -k infrastructure/k8s/`. The Helm chart
+# is the production-grade path; kustomization is the lightweight
+# dev/CI path.
+#
+# WARNING: This file references Secret resources that are real placeholders
+# (`REPLACE_ME_*`). Replace via sealed-secrets / external-secrets / SOPS
+# before `kubectl apply -k` ingests them in any non-dev environment.
+# ============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: stellar-bounty
+
+resources:
+  - namespace.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - postgres-statefulset.yaml
+  - configmap.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - network-policy.yaml
+  - promtail-daemonset.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: stellar-bounty
+      app.kubernetes.io/managed-by: kustomize

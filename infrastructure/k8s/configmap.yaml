@@ -1,0 +1,52 @@
+# ============================================================================
+# infrastructure/k8s/configmap.yaml
+#
+# Non-secret backend runtime configuration. Secrets live in
+# infrastructure/k8s/secret.yaml — that file is `.gitignore`'-d and
+# rendered from sealed-secrets / external-secrets in real deployments.
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: stellar-bounty
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+  STELLAR_NETWORK: "testnet"
+  STELLAR_RPC_URL: "https://soroban-testnet.stellar.org"
+  # Used by the frontend at runtime via NEXT_PUBLIC_API_URL.
+  NEXT_PUBLIC_API_URL: "https://REPLACE_WITH_HOSTNAME/api/v1"
+  NEXT_PUBLIC_STELLAR_NETWORK: "TESTNET"
+  LOG_LEVEL: "info"
+  SERVICE_NAME: "stellar-bounty-backend"
+  CORS_ORIGIN: "https://REPLACE_WITH_HOSTNAME"
+  TRUST_PROXY: "true"
+---
+# Secret is intentionally a PLACEHOLDER — replace with sealed-secrets /
+# external-secrets in real deployments, or `kubectl create secret` against
+# the values. The shape is documented here so reviewers know the keys
+# the deployment depends on.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secrets
+  namespace: stellar-bounty
+type: Opaque
+stringData:
+  JWT_SECRET: "REPLACE_ME_use_sealed_secrets_or_external_secrets"
+  STELLAR_SIGNING_SECRET: "REPLACE_ME_optional"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secrets
+  namespace: stellar-bounty
+type: Opaque
+stringData:
+  POSTGRES_USER: "REPLACE_ME"
+  POSTGRES_PASSWORD: "REPLACE_ME"
+  POSTGRES_DB: "stellar_bounty"

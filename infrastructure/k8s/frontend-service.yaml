@@ -1,0 +1,20 @@
+# ============================================================================
+# infrastructure/k8s/frontend-service.yaml — Next.js ClusterIP
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,20 @@
+# =============================================================================
+# Grafana provisioning — Prometheus datasource
+#
+# Loaded by grafana when /etc/grafana/provisioning/datasources is mounted.
+# Matches the metrics dashboard at dashboards/stellar-bounty.json.
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # Default scrape endpoint inside compose / k8s cluster.
+    url: ${PROMETHEUS_URL:-http://prometheus:9090}
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: '30s'
+      httpMethod: POST

@@ -1,0 +1,13 @@
+{{- if and .Values.frontend.enabled .Values.frontend.pdb.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "stellar-bounty.fullname" . }}-frontend
+  labels:
+    {{- include "stellar-bounty.componentLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.frontend.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "stellar-bounty.componentSelectorLabels" (dict "ctx" . "component" "frontend") | nindent 6 }}
+{{- end }}

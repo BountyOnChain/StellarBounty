@@ -1,0 +1,51 @@
+{{- /* Print the URL + verification commands after a successful install. */ -}}
+StellarBounty v{{ .Chart.AppVersion }} installed as release "{{ .Release.Name }}" into namespace "{{ .Release.Namespace }}".
+
+Components enabled:
+{{- if .Values.backend.enabled }}
+  - Backend (NestJS API):     service {{ include "stellar-bounty.fullname" . }}-backend:{{ .Values.backend.service.port }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+  - Frontend (Next.js):       service {{ include "stellar-bounty.fullname" . }}-frontend:{{ .Values.frontend.service.port }}
+{{- end }}
+{{- if .Values.postgres.enabled }}
+  - Postgres 16:              service {{ include "stellar-bounty.fullname" . }}-postgres-headless:{{ .Values.postgres.service.port }}
+{{- end }}
+{{- if .Values.promtail.enabled }}
+  - Promtail (log shipping):  per-node DaemonSet → {{ .Values.promtail.lokiUrl }}
+{{- end }}
+{{- if .Values.ingress.enabled }}
+
+Ingress:
+  Hostname:   {{ .Values.ingress.hostname }}
+  Class:      {{ .Values.ingress.className }}
+{{- if .Values.ingress.tls.enabled }}
+  TLS secret: {{ .Values.ingress.tls.secretName }}
+{{- end }}
+
+Verify the chart boots and stays healthy (Closes #425 acceptance):
+
+  helm status {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/part-of=stellar-bounty
+  kubectl rollout status deployment/{{ include "stellar-bounty.fullname" . }}-backend -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.promtail.enabled }}
+
+Loki verification (Closes #421 acceptance):
+
+  # Wait ~30s for Promtail to start scraping.
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "stellar-bounty.fullname" . }}-promtail --tail=20
+
+  # Query Loki directly (port-forward ok if no ingress to Grafana):
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "stellar-bounty.fullname" . }}-backend 4000:4000 &
+  # Logs should now stream into Loki. Open Grafana → Explore → Loki and run:
+  #   {namespace="{{ .Release.Namespace }}",service="stellar-bounty-backend"} | json | level="error"
+{{- end }}
+
+Secrets referenced (must exist out-of-band):
+
+  - {{ include "stellar-bounty.secretName" (dict "secret" .Values.secrets.backend) }}
+  - {{ include "stellar-bounty.secretName" (dict "secret" .Values.secrets.postgres) }}
+
+  Use sealed-secrets / external-secrets / SOPS for production.

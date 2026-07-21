@@ -1,0 +1,43 @@
+# ============================================================================
+# infrastructure/k8s/ingress.yaml — TLS-terminating public ingress
+#
+# Class name is the cluster-specific controller (e.g. nginx, traefik).
+# For kind use the ingress-nginx values; for prod use whatever the platform
+# exposes. The cert-manager annotation stays inert unless cert-manager is
+# installed.
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stellar-bounty
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/part-of: stellar-bounty
+  annotations:
+    # Replace per cluster. The standard ingress-nginx class works on kind.
+    kubernetes.io/ingress.class: REPLACE_WITH_INGRESS_CLASS
+    # Only effective when cert-manager is installed; otherwise delete.
+    cert-manager.io/cluster-issuer: REPLACE_WITH_CLUSTER_ISSUER
+spec:
+  tls:
+    - hosts:
+        - REPLACE_WITH_HOSTNAME
+      secretName: stellar-bounty-tls
+  rules:
+    - host: REPLACE_WITH_HOSTNAME
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 4000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

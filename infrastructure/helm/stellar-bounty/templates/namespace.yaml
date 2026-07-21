@@ -1,0 +1,15 @@
+{{- /*
+Namespace — created unless the chart is installed into an existing
+namespace (via helm --create-namespace=false -n foo).
+*/ -}}
+{{- if eq .Release.Namespace "default" -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "stellar-bounty.name" . }}
+  labels:
+    name: {{ include "stellar-bounty.name" . }}
+    app.kubernetes.io/part-of: stellar-bounty
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+{{- end }}

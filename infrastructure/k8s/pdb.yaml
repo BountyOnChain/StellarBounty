@@ -1,0 +1,34 @@
+# ============================================================================
+# infrastructure/k8s/pdb.yaml — PodDisruptionBudgets
+#
+# PDBs cap the number of pods that can be voluntarily down at any one
+# time (e.g. during `kubectl drain`). `maxUnavailable: 1` ensures at least
+# `replicas - 1` pods serve traffic during a rolling restart.
+# ============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: stellar-bounty
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: stellar-bounty
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend

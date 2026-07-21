@@ -1,0 +1,195 @@
+# ============================================================================
+# values.yaml — full chart configuration surface
+#
+# Override defaults with `--set key=value` or `-f custom-values.yaml`.
+# All knobs satisfy the acceptance criteria in #425:
+#   - replicas (per-component)
+#   - ingress class
+#   - secrets (referenced, not inlined)
+# ============================================================================
+
+# --- global ------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  backend:
+    repository: stellar-bounty/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: stellar-bounty/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  promtail:
+    repository: grafana/promtail
+    tag: 3.3.2
+    pullPolicy: IfNotPresent
+
+# --- backend -----------------------------------------------------------------
+backend:
+  enabled: true
+  replicaCount: 2
+  image: {}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilization: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+# --- frontend ----------------------------------------------------------------
+frontend:
+  enabled: true
+  replicaCount: 2
+  image: {}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    NEXT_PUBLIC_API_URL:      "http://localhost:3000/api/v1"
+    NEXT_PUBLIC_STELLAR_NETWORK: "TESTNET"
+  livenessProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+# --- postgres ----------------------------------------------------------------
+postgres:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+  auth:
+    # Reference an existing Secret (or set via `--set`). NEVER bake real
+    # credentials here.
+    existingSecret: postgres-secrets
+    secretKeys:
+      user: POSTGRES_USER
+      password: POSTGRES_PASSWORD
+      database: POSTGRES_DB
+  persistence:
+    enabled: true
+    size: 8Gi
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# --- ingress -----------------------------------------------------------------
+ingress:
+  enabled: true
+  className: REPLACE_WITH_INGRESS_CLASS
+  hostname: REPLACE_WITH_HOSTNAME
+  # Only effective if cert-manager is installed in the cluster.
+  clusterIssuer: REPLACE_WITH_CLUSTER_ISSUER
+  tls:
+    enabled: true
+    secretName: stellar-bounty-tls
+
+# --- network policy ----------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Default-deny + scoped allow rules. Safe to disable in kind/dev.
+
+# --- non-secret config -------------------------------------------------------
+config:
+  nodeEnv: production
+  port: 4000
+  stellarNetwork: testnet
+  stellarRpcUrl: https://soroban-testnet.stellar.org
+  logLevel: info
+  serviceName: stellar-bounty-backend
+  corsOrigin: ""
+  trustProxy: "true"
+
+# --- secrets (REFERENCED, never inlined) ------------------------------------
+secrets:
+  # Existing Secret names the deployment will envFrom. Replace via
+  # --set or `-f production-secrets.yaml`.
+  backend:
+    existingSecret: backend-secrets
+  postgres:
+    existingSecret: postgres-secrets
+
+# --- promtail (log shipping to Loki) ----------------------------------------
+promtail:
+  enabled: true
+  replicaCount: 1
+  image: {}
+  lokiUrl: http://loki:3100/loki/api/v1/push

@@ -1,0 +1,57 @@
+# =============================================================================
+# Loki — local development configuration
+#
+# Used by docker-compose.yml (loki service) and the k8s/helm chart. Suitable
+# for dev + CI only: no auth, single replica, local filesystem store.
+#
+# Production deployments should:
+#   - enable authn (oidc or basic auth on the front-proxy)
+#   - swap filesystem for S3 / GCS chunks
+#   - raise replication_factor
+#   - inject via envsubst (see infrastructure/alertmanager/alertmanager.yml)
+# =============================================================================
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+# Cap local disk usage — log retention controls for dev.
+limits_config:
+  retention_period: 168h            # 7 days
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true

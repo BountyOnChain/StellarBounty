@@ -13,6 +13,12 @@ services:
       JWT_SECRET: local-development-secret
       STELLAR_NETWORK: testnet
       CORS_ORIGIN: http://localhost:3000
+      # Force JSON log format in containers so the per-line entries are
+      # strictly machine-parseable (Loki / Promtail expect one JSON object
+      # per line on a stream). See apps/backend/src/common/json-logger.service.ts.
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+      SERVICE_NAME: stellar-bounty-backend
     depends_on:
       - postgres
     ports:
@@ -41,5 +47,35 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # ---------------------------------------------------------------------------
+  # Loki — log aggregation backend (Closes #421)
+  # Stores compressed JSON log lines scraped by promtail.
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3.3.2
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - '3100:3100'
+    volumes:
+      - loki_data:/loki
+      - ./infrastructure/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+
+  # ---------------------------------------------------------------------------
+  # Promtail — ships /var/lib/docker/containers/*/*.log (default json-file
+  # driver output) into loki using the existing JsonLoggerService schema
+  # (timestamp/level/service/env/requestId). See:
+  #   infrastructure/loki/promtail-config.yaml
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:3.3.2
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infrastructure/loki/promtail-config.yaml:/etc/promtail/config.yaml:ro
+
 volumes:
   postgres_data:
+  loki_data:

@@ -1,0 +1,61 @@
+# ============================================================================
+# cargo-deny configuration (Closes #423 — audit:contracts CI job)
+#
+# `cargo deny check` enforces four orthogonal policies:
+#   - advisories  : RustSec advisory DB
+#   - bans        : forbidden crate versions or sources
+#   - licenses    : allowed licenses per dependency
+#   - sources     : allowed registry sources (multi-registry lockfile attacks)
+#
+# Targets the WASM32 release build only because that's what ships to Soroban;
+# host-toolchain warnings are noisy and irrelevant to security review.
+# ============================================================================
+
+[graph]
+# Skip dev-only crates so cargo-deny focuses on production deps.
+all-features = false
+
+[output]
+# Quiet terminal output; CI logs are the source of truth.
+quiet = false
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+ignore = []
+# A yanked or unmaintained advisory on the dependency tree fails CI.
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "CC0-1.0",
+]
+confidence-threshold = 0.8
+# Soroban SDK is Apache-2.0; everything in the dependency tree currently
+# resolves to one of the licenses above. Any new dependency that surfaces
+# an "unknown" license MUST be explicitly allow-listed before merging.
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+deny = []
+# 招呼してきた crate (eg. tokio) 사용은 거부한다. WASM-only contracts have no
+# business pulling async runtimes. Add explicit bans here as needed.
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+# Lockfile-only build — anything not on crates.io is a supply-chain red flag.

@@ -1,0 +1,25 @@
+# =============================================================================
+# Grafana provisioning — Loki datasource
+#
+# Loaded by grafana when /etc/grafana/provisioning/datasources is mounted.
+# Closes #421: alongside the new promtail pipeline, Grafana can now query
+# Loki directly for service logs. The Starlark-style templating ${VAR:-default}
+# is resolved by grafana's env-var interpolation at startup.
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    # Default scrape endpoint inside compose / k8s cluster.
+    url: ${LOKI_URL:-http://loki:3100}
+    editable: false
+    jsonData:
+      maxLines: 5000
+      timeout: 60
+      # Smaller derived fields keep the UI derivative queries (counts over
+      # time) fast even when many containers are quiet.
+      keepCookies: []
+    secureJsonData: {}
