@@ -38,6 +38,8 @@ pub enum ContractError {
     OperationAlreadyUnlocked = 11,
     /// The queued operation does not match the requested execution.
     InvalidOperation = 12,
+    /// A reentrant call was attempted — the contract is already executing a mutating method.
+    Reentrant = 13,
 }
 
 #[contracttype]
@@ -83,6 +85,7 @@ impl EscrowContract {
         timelock_duration: u64,
     ) -> Result<(), ContractError> {
         owner.require_auth();
+        Self::check_reentrancy(&env)?;
         if amount <= 0 {
             return Err(ContractError::InvalidAmount);
         }
@@ -99,6 +102,7 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Created);
+        Self::clear_lock(&env);
         Ok(())
     }
 
@@ -106,6 +110,7 @@ impl EscrowContract {
     /// Transitions Created → Funded.
     pub fn fund(env: Env, owner: Address) -> Result<(), ContractError> {
         owner.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_owner(&env, &owner)?;
         Self::assert_status(&env, BountyStatus::Created)?;
 
@@ -122,42 +127,51 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::Funded);
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Contributor starts work. Transitions Funded → InProgress.
     pub fn start_work(env: Env, contributor: Address) -> Result<(), ContractError> {
         contributor.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_status(&env, BountyStatus::Funded)?;
         env.storage().instance().set(&symbol_short!("CONTRIB"), &contributor);
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::InProgress);
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Contributor submits work. Transitions InProgress → UnderReview.
     pub fn submit(env: Env, contributor: Address) -> Result<(), ContractError> {
         contributor.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_contributor(&env, &contributor)?;
         Self::assert_status(&env, BountyStatus::InProgress)?;
         env.storage()
             .instance()
             .set(&symbol_short!("STATUS"), &BountyStatus::UnderReview);
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Owner approves and releases funds to contributor. Transitions UnderReview → Completed.
     pub fn approve(env: Env, owner: Address) -> Result<(), ContractError> {
         owner.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_owner(&env, &owner)?;
         Self::assert_status(&env, BountyStatus::UnderReview)?;
 
-        Self::queue_operation(&env, &owner, TimelockOperation::Approve)
+        let result = Self::queue_operation(&env, &owner, TimelockOperation::Approve);
+        Self::clear_lock(&env);
+        result
     }
 
     /// Execute a queued approval after the time-lock expires.
     pub fn execute_approve(env: Env) -> Result<(), ContractError> {
+        Self::check_reentrancy(&env)?;
         let pending = Self::pending_operation(&env)?;
         if pending.operation != TimelockOperation::Approve {
             return Err(ContractError::InvalidOperation);
@@ -177,23 +191,28 @@ impl EscrowContract {
         Self::clear_pending_operation(&env);
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("approve")), ());
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Owner cancels and gets a refund. Only valid from Created or Funded.
     pub fn cancel(env: Env, owner: Address) -> Result<(), ContractError> {
         owner.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_owner(&env, &owner)?;
         let status = Self::read_status(&env)?;
         if status != BountyStatus::Created && status != BountyStatus::Funded {
             return Err(ContractError::InvalidStatus);
         }
 
-        Self::queue_operation(&env, &owner, TimelockOperation::Cancel)
+        let result = Self::queue_operation(&env, &owner, TimelockOperation::Cancel);
+        Self::clear_lock(&env);
+        result
     }
 
     /// Execute a queued cancellation after the time-lock expires.
     pub fn execute_cancel(env: Env) -> Result<(), ContractError> {
+        Self::check_reentrancy(&env)?;
         let pending = Self::pending_operation(&env)?;
         if pending.operation != TimelockOperation::Cancel {
             return Err(ContractError::InvalidOperation);
@@ -219,6 +238,7 @@ impl EscrowContract {
         Self::clear_pending_operation(&env);
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("cancel")), ());
+        Self::clear_lock(&env);
         Ok(())
     }
 
@@ -226,6 +246,7 @@ impl EscrowContract {
     /// Transitions UnderReview → Disputed.
     pub fn dispute(env: Env, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_status(&env, BountyStatus::UnderReview)?;
 
         let owner = Self::read_owner(&env)?;
@@ -240,6 +261,7 @@ impl EscrowContract {
         Self::clear_pending_operation(&env);
 
         env.events().publish((symbol_short!("dispute"), caller), ());
+        Self::clear_lock(&env);
         Ok(())
     }
 
@@ -247,6 +269,7 @@ impl EscrowContract {
     /// Pays out to `winner` and transitions Disputed → Completed.
     pub fn resolve(env: Env, arbitrator: Address, winner: Address) -> Result<(), ContractError> {
         arbitrator.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_arbitrator(&env, &arbitrator)?;
         Self::assert_status(&env, BountyStatus::Disputed)?;
 
@@ -256,11 +279,14 @@ impl EscrowContract {
             return Err(ContractError::InvalidWinner);
         }
 
-        Self::queue_operation(&env, &arbitrator, TimelockOperation::Resolve(winner))
+        let result = Self::queue_operation(&env, &arbitrator, TimelockOperation::Resolve(winner));
+        Self::clear_lock(&env);
+        result
     }
 
     /// Execute a queued dispute resolution after the time-lock expires.
     pub fn execute_resolve(env: Env) -> Result<(), ContractError> {
+        Self::check_reentrancy(&env)?;
         let pending = Self::pending_operation(&env)?;
         Self::assert_unlocked(&env, &pending)?;
         Self::assert_status(&env, BountyStatus::Disputed)?;
@@ -283,12 +309,14 @@ impl EscrowContract {
         env.events().publish((symbol_short!("resolve"), winner), ());
         env.events()
             .publish((symbol_short!("execop"), symbol_short!("resolve")), ());
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Cancel a queued operation before it unlocks. Only the initiator can cancel.
     pub fn cancel_operation(env: Env, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
+        Self::check_reentrancy(&env)?;
         let pending = Self::pending_operation(&env)?;
         if caller != pending.initiator {
             return Err(ContractError::Unauthorized);
@@ -299,18 +327,21 @@ impl EscrowContract {
 
         Self::clear_pending_operation(&env);
         env.events().publish((symbol_short!("cancelop"), caller), ());
+        Self::clear_lock(&env);
         Ok(())
     }
 
     /// Rotate the dispute arbitrator. Only the bounty owner can change this key.
     pub fn rotate_arbitrator(env: Env, caller: Address, new_arbitrator: Address) -> Result<(), ContractError> {
         caller.require_auth();
+        Self::check_reentrancy(&env)?;
         Self::assert_owner(&env, &caller)?;
 
         env.storage()
             .instance()
             .set(&symbol_short!("ARBITRATR"), &new_arbitrator);
         env.events().publish((symbol_short!("rotarb"), caller), new_arbitrator);
+        Self::clear_lock(&env);
         Ok(())
     }
 
@@ -346,6 +377,22 @@ impl EscrowContract {
     }
 
     // --- helpers ---
+
+    /// Guard against reentrant calls. If LOCKED is already set in storage, the call
+    /// is reentrant — emit an event and return `ContractError::Reentrant`.
+    fn check_reentrancy(env: &Env) -> Result<(), ContractError> {
+        if env.storage().instance().has(&symbol_short!("LOCKED")) {
+            env.events().publish((symbol_short!("reentrant"),), ());
+            return Err(ContractError::Reentrant);
+        }
+        env.storage().instance().set(&symbol_short!("LOCKED"), &true);
+        Ok(())
+    }
+
+    /// Clear the reentrancy lock so the contract can accept another call.
+    fn clear_lock(env: &Env) {
+        env.storage().instance().remove(&symbol_short!("LOCKED"));
+    }
 
     fn normalize_timelock(timelock_duration: u64) -> u64 {
         if timelock_duration == 0 {
@@ -964,5 +1011,35 @@ mod tests {
             client.try_resolve(&arbitrator, &contributor),
             Err(Ok(ContractError::InvalidStatus))
         );
+    }
+
+    #[test]
+    fn test_reentrancy_guard_blocks_mutating_call() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
+
+        // Simulate reentrancy: manually set LOCKED in storage, then call a
+        // mutating method. The guard should detect the flag and return
+        // ContractError::Reentrant.
+        env.as_contract(&client.address, || {
+            env.storage().instance().set(&symbol_short!("LOCKED"), &true);
+        });
+
+        // Calling any mutating method while LOCKED is set should fail.
+        assert_eq!(client.try_fund(&owner), Err(Ok(ContractError::Reentrant)));
+    }
+
+    #[test]
+    fn test_reentrancy_guard_allows_sequential_mutating_calls() {
+        let (env, client, owner, token_address, _, arbitrator, amount) = setup();
+        client.initialize(&owner, &amount, &token_address, &arbitrator, &DEFAULT_TIMELOCK_SECONDS);
+        client.fund(&owner);
+
+        let contributor = Address::generate(&env);
+        client.start_work(&contributor);
+        client.submit(&contributor);
+
+        // Sequential calls work fine — the guard should be cleared between calls.
+        assert_eq!(client.get_status(), BountyStatus::UnderReview);
     }
 }
