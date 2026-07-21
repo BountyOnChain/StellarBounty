@@ -321,7 +321,6 @@ export class MetricsService {
         lines.push(`stellar_bounty_dynamic_fee_stroops_count{${key}} ${this.dynamicFeeCounts.get(key) ?? 0}`);
       });
   }
-  }
 
   private httpKey(metric: RequestMetricLabels): string {
     return [
