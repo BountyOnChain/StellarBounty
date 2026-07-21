@@ -64,17 +64,26 @@ jobs:
           aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
 
       # -------------------------------------------------------------------------
-      # The actual AWS deploy steps (ECR push, ECS update, etc.) live in your
-      # platform-owned workflow runner / Terraform. This job focuses on the
-      # OIDC → smoke-test chain, so the deploy step is intentionally generic.
-      # Replace this stub with your concrete deploy commands.
-      - name: Deploy (stub — replace with your platform command)
+      # MERGE-BLOCKER: this step is a stub. Until a real `DEPLOY_COMMAND`
+      # variable is set in repo settings, this step FAILS so that:
+      #   (a) reviewers cannot accidentally merge a deploy workflow that
+      #       is silently green and never actually deploys; and
+      #   (b) the subsequent smoke-test is never run against an
+      #       unchanged live stack (which would mask regressions).
+      # Concrete ECR push, ECS update, or platform-managed deploy steps
+      # should replace this invocation before the first production deploy.
+      - name: Deploy (must be replaced with your platform command)
         env:
-          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+          DEPLOY_COMMAND: ${{ vars.DEPLOY_COMMAND }}
         run: |
-          echo "DEPLOY_STUB: would deploy artifact to \${DEPLOY_TARGET:-(unset)}"
-          echo "When the real deploy is wired in, place it here and let the"
-          echo "smoke-test below verify the live stack."
+          if [[ -z "${DEPLOY_COMMAND}" ]]; then
+            echo "::error::vars.DEPLOY_COMMAND is not set. Refusing to merge a" \
+                 "deploy workflow that has no real deploy step." >&2
+            echo "Set DEPLOY_COMMAND to your platform command before re-running" >&2
+            echo "(example: vars.DEPLOY_COMMAND = ./scripts/platform/deploy.sh)" >&2
+            exit 1
+          fi
+          ${DEPLOY_COMMAND}
 
       - name: Make scripts executable
         run: chmod +x scripts/smoke-test.sh

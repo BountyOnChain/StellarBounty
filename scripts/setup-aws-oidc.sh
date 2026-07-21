@@ -115,9 +115,13 @@ else
 fi
 
 # -- 2. Trust policy -------------------------------------------------------------------
-# Restrict the JWT `sub` claim to known workflow triggers. AWS jq-style
-# string functions cannot OR multiple `StringLike` values in a single
-# condition, so we emit one trust statement per allowed `sub` pattern.
+# Restrict the JWT `sub` claim to known workflow triggers. AWS IAM does
+# NOT support disjunction (OR) inside a single Condition block, so AWS
+# policy semantics treat each top-level `Statement` as an OR alternative
+# when their conditions match different values — we therefore emit one
+# Statement per allowed `sub` pattern (main branch, release tags,
+# GitHub-Actions environments). See:
+# https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_single-vs-multi-valued.html
 TRUST_POLICY_FILE="$(mktemp)"
 {
   printf '{\n  "Version": "2012-10-17",\n  "Statement": [\n'
