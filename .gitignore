@@ -25,3 +25,4 @@ backups/
 *.log
 coverage/
 test-results/
+apps/contracts/test_snapshots/
