@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { type BountyCardData } from "@/app/components/BountyCard";
-import BountyGrid from "@/app/components/BountyGrid";
+import BountyListClient from "@/app/components/BountyListClient";
 import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
@@ -54,6 +54,7 @@ type ApiBountiesPayload = {
   page?: number;
   pageSize?: number;
   totalPages?: number;
+  nextCursor?: string | null;
 };
 
 type ApiBountiesResponse = ApiBounty[] | ApiBountiesPayload;
@@ -64,6 +65,7 @@ type LoadedBounties = {
   page: number;
   pageSize: number;
   totalPages: number;
+  nextCursor: string | null;
 };
 
 function normalizePage(value: string | undefined): number {
@@ -91,7 +93,7 @@ async function getBounties(
     const response = await fetch(url, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
-      return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
+      return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1, nextCursor: null };
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
@@ -102,6 +104,7 @@ async function getBounties(
     const totalPages = Array.isArray(payload)
       ? 1
       : payload.totalPages ?? Math.max(1, Math.ceil(total / Math.max(1, respPageSize)));
+    const nextCursor = Array.isArray(payload) ? null : payload.nextCursor ?? null;
 
     const bounties = data.map((bounty, index) => ({
       id: bounty.id ?? bounty._id ?? index,
@@ -111,9 +114,9 @@ async function getBounties(
       status: bounty.status ?? "open",
     }));
 
-    return { bounties, total, page: respPage, pageSize: respPageSize, totalPages };
+    return { bounties, total, page: respPage, pageSize: respPageSize, totalPages, nextCursor };
   } catch {
-    return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1 };
+    return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1, nextCursor: null };
   }
 }
 
@@ -270,12 +273,16 @@ function PaginationControls({
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const page = normalizePage(searchParams?.page);
   const pageSize = normalizeLimit(searchParams?.limit);
-  const { bounties: pageBounties, total, totalPages } = await getBounties(page, pageSize);
+  const { bounties: pageBounties, total, totalPages, nextCursor } = await getBounties(page, pageSize);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.q ?? searchParams?.search ?? "";
   const statusCounts = getStatusCounts(pageBounties, search);
   const bounties = applyListingControls(pageBounties, { sort, status, search });
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  const filters: Record<string, string> = {};
+  if (status !== "all") filters.status = status;
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50 px-4 py-10 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
@@ -350,24 +357,17 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             <p>
               Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-200">{total}</span> bounties
-              {totalPages > 1 ? (
-                <>
-                  {" "}· page <span className="font-semibold text-slate-900 dark:text-slate-200">{page}</span> of{" "}
-                  <span className="font-semibold text-slate-900 dark:text-slate-200">{totalPages}</span>
-                </>
-              ) : null}
             </p>
-            <p className="text-slate-500 dark:text-slate-500">Filters are saved in the URL so you can share this exact view.</p>
+            <p className="text-slate-500 dark:text-slate-500">Scroll down to load more bounties automatically.</p>
           </div>
         </section>
 
-        <BountyGrid bounties={bounties} />
-
-        <PaginationControls
-          currentPage={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          searchParams={searchParams ?? {}}
+        <BountyListClient
+          initialData={bounties}
+          initialTotal={total}
+          initialNextCursor={nextCursor}
+          baseUrl={apiUrl}
+          filters={filters}
         />
       </div>
     </main>

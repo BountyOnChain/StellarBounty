@@ -38,32 +38,48 @@ export class BountiesService {
 
   /**
    * List bounties with server-side pagination and filters (owner, contributor, status).
+   * Supports both offset-based (page/limit) and cursor-based (cursor/limit) pagination.
    */
   async findAll(
     pagination: PaginationQueryDto = {},
   ): Promise<PaginatedResponse<Bounty>> {
-    const { page = 1, limit = 20, owner, contributor, status } = pagination;
+    const { limit = 20, owner, contributor, status, cursor } = pagination;
 
-    const query: any = {};
+    const buildWhere = (qb: any) => {
+      if (owner) {
+        qb.andWhere('bounty.ownerAddress = :owner', { owner });
+      }
+      if (status) {
+        qb.andWhere('bounty.status = :status', { status });
+      }
+      if (contributor) {
+        qb.innerJoin('bounty.submissions', 'submission', 'submission.contributorAddress = :contributor', { contributor });
+      }
+    };
 
-    if (owner) {
-      query.owner = owner;
+    // Count total (always the full count for the given filters)
+    const countQb = this.bounties.createQueryBuilder('bounty');
+    buildWhere(countQb);
+    const total = await countQb.getCount();
+
+    // Fetch page data
+    const dataQb = this.bounties.createQueryBuilder('bounty');
+    buildWhere(dataQb);
+    dataQb.orderBy('bounty.createdAt', 'DESC');
+
+    if (cursor) {
+      dataQb.andWhere('bounty.createdAt < (SELECT "createdAt" FROM bounties WHERE id = :cursor)', { cursor });
     }
-    if (contributor) {
-      query['submissions.contributor'] = contributor;
-    }
-    if (status) {
-      query.status = status;
-    }
 
-    const [data, total] = await this.bounties.findAndCount({
-      where: Object.keys(query).length > 0 ? query : undefined,
-      order: { createdAt: 'DESC' },
-      skip: toSkip(page, limit),
-      take: limit,
-    });
+    // Fetch one extra to detect if there is a next page
+    const data = await dataQb.take(limit + 1).getMany();
+    const hasMore = data.length > limit;
+    const items = hasMore ? data.slice(0, limit) : data;
 
-    return PaginatedResponse.of(data, total, page, limit);
+    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+    const page = cursor ? undefined : (pagination.page ?? 1);
+
+    return PaginatedResponse.of(items, total, page, limit, nextCursor);
   }
 
   async findOne(id: string) {
