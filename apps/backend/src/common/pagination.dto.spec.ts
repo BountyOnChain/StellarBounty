@@ -62,6 +62,7 @@ describe('toSkip / toTotalPages / PaginatedResponse.of', () => {
       page: 2,
       pageSize: 15,
       totalPages: 4,
+      nextCursor: null,
     });
   });
 
