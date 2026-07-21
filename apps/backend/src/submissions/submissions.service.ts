@@ -109,6 +109,7 @@ export class SubmissionsService {
   private async getDynamicFee(
     server: StellarSdk.rpc.Server,
     retryOptions: ReturnType<typeof this.createStellarRpcRetryOptions>,
+    network: string,
   ): Promise<number> {
     try {
       const feeStats = await withStellarRpcRetry(
@@ -121,6 +122,9 @@ export class SubmissionsService {
       const maxFee = Number(this.config.get<number>('STELLAR_MAX_FEE', 100000));
       const fee = Math.min(p95, maxFee);
       this.logger.log(`Fee stats: p95=${p95}, maxFee=${maxFee}, using=${fee}`);
+
+      this.metrics.recordDynamicFee({ operation: 'approve', network, feeStroops: fee });
+
       return fee;
     } catch (error) {
       this.logger.warn(
@@ -150,7 +154,7 @@ export class SubmissionsService {
           retryOptions,
         );
 
-        const fee = await this.getDynamicFee(server, retryOptions);
+        const fee = await this.getDynamicFee(server, retryOptions, network);
 
         const contract = new StellarSdk.Contract(contractId);
         const tx = new StellarSdk.TransactionBuilder(account, {

@@ -1,0 +1,117 @@
+# =============================================================================
+# StellarBounty — Alertmanager routing
+#
+# Resolves issue #428:
+#   - Critical → PagerDuty (24/7 page)
+#   - Warning  → Slack (#alerts-warnings, deduplicated by alertname)
+#   - Default  → Slack (#alerts-general), captures anything not matched
+#
+# Each receiver uses the runbook_url annotation on the firing alert to
+# give responders a one-click path to triage steps. See docs/runbooks/.
+#
+# Required secrets (defined in docs/operations.md):
+#   - PAGERDUTY_ROUTING_KEY  — PagerDuty Events API v2 routing key
+#   - SLACK_WEBHOOK_URL      — Slack incoming webhook
+#
+# The `${PAGERDUTY_ROUTING_KEY}` and `${SLACK_WEBHOOK_URL}` placeholders
+# are templated through `alertmanager --config.file=...` and resolved
+# at runtime by the supplied env-file (see docs/operations.md →
+# "Alertmanager configuration").
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+  # PagerDuty/Slack URLs are intentionally NOT inlined here; we resolve
+  # them via env_file / launch flags to keep secrets out of git.
+
+route:
+  receiver: slack-default
+  group_by:
+    - alertname
+    - team
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Page on critical (PagerDuty) AND continue to Slack for visibility
+    - matchers:
+        - severity="critical"
+      receiver: pagerduty-critical
+      continue: true
+    - matchers:
+        - severity="critical"
+      receiver: slack-critical
+
+    # Warning → low-noise Slack channel
+    - matchers:
+        - severity="warning"
+      receiver: slack-warnings
+      group_wait: 2m
+      repeat_interval: 12h
+
+    # Everything else → general Slack
+    - matchers:
+        - severity="info"
+      receiver: slack-default
+
+receivers:
+  - name: pagerduty-critical
+    pagerduty_configs:
+      - routing_key: "${PAGERDUTY_ROUTING_KEY}"
+        send_resolved: true
+        severity: critical
+        description: |-
+          {{ .GroupLabels.alertname }} ({{ .CommonLabels.team }}):
+          {{ .CommonAnnotations.summary }}
+        details:
+          runbook_url: "{{ (index .Alerts 0).Annotations.runbook_url }}"
+          firing_instance: "{{ (index .Alerts 0).Labels.instance }}"
+          team: "{{ .CommonLabels.team }}"
+
+  - name: slack-critical
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        send_resolved: true
+        channel: "#alerts-critical"
+        title: "[CRITICAL] {{ .CommonLabels.alertname }}"
+        title_link: "{{ (index .Alerts 0).Annotations.runbook_url }}"
+        text: |-
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Runbook:* <{{ (index .Alerts 0).Annotations.runbook_url }}|Open runbook>
+          *Team:* {{ .CommonLabels.team }}
+
+  - name: slack-warnings
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        send_resolved: true
+        channel: "#alerts-warnings"
+        title: "[WARN] {{ .CommonLabels.alertname }}"
+        title_link: "{{ (index .Alerts 0).Annotations.runbook_url }}"
+        text: |-
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Runbook:* <{{ (index .Alerts 0).Annotations.runbook_url }}|Open runbook>
+          *Team:* {{ .CommonLabels.team }}
+
+  - name: slack-default
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        send_resolved: false
+        channel: "#alerts-general"
+        title: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+        text: |-
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}inhibit_rules:
+  # NOTE: this repo does not ship an InstanceDown alert yet. When added
+  # (typically by Prometheus's `up == 0`-style scrape rules), the
+  # following template will suppress component-level backend alerts when
+  # the entire instance is unreachable so we don't double-page:
+  #
+  #   - source_matchers:
+  #       - alertname="InstanceDown"
+  #     target_matchers:
+  #       - team="backend"
+  #     equal: [instance]
+  #
+  # Left as a commented template to keep configuration intent visible.

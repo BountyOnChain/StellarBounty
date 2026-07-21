@@ -49,6 +49,13 @@ export class PaginationQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({
+    description: 'Cursor for keyset pagination. Pass the id of the last item from the previous page.',
+  })
+  @IsOptional()
+  @IsString()
+  cursor?: string;
 }
 
 /** Keep everything below unchanged (toSkip, toTotalPages, PaginatedResponse) */
@@ -80,11 +87,15 @@ export class PaginatedResponse<T> {
   @ApiProperty({ description: 'Total number of pages.' })
   totalPages!: number;
 
+  @ApiPropertyOptional({ description: 'Cursor for the next page. Null when on the last page.' })
+  nextCursor?: string | null;
+
   static of<T>(
     data: T[],
     total: number,
     page: number | undefined,
     limit: number | undefined,
+    nextCursor?: string | null,
   ): PaginatedResponse<T> {
     const safePage = page ?? DEFAULT_PAGE;
     const safeLimit = limit ?? DEFAULT_PAGE_SIZE;
@@ -94,6 +105,7 @@ export class PaginatedResponse<T> {
       page: safePage,
       pageSize: safeLimit,
       totalPages: toTotalPages(total, safeLimit),
+      nextCursor: nextCursor ?? null,
     };
   }
 }

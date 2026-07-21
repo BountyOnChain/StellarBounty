@@ -1,0 +1,117 @@
+# =============================================================================
+# StellarBounty — Deploy & Smoke Test
+#
+# Closes #426: post-deploy smoke tests run automatically.
+# Closes #427: deploys authenticate to AWS via OIDC — no long-lived IAM keys.
+#
+# Triggers:
+#   - workflow_dispatch (manual deploy)
+#   - release: published (deploy on tagged release)
+#
+# Pipeline (single job — keeps deploy → verify atomic):
+#   1. Assume github-actions-role via OIDC
+#   2. (Optional) docker buildx + ECR push — kicks off at the marked callout
+#   3. Run scripts/smoke-test.sh against the configured BACKEND_URL/FRONTEND_URL
+#
+# Required GitHub repository variables:
+#   - AWS_ACCOUNT_ID
+#   - AWS_DEFAULT_REGION
+# Optional:
+#   - BACKEND_URL  (override default per environment)
+#   - FRONTEND_URL
+# =============================================================================
+
+name: Deploy & Smoke Test
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-and-smoke-test:
+    name: Deploy & Verify
+    runs-on: ubuntu-latest
+    # OIDC is required so that aws-actions/configure-aws-credentials can
+    # mint a short-lived AWS session token. See docs/operations.md.
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      # Defaults — override via repo variables for staging/production.
+      BACKEND_URL: ${{ vars.BACKEND_URL || format('http://localhost:{0}', 4000) }}
+      FRONTEND_URL: ${{ vars.FRONTEND_URL || format('http://localhost:{0}', 3000) }}
+      SMOKE_TIMEOUT_SECONDS: ${{ vars.SMOKE_TIMEOUT || 5 }}
+      SMOKE_RETRIES: ${{ vars.SMOKE_RETRIES || 6 }}
+      SMOKE_BACKOFF_SECONDS: ${{ vars.SMOKE_BACKOFF || 10 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        # Exchange the GHA OIDC token for short-lived AWS credentials.
+        # Role is bootstrapped once via scripts/setup-aws-oidc.sh.
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: stellarbounty-deploy-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      # -------------------------------------------------------------------------
+      # MERGE-BLOCKER: this step is a stub. Until a real `DEPLOY_COMMAND`
+      # variable is set in repo settings, this step FAILS so that:
+      #   (a) reviewers cannot accidentally merge a deploy workflow that
+      #       is silently green and never actually deploys; and
+      #   (b) the subsequent smoke-test is never run against an
+      #       unchanged live stack (which would mask regressions).
+      # Concrete ECR push, ECS update, or platform-managed deploy steps
+      # should replace this invocation before the first production deploy.
+      - name: Deploy (must be replaced with your platform command)
+        env:
+          DEPLOY_COMMAND: ${{ vars.DEPLOY_COMMAND }}
+        run: |
+          if [[ -z "${DEPLOY_COMMAND}" ]]; then
+            echo "::error::vars.DEPLOY_COMMAND is not set. Refusing to merge a" \
+                 "deploy workflow that has no real deploy step." >&2
+            echo "Set DEPLOY_COMMAND to your platform command before re-running" >&2
+            echo "(example: vars.DEPLOY_COMMAND = ./scripts/platform/deploy.sh)" >&2
+            exit 1
+          fi
+          ${DEPLOY_COMMAND}
+
+      - name: Make scripts executable
+        run: chmod +x scripts/smoke-test.sh
+
+      - name: Run post-deploy smoke tests
+        # BACKEND_URL / FRONTEND_URL / SMOKE_* env vars are inherited from
+        # the job-level `env:` block above.
+        run: ./scripts/smoke-test.sh
+
+      - name: Open incident issue on smoke-test failure
+        # Failure-only labelling prevents spurious issues on every green run.
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const tag = context.payload.release?.tag_name ?? context.ref;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `❌ Deploy ${tag} smoke-test FAILED`,
+              body: [
+                `- Workflow run: ${runUrl}`,
+                `- Trigger: ${context.eventName}`,
+                `- Tag/ref: ${tag}`,
+                `- Status: ${context.job.status}`,
+                '',
+                'Smoke-test failure requires a rollback or fix before another deploy.',
+              ].join('\n'),
+              labels: ['infrastructure', 'reliability', 'priority:high'],
+            });

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { type BountyCardData } from "@/app/components/BountyCard";
-import BountyGrid from "@/app/components/BountyGrid";
+import BountyListClient from "@/app/components/BountyListClient";
 import BountySearchInput, { type BountyStatusCounts } from "@/app/components/BountySearchInput";
 import { absoluteUrl, defaultDescription, siteName } from "./seo";
 
@@ -69,6 +69,7 @@ type ApiBountiesPayload = {
   page?: number;
   pageSize?: number;
   totalPages?: number;
+  nextCursor?: string | null;
 };
 
 type ApiBountiesResponse = ApiBounty[] | ApiBountiesPayload;
@@ -79,6 +80,7 @@ type LoadedBounties = {
   page: number;
   pageSize: number;
   totalPages: number;
+  nextCursor: string | null;
 };
 
 function normalizePage(value: string | undefined): number {
@@ -120,7 +122,11 @@ async function getBounties(query: BountyQuery): Promise<LoadedBounties> {
     const response = await fetch(url, { next: { revalidate } });
 
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
+
       return { bounties: [], total: 0, page: query.page, pageSize: query.limit, totalPages: 1 };
+
+      return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1, nextCursor: null };
+
     }
 
     const payload = (await response.json()) as ApiBountiesResponse;
@@ -131,6 +137,7 @@ async function getBounties(query: BountyQuery): Promise<LoadedBounties> {
     const totalPages = Array.isArray(payload)
       ? 1
       : payload.totalPages ?? Math.max(1, Math.ceil(total / Math.max(1, respPageSize)));
+    const nextCursor = Array.isArray(payload) ? null : payload.nextCursor ?? null;
 
     const bounties = data.map((bounty, index) => ({
       id: bounty.id ?? bounty._id ?? index,
@@ -140,9 +147,13 @@ async function getBounties(query: BountyQuery): Promise<LoadedBounties> {
       status: bounty.status ?? "open",
     }));
 
-    return { bounties, total, page: respPage, pageSize: respPageSize, totalPages };
+    return { bounties, total, page: respPage, pageSize: respPageSize, totalPages, nextCursor };
   } catch {
+
     return { bounties: [], total: 0, page: query.page, pageSize: query.limit, totalPages: 1 };
+
+    return { bounties: [], total: 0, page, pageSize: limit, totalPages: 1, nextCursor: null };
+
   }
 }
 
@@ -217,6 +228,7 @@ function applyListingControls(
     return 0;
   });
 }
+
 
 
 function buildPageHref(
@@ -302,6 +314,12 @@ function PaginationControls({
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const page = normalizePage(searchParams?.page);
   const pageSize = normalizeLimit(searchParams?.limit);
+
+export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
+  const page = normalizePage(searchParams?.page);
+  const pageSize = normalizeLimit(searchParams?.limit);
+  const { bounties: pageBounties, total, nextCursor } = await getBounties(page, pageSize);
+
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
 
@@ -325,6 +343,12 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const search = searchParams?.q ?? searchParams?.search ?? "";
   const statusCounts = getStatusCounts(pageBounties, search);
   const bounties = applyListingControls(pageBounties, { sort, status, search });
+
+
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  const filters: Record<string, string> = {};
+  if (status !== "all") filters.status = status;
 
 
   return (
@@ -446,6 +470,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             <p>
               Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-200">{total}</span> bounties
+
               {q ? (
                 <>
                   {" "}
@@ -491,6 +516,19 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           totalPages={totalPages}
           pageSize={pageSize}
           searchParams={searchParams ?? {}}
+
+            </p>
+            <p className="text-slate-500 dark:text-slate-500">Scroll down to load more bounties automatically.</p>
+          </div>
+        </section>
+
+        <BountyListClient
+          initialData={bounties}
+          initialTotal={total}
+          initialNextCursor={nextCursor}
+          baseUrl={apiUrl}
+          filters={filters}
+
         />
       </div>
     </main>
