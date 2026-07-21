@@ -1,7 +1,11 @@
 groups:
   - name: stellar-bounty-alerts
     interval: 30s
+    # Every alert carries a `runbook_url` annotation that Alertmanager
+    # promotes into PagerDuty details and Slack title links. See
+    # docs/runbooks/ and infrastructure/alertmanager/alertmanager.yml.
     rules:
+
       # Alert 1: High Error Rate (> 5%)
       - alert: HighErrorRate
         expr: |
@@ -17,7 +21,8 @@ groups:
         annotations:
           summary: "High HTTP error rate detected"
           description: "Error rate is {{ $value }}% (threshold: 5%)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighErrorRate.md"
+
       # Alert 2: High API Latency (p95 > 2s)
       - alert: HighLatency
         expr: |
@@ -31,7 +36,8 @@ groups:
         annotations:
           summary: "High API latency detected"
           description: "p95 latency is {{ $value }}s (threshold: 2s)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighLatency.md"
+
       # Alert 3: Database Query Errors (> 10% error rate)
       - alert: HighDatabaseErrorRate
         expr: |
@@ -47,7 +53,8 @@ groups:
         annotations:
           summary: "High database query error rate"
           description: "Database error rate is {{ $value }}% (threshold: 10%)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighDatabaseErrorRate.md"
+
       # Alert 4: Database Slow Queries (> 10% slow queries)
       - alert: HighSlowQueryRate
         expr: |
@@ -63,7 +70,8 @@ groups:
         annotations:
           summary: "High rate of slow database queries"
           description: "Slow query rate is {{ $value }}% (threshold: 10%)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighSlowQueryRate.md"
+
       # Alert 5: Stellar RPC Failure Rate (> 10%)
       - alert: StellarRPCFailure
         expr: |
@@ -82,7 +90,8 @@ groups:
         annotations:
           summary: "Stellar RPC failure rate high"
           description: "RPC failure rate is {{ $value }}% (threshold: 10%)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/StellarRPCFailure.md"
+
       # Alert 6: High Memory Usage (> 80% of available)
       - alert: HighMemoryUsage
         expr: |
@@ -99,7 +108,8 @@ groups:
         annotations:
           summary: "High memory usage detected"
           description: "Memory usage is {{ $value }}% (threshold: 80%)"
-          
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighMemoryUsage.md"
+
       # Alert 7: High WebSocket Connections (> 1000)
       - alert: HighWebSocketConnections
         expr: stellar_bounty_websocket_connections_active > 1000
@@ -110,3 +120,4 @@ groups:
         annotations:
           summary: "High WebSocket connections"
           description: "WebSocket connections: {{ $value }} (threshold: 1000)"
+          runbook_url: "https://github.com/BountyOnChain/StellarBounty/blob/main/docs/runbooks/HighWebSocketConnections.md"

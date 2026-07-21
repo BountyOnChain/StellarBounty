@@ -464,6 +464,68 @@ To rotate the IAM role:
 
 ---
 
+
+### Alertmanager configuration
+
+The repository ships `infrastructure/alertmanager/alertmanager.yml`,
+which routes Prometheus alerts by severity:
+
+| Severity | Receiver | Channel |
+|----------|----------|---------|
+| `critical` | `pagerduty-critical` + `slack-critical` (via `continue: true`) | PagerDuty page + `#alerts-critical` |
+| `warning`  | `slack-warnings` | `#alerts-warnings` (12h repeat) |
+| `info`     | `slack-default` | `#alerts-general` |
+| (unmatched)| `slack-default` | `#alerts-general` |
+
+Alertmanager itself does NOT perform env-var substitution in YAML
+configs (unlike Prometheus rule files). The `${...}` placeholders are
+resolved by an `envsubst` step before launching — the rendered file
+is what Alertmanager loads.
+
+Required env vars on the host:
+
+- `PAGERDUTY_ROUTING_KEY`
+- `SLACK_WEBHOOK_URL`
+
+Render templated secrets and launch:
+
+\`\`\`bash
+envsubst < infrastructure/alertmanager/alertmanager.yml \
+         > /tmp/alertmanager.rendered.yml
+
+docker run --rm \
+  --env-file <(printf 'PAGERDUTY_ROUTING_KEY=%s\nSLACK_WEBHOOK_URL=%s\n' \
+                "$PAGERDUTY_ROUTING_KEY" "$SLACK_WEBHOOK_URL") \
+  -v /tmp/alertmanager.rendered.yml:/etc/alertmanager/alertmanager.yml:ro \
+  --network host \
+  prom/alertmanager:v0.27.0 \
+    --config.file=/etc/alertmanager/alertmanager.yml \
+    --storage.path=/alertmanager
+\`\`\`
+
+In Kubernetes / Nomad, set the same env vars on the `alertmanager`
+pod spec and run the `envsubst` step as an initContainer.
+
+#### Reloading rules
+
+Prometheus rule changes ship via this repo. After merging a PR that
+modifies `infrastructure/prometheus/rules.yml`, reload Prometheus:
+
+\`\`\`bash
+curl -X POST http://prometheus:9090/-/reload
+\`\`\`
+
+Verify the new rules are loaded:
+
+\`\`\`bash
+curl -s http://prometheus:9090/api/v1/rules \
+  | jq '.data.groups[].rules[] | {name, alert:.alert, labels:.labels}'
+\`\`\`
+
+If a fired alert is missing its `runbook_url` annotation, the running
+rules are out of sync — re-apply the repo version.
+
+---
 ### Troubleshooting
 
 | Problem | Likely Cause | Solution |
