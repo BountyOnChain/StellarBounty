@@ -198,82 +198,10 @@ function applyListingControls(
   });
 }
 
-function buildPageHref(
-  searchParams: SearchParams,
-  nextPage: number,
-  nextLimit: number,
-): string {
-  const params = new URLSearchParams();
-  const sort = normalizeSort(searchParams.sort);
-  if (sort !== "newest") params.set("sort", sort);
-  const status = normalizeStatus(searchParams.status);
-  if (status !== "all") params.set("status", status);
-  const search = searchParams.q ?? searchParams.search;
-  if (search) params.set("q", search);
-  if (nextLimit !== DEFAULT_PAGE_SIZE) params.set("limit", String(nextLimit));
-  if (nextPage > 1) params.set("page", String(nextPage));
-  const qs = params.toString();
-  return qs ? `/?${qs}` : "/";
-}
-
-function PaginationControls({
-  currentPage,
-  totalPages,
-  pageSize,
-  searchParams,
-}: {
-  currentPage: number;
-  totalPages: number;
-  pageSize: number;
-  searchParams: SearchParams;
-}) {
-  if (totalPages <= 1) {
-    return null;
-  }
-  const hasPrev = currentPage > 1;
-  const hasNext = currentPage < totalPages;
-  const prevHref = buildPageHref(searchParams, currentPage - 1, pageSize);
-  const nextHref = buildPageHref(searchParams, currentPage + 1, pageSize);
-
-  return (
-    <nav
-      aria-label="Pagination"
-      className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-black/10 sm:px-6"
-    >
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        Page <span className="font-semibold text-slate-900 dark:text-slate-100">{currentPage}</span> of{" "}
-        <span className="font-semibold text-slate-900 dark:text-slate-100">{totalPages}</span>
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={prevHref}
-          aria-disabled={!hasPrev}
-          className={`inline-flex min-w-24 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium transition ${hasPrev
-              ? "border-slate-300 text-slate-700 hover:border-slate-500 hover:text-slate-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
-              : "pointer-events-none cursor-not-allowed border-slate-200 text-slate-400 opacity-50 dark:border-slate-800 dark:text-slate-600"
-            }`}
-        >
-          ← Previous
-        </Link>
-        <Link
-          href={nextHref}
-          aria-disabled={!hasNext}
-          className={`inline-flex min-w-24 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition ${hasNext
-              ? "bg-yellow-400 text-slate-950 hover:bg-yellow-300"
-              : "pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-600"
-            }`}
-        >
-          Next →
-        </Link>
-      </div>
-    </nav>
-  );
-}
-
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const page = normalizePage(searchParams?.page);
   const pageSize = normalizeLimit(searchParams?.limit);
-  const { bounties: pageBounties, total, totalPages, nextCursor } = await getBounties(page, pageSize);
+  const { bounties: pageBounties, total, nextCursor } = await getBounties(page, pageSize);
   const sort = normalizeSort(searchParams?.sort);
   const status = normalizeStatus(searchParams?.status);
   const search = searchParams?.q ?? searchParams?.search ?? "";

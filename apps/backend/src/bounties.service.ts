@@ -6,7 +6,6 @@ import { sanitizeDescription } from './common/sanitize-description';
 import {
   PaginatedResponse,
   PaginationQueryDto,
-  toSkip,
 } from './common/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
 import { SavedBounty } from './entities/saved-bounty.entity';
