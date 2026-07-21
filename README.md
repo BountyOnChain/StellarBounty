@@ -48,6 +48,16 @@ npm run dev:frontend
 npm run dev:backend
 ```
 
+## API Examples
+
+Ready-to-use cURL, node-fetch, and Freighter examples for every endpoint live in [`docs/api-examples/`](docs/api-examples/). Use them as a starting point for integrations or testing:
+
+- [Auth](docs/api-examples/auth.md) — challenge, verify, refresh, revoke
+- [Bounties](docs/api-examples/bounties.md) — create, list, get, update, delete, restore
+- [Submissions](docs/api-examples/submissions.md) — create, list, approve, reject
+- [Me](docs/api-examples/me.md) — saved bounties
+- [Metrics](docs/api-examples/metrics.md) — Prometheus scrape endpoint
+
 ## Contracts
 
 ```bash
