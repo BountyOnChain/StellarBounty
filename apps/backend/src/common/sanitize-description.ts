@@ -1,4 +1,4 @@
-import sanitizeHtml = require('sanitize-html');
+import sanitizeHtml from 'sanitize-html';
 
 const FENCED_CODE_BLOCK = /```[\s\S]*?```/g;
 const DANGEROUS_MARKDOWN_IMAGE = /!\[([^\]]*)\]\(\s*(?:javascript|data|vbscript):[^)]*\)+/gi;
