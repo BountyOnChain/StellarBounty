@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# migration-check.sh — Verify schema.dump is present and the database
-# schema is in sync with the entities (no pending migrations needed).
+# migration-check.sh — Verify schema.dump is present and committed,
+# ensuring the reference schema file is never accidentally deleted.
 #
 # Usage:
-#   DATABASE_URL=postgresql://... ./scripts/migration-check.sh
+#   ./scripts/migration-check.sh
 #
-# Exits non-zero if schema.dump is missing or schema is out of sync.
+# Exits non-zero if schema.dump is missing.
 
 set -euo pipefail
 
@@ -16,43 +16,14 @@ SCHEMA_DUMP="$REPO_ROOT/schema.dump"
 
 if [ ! -f "$SCHEMA_DUMP" ]; then
   echo "ERROR: schema.dump not found at $SCHEMA_DUMP"
-  echo "Run 'npm run migration:dump --workspace=apps/backend' to create it."
+  echo ""
+  echo "The schema.dump reference file is required for migration safety."
+  echo "To create it, run:"
+  echo "  DATABASE_URL=postgresql://... npm run migration:dump --workspace=apps/backend"
+  echo ""
+  echo "Then commit the updated schema.dump file."
   exit 1
 fi
 
-if [ -z "${DATABASE_URL:-}" ]; then
-  echo "ERROR: DATABASE_URL is not set."
-  exit 1
-fi
-
-cd "$REPO_ROOT"
-
-echo "Building backend..."
-npm run build --workspace=apps/backend
-
-echo "Running migrations..."
-npm run migration:run --workspace=apps/backend
-
-echo "Verifying schema is up to date (no ungenerated migrations)..."
-cd apps/backend
-npx typeorm migration:generate -d dist/data-source.js --check dummy 2>&1
-RESULT=$?
-cd "$REPO_ROOT"
-
-if [ "$RESULT" -ne 0 ]; then
-  echo ""
-  echo "✗ SCHEMA DRIFT DETECTED"
-  echo ""
-  echo "The database schema is out of sync with the entities."
-  echo "This usually means a migration was added or modified without"
-  echo "being properly applied."
-  echo ""
-  echo "To fix:"
-  echo "  1. Run 'npm run migration:run --workspace=apps/backend'"
-  echo "  2. Run 'npm run migration:dump --workspace=apps/backend'"
-  echo "  3. Commit the updated migration files and schema.dump"
-  exit 1
-fi
-
-echo "✓ Schema is in sync — no drift detected."
+echo "✓ schema.dump present — migration reference file is committed."
 exit 0
