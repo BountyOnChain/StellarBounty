@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -17,7 +18,7 @@ import { PaginationQueryDto, PaginatedResponse } from './common/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
 
 @ApiTags('v1: bounties')
-@Controller('api/v1/bounties')
+@Controller('bounties')
 export class BountiesController {
   constructor(private readonly bountiesService: BountiesService) {}
 
@@ -100,5 +101,31 @@ export class BountiesController {
   @Patch(':id/restore')
   restore(@Param('id') id: string) {
     return this.bountiesService.restore(id);
+  }
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Save a bounty to your saved list' })
+  @ApiParam({ name: 'id', description: 'Bounty UUID' })
+  @ApiCreatedResponse({ description: 'Bounty saved.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiNotFoundResponse({ description: 'Bounty not found.' })
+  @ApiConflictResponse({ description: 'Bounty already saved.' })
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Post(':id/save')
+  save(@Param('id') id: string, @Request() req: { user: { address: string } }) {
+    return this.bountiesService.saveBounty(req.user.address, id);
+  }
+
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Remove a saved bounty from your list' })
+  @ApiParam({ name: 'id', description: 'Bounty UUID' })
+  @ApiOkResponse({ description: 'Bounty unsaved.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiNotFoundResponse({ description: 'Saved bounty not found.' })
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Delete(':id/save')
+  unsave(@Param('id') id: string, @Request() req: { user: { address: string } }) {
+    return this.bountiesService.unsaveBounty(req.user.address, id);
   }
 }

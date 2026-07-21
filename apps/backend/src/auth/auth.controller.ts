@@ -18,7 +18,7 @@ import { VerifyDto, VerifyResponseDto } from './dto/verify.dto';
 import { RefreshTokenDto, RevokeTokenDto } from './dto/refresh-token.dto';
 
 @ApiTags('v1: auth')
-@Controller('api/v1/auth')
+@Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

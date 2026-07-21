@@ -17,7 +17,7 @@ import { CreateSubmissionDto, SubmissionResponseDto } from './submissions.dto';
 import { SubmissionsService } from './submissions.service';
 
 @ApiTags('v1: submissions')
-@Controller('api/v1/bounties/:bountyId/submissions')
+@Controller('bounties/:bountyId/submissions')
 export class SubmissionsController {
   constructor(private readonly submissionsService: SubmissionsService) {}
 
