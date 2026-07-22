@@ -1,7 +1,7 @@
 import { AppDataSource } from '../data-source';
 
 const APP_TABLES = ['bounties', 'bounty_contracts', 'nonces', 'saved_bounties', 'submissions'];
-const MIGRATION_COUNT = 7;
+const MIGRATION_COUNT = 8;
 
 async function getAppTables(): Promise<string[]> {
   const rows: { table_name: string }[] = await AppDataSource.query(
@@ -30,6 +30,56 @@ async function hasTagsColumn(): Promise<boolean> {
   return rows.length > 0;
 }
 
+async function hasStatusDeadlineIndex(): Promise<boolean> {
+  const rows: { indexname: string }[] = await AppDataSource.query(
+    `
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'bounties'
+        AND indexname = 'idx_bounties_status_deadline'
+    `,
+  );
+  return rows.length > 0;
+}
+
+type QueryPlan = {
+  'Node Type'?: string;
+  'Index Name'?: string;
+  Plans?: QueryPlan[];
+};
+
+function planUsesStatusDeadlineIndex(plan: QueryPlan): boolean {
+  if (
+    plan['Node Type'] === 'Index Only Scan' &&
+    plan['Index Name'] === 'idx_bounties_status_deadline'
+  ) {
+    return true;
+  }
+
+  return (plan.Plans ?? []).some(planUsesStatusDeadlineIndex);
+}
+
+async function assertDeadlineQueryUsesStatusDeadlineIndex(): Promise<void> {
+  await AppDataSource.query('BEGIN');
+  try {
+    // 禁用顺序扫描只用于验证索引可被该谓词命中，不改变真实运行时查询计划。
+    await AppDataSource.query('SET LOCAL enable_seqscan = off');
+    const rows: { 'QUERY PLAN': [{ Plan: QueryPlan }] }[] = await AppDataSource.query(`
+      EXPLAIN (FORMAT JSON)
+      SELECT "status", "deadline"
+      FROM "bounties"
+      WHERE "status" = 'open'
+        AND "deadline" < now()
+    `);
+    if (!planUsesStatusDeadlineIndex(rows[0]['QUERY PLAN'][0].Plan)) {
+      throw new Error('Expected deadline query to use idx_bounties_status_deadline index-only scan');
+    }
+  } finally {
+    await AppDataSource.query('ROLLBACK');
+  }
+}
+
 async function assertSchemaApplied(): Promise<void> {
   const tables = await getAppTables();
   const expected = [...APP_TABLES].sort();
@@ -41,6 +91,12 @@ async function assertSchemaApplied(): Promise<void> {
   if (!(await hasTagsColumn())) {
     throw new Error('Expected tags column on bounties table');
   }
+
+  if (!(await hasStatusDeadlineIndex())) {
+    throw new Error('Expected idx_bounties_status_deadline index on bounties table');
+  }
+
+  await assertDeadlineQueryUsesStatusDeadlineIndex();
 }
 
 async function assertSchemaEmpty(): Promise<void> {
@@ -52,6 +108,10 @@ async function assertSchemaEmpty(): Promise<void> {
 
   if (await hasTagsColumn()) {
     throw new Error('Expected tags column to be removed from bounties table');
+  }
+
+  if (await hasStatusDeadlineIndex()) {
+    throw new Error('Expected idx_bounties_status_deadline index to be removed');
   }
 }
 

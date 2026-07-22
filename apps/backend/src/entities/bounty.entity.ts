@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -17,6 +18,10 @@ export enum BountyStatus {
   CANCELLED = 'cancelled',
 }
 
+// 截止时间自动化只扫描活跃 bounty，实体索引声明需和迁移保持同名以通过 schema drift 检查。
+@Index('idx_bounties_status_deadline', ['status', 'deadline'], {
+  where: `"status" IN ('open', 'in_progress')`,
+})
 @Entity('bounties')
 export class Bounty {
   @PrimaryGeneratedColumn('uuid')

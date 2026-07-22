@@ -29,6 +29,7 @@ import { AddDeletedAtToBounties1747657500000 } from './migrations/1747657500000-
 import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657600000-AddOneApprovedSubmissionIndex';
 import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-AddSavedBountiesTable';
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
+import { AddBountiesStatusDeadlineIndex1747700200000 } from './migrations/1747700200000-AddBountiesStatusDeadlineIndex';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CspReportController } from './csp-report.controller';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
@@ -110,6 +111,7 @@ import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
             AddOneApprovedSubmissionIndex1747657600000,
             AddSavedBountiesTable1747657700000,
             AddBountyContractsTable1747700000000,
+            AddBountiesStatusDeadlineIndex1747700200000,
           ],
           logger: new TypeOrmMetricsLogger(metrics),
           extra: createDbPoolExtra(config),

@@ -70,6 +70,8 @@ ALTER TABLE ONLY public.submissions
 
 CREATE INDEX "idx_bounty_contracts_bounty_id" ON public.bounty_contracts USING btree ("bounty_id");
 
+CREATE INDEX "idx_bounties_status_deadline" ON public.bounties USING btree (status, deadline) WHERE (status = ANY (ARRAY['open'::public.bounty_status_enum, 'in_progress'::public.bounty_status_enum]));
+
 CREATE INDEX "idx_bounties_owner" ON public.bounties USING btree ("ownerAddress");
 
 CREATE UNIQUE INDEX "idx_submissions_one_approved_per_bounty" ON public.submissions USING btree ("bountyId") WHERE (status = 'approved'::public.submission_status_enum);
