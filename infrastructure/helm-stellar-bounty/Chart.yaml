@@ -1,0 +1,6 @@
+apiVersion: v2
+name: stellar-bounty
+description: Helm chart for StellarBounty
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

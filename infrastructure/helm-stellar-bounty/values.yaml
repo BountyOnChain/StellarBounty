@@ -1,0 +1,7 @@
+replicaCount: 2
+image:
+  repository: stellar-bounty
+  tag: latest
+service:
+  port: 3000
+  targetPort: 3000
