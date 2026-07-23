@@ -65,6 +65,14 @@ jobs:
           mkdir -p backups
           ./scripts/backup-db.sh
 
+      - name: Archive WAL segments
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_bounty
+        run: |
+          chmod +x scripts/wal-archive.sh
+          mkdir -p wal-archive
+          ./scripts/wal-archive.sh || echo "WAL archiving skipped (no WAL directory)"
+
       - name: Configure AWS credentials (OIDC)
         # Exchanges the GitHub Actions OIDC token for short-lived AWS
         # credentials via the `github-actions-role` IAM role. Eliminates
@@ -76,15 +84,22 @@ jobs:
           role-session-name: stellarbounty-backup-${{ github.run_id }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION || 'us-east-1' }}
 
-      - name: Upload backup to S3
+      - name: Upload backup and WAL to S3
         env:
           BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET || 'stellar-bounty-db-backups' }}
           BACKUP_DIR: backups
+          WAL_ARCHIVE_DIR: wal-archive
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           aws s3 cp backups/latest.dump "s3://${BACKUP_S3_BUCKET}/stellar_bounty_${TIMESTAMP}.dump" --no-progress
           aws s3 cp backups/latest.dump "s3://${BACKUP_S3_BUCKET}/latest.dump" --no-progress
           echo "Backup uploaded to s3://${BACKUP_S3_BUCKET}/stellar_bounty_${TIMESTAMP}.dump"
+
+          # Upload WAL files if any exist
+          if [ -d "${WAL_ARCHIVE_DIR}" ] && [ -n "$(find ${WAL_ARCHIVE_DIR} -maxdepth 1 -type f 2>/dev/null)" ]; then
+            aws s3 sync "${WAL_ARCHIVE_DIR}/" "s3://${BACKUP_S3_BUCKET}/wal/" --no-progress
+            echo "WAL files uploaded to s3://${BACKUP_S3_BUCKET}/wal/"
+          fi
 
       - name: Verify backup integrity
         run: |

@@ -67,7 +67,10 @@ This document describes the database backup and restore procedures for StellarBo
 | Schedule | Type | Storage | Retention |
 |----------|------|---------|-----------|
 | Daily at 02:00 UTC | Full `pg_dump` (custom format, compressed) | S3 object storage | 30 days |
+| Every 60s (production) / Hourly (CI) | WAL segment archival to S3 | S3 object storage | 3 days |
 | Daily at 04:00 UTC | Verification (latest, 14-day, and WAL-PITR-style restore checks) | Ephemeral (CI) | — |
+
+**Recovery window:** Any point within the last 3 days (via base backup + WAL replay)
 
 ---
 
@@ -177,10 +180,11 @@ npm run migration:run
   1. Start a PostgreSQL service container
   2. Install PostgreSQL client tools
   3. Run `scripts/backup-db.sh` against the service DB
-  4. Configure AWS credentials from GitHub Secrets
-  5. Upload backup to S3
-  6. Verify backup file integrity
-  7. Create GitHub Issue on failure
+  4. Run `scripts/wal-archive.sh` to archive WAL segments
+  5. Configure AWS credentials from GitHub Secrets
+  6. Upload backup + WAL files to S3
+  7. Verify backup file integrity
+  8. Create GitHub Issue on failure
 
 - **Required variables / secrets** (no AWS access keys):
   - `AWS_ACCOUNT_ID`            (variable — your AWS account id)
@@ -188,6 +192,10 @@ npm run migration:run
   - `BACKUP_S3_BUCKET`          (variable — defaults to `stellar-bounty-db-backups`)
 
 AWS credentials are obtained via OIDC; see "AWS OIDC Trust" below.
+
+> **Note:** WAL archiving in CI runs once per backup (daily). In production, enable
+> continuous archiving via `archive_mode=on` in `postgresql.conf` and cron jobs
+> (see "WAL Archiving" section above).
 
 #### 2. Backup Verification (`backup-verify.yml`)
 
@@ -307,6 +315,127 @@ In the event of a database failure, follow these steps:
    ```bash
    curl http://localhost:4000/health
    ```
+
+---
+
+### WAL Archiving & Point-in-Time Recovery (PITR)
+
+To recover from a destructive migration with minimal data loss, StellarBounty archives PostgreSQL WAL (Write-Ahead Log) segments to S3. This enables recovery to any point in time within the retention window (default: 3 days).
+
+#### How it works
+
+- **Base backup:** Full `pg_dump` created daily at 02:00 UTC
+- **WAL archiving:** Continuous WAL segments uploaded to S3 every 60 seconds (in production)
+- **PITR window:** Latest full backup + all WAL segments up to target time
+- **Data loss:** Reduced from 24 hours (daily snapshots only) to ~60 seconds (WAL archive interval)
+
+#### WAL Archive Script: `scripts/wal-archive.sh`
+
+Discovers unarchived WAL segments from PostgreSQL's `pg_wal/` directory and uploads them to S3.
+
+##### Usage
+
+```bash
+# Prerequisites
+export DATABASE_URL="postgresql://user:password@host:5432/stellar_bounty"
+
+# Local WAL archiving only
+./scripts/wal-archive.sh
+
+# Local + S3 upload
+./scripts/wal-archive.sh --s3
+```
+
+##### Environment Variables
+
+| Variable | Default | Required | Description |
+|----------|---------|----------|-------------|
+| `DATABASE_URL` | — | Yes | PostgreSQL connection string |
+| `WAL_ARCHIVE_DIR` | `./wal-archive` | No | Local WAL archive directory |
+| `WAL_S3_BUCKET` | `stellar-bounty-db-backups` | No | S3 bucket for WAL storage |
+| `WAL_RETENTION_DAYS` | `3` | No | Local WAL retention period |
+| `AWS_DEFAULT_REGION` | `us-east-1` | No | AWS region |
+
+##### Cron Setup (Self-Hosted)
+
+To run every 60 seconds:
+
+```bash
+* * * * * cd /path/to/StellarBounty && DATABASE_URL="postgresql://..." ./scripts/wal-archive.sh --s3 >> /var/log/stellar-bounty-wal-archive.log 2>&1
+```
+
+Or use a simple daemon loop:
+
+```bash
+while true; do
+  DATABASE_URL="postgresql://..." ./scripts/wal-archive.sh --s3
+  sleep 60
+done > /var/log/stellar-bounty-wal-archive.log 2>&1 &
+```
+
+---
+
+### Point-in-Time Recovery (PITR)
+
+Recover the database to any point in time within the WAL retention window.
+
+#### Prerequisites
+
+- Latest base backup + WAL segments available in S3
+- Target timestamp in ISO 8601 format (e.g., `2026-07-21 15:30:00`)
+
+#### PITR Restore Procedure
+
+```bash
+# 1. Set environment variables
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/stellar_bounty"
+export BACKUP_S3_BUCKET="stellar-bounty-db-backups"
+export WAL_S3_BUCKET="stellar-bounty-db-backups"
+
+# 2. Perform PITR restore (downloads base backup + WAL segments)
+./scripts/restore-db.sh --pitr "2026-07-21 15:30:00"
+
+# 3. Run migrations to ensure schema is current
+npm run migration:run
+
+# 4. Verify recovery
+psql -h localhost -U postgres -d stellar_bounty -c "SELECT COUNT(*) FROM bounties;"
+```
+
+#### Example: Recover from a Destructive Migration
+
+```bash
+# Destructive migration was deployed at 16:00 UTC.
+# You noticed at 16:15 UTC. Recover to 15:55 UTC:
+
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/stellar_bounty"
+export CONFIRM_DESTROY=yes
+
+./scripts/restore-db.sh --pitr "2026-07-21 15:55:00"
+npm run migration:run
+```
+
+#### Inspecting WAL Segments
+
+To inspect WAL segment contents and find exact recovery points:
+
+```bash
+# List available WAL files in S3
+aws s3 ls s3://stellar-bounty-db-backups/wal/
+
+# Download a specific WAL file
+aws s3 cp "s3://stellar-bounty-db-backups/wal/000000010000000000000042" ./000000010000000000000042
+
+# Inspect WAL events with pg_waldump
+pg_waldump ./000000010000000000000042 | grep -A5 "rm_length" | head -20
+```
+
+#### Limitations
+
+- PITR recovery restores the database from a base backup + WAL replay.
+- Recovery target must be after the base backup timestamp and before the latest WAL segment.
+- WAL segments are retained for 3 days by default (configurable via `WAL_RETENTION_DAYS`).
+- Recovering beyond the retention window requires using the full-backup-only restore (`./scripts/restore-db.sh --s3 latest.dump`).
 
 ---
 
