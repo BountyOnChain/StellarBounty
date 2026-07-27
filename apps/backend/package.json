@@ -38,7 +38,7 @@
     "class-validator": "^0.15.1",
     "compression": "^1.8.1",
     "helmet": "^8.2.0",
-    "joi": "^17.13.3",
+    "joi": "^18.2.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.12.0",
