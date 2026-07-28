@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import BountyDetailClient from "./BountyDetailClient";
 import { absoluteUrl, siteName } from "../../seo";
+import { bountyToJobPosting } from "../../lib/structured-data";
 
 type Bounty = {
   id: string;
@@ -128,20 +129,8 @@ export default async function BountyDetailPage({ params }: { params: { id: strin
     );
   }
 
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "CreativeWork",
-    name: bounty.title,
-    description: getBountyDescription(bounty),
-    url: absoluteUrl(`/bounties/${bounty.id}`),
-    dateModified: bounty.deadline === "No deadline" ? undefined : bounty.deadline,
-    offers: {
-      "@type": "Offer",
-      price: bounty.reward,
-      priceCurrency: "XLM",
-      availability: bounty.status === "open" ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
-    },
-  };
+  const url = absoluteUrl(`/bounties/${bounty.id}`);
+  const structuredData = bountyToJobPosting(bounty, url);
 
   return (
     <>
