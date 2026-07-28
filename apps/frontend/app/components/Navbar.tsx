@@ -51,6 +51,18 @@ export default function Navbar() {
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
+    /* Close drawer on Escape key */
+    useEffect(() => {
+        if (!drawerOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setDrawerOpen(false);
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [drawerOpen]);
+
     useEffect(() => {
         document.body.style.overflow = drawerOpen ? "hidden" : "";
         return () => {
