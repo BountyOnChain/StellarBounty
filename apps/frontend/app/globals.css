@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Respect reduced-motion preferences at the global level.
+ * The `motion-reduce:` Tailwind variant is used per-element, but this
+ * catch-all ensures no animation plays when the user has asked for it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Lightbox overlay — dark background that fades in */
+.lightbox-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4;
+}
+
+.lightbox-overlay img {
+  @apply max-h-[90vh] max-w-full rounded-lg object-contain shadow-2xl;
+}
