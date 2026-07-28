@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import MarkdownRenderer from "@/app/components/MarkdownRenderer";
+import MarkdownToolbar from "@/components/MarkdownToolbar";
 import { useWallet } from "@/components/WalletContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
@@ -47,10 +48,13 @@ export default function CreateBountyPage() {
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateBountyFormValues>({
@@ -63,7 +67,41 @@ export default function CreateBountyPage() {
     },
   });
 
+  const { ref: registerRef, ...descriptionRegister } = register("description");
+
   const description = watch("description");
+
+  const handleDescriptionRef = useCallback(
+    (el: HTMLTextAreaElement | null) => {
+      registerRef(el);
+      textareaRef.current = el;
+    },
+    [registerRef]
+  );
+
+  const handleDescriptionChange = useCallback(
+    (newValue: string) => {
+      setValue("description", newValue, { shouldValidate: true });
+    },
+    [setValue]
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+P: toggle preview
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        e.preventDefault();
+        setActiveTab((prev) => (prev === "write" ? "preview" : "write"));
+      }
+    };
+
+    ta.addEventListener("keydown", handleKeyDown);
+    return () => ta.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!publicKey) {
@@ -194,47 +232,61 @@ export default function CreateBountyPage() {
               Description (supports Markdown)
             </label>
 
-            <div className="mb-0 flex overflow-hidden rounded-t-lg border border-b-0 border-slate-300 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setActiveTab("write")}
-                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
-                  activeTab === "write"
-                    ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Write
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("preview")}
-                className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
-                  activeTab === "preview"
-                    ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Preview
-              </button>
-            </div>
-
-            {activeTab === "write" ? (
-              <textarea
-                rows={12}
-                {...register("description")}
-                className="min-h-64 w-full resize-y rounded-b-lg border border-slate-300 bg-white p-4 font-mono text-sm text-slate-950 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                placeholder="Write your bounty requirements in markdown..."
-              />
-            ) : (
-              <div className="min-h-64 min-w-0 overflow-x-auto rounded-b-lg border border-slate-300 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-                {description ? (
-                  <MarkdownRenderer content={description} />
-                ) : (
-                  <p className="text-sm italic text-slate-500 dark:text-slate-500">Nothing to preview yet...</p>
-                )}
+            <div className="overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700">
+              {/* Tab bar */}
+              <div className="flex border-b border-slate-300 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("write")}
+                  className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+                    activeTab === "write"
+                      ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("preview")}
+                  className={`min-h-11 flex-1 px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+                    activeTab === "preview"
+                      ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-b-2 border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Preview
+                </button>
               </div>
-            )}
+
+              {activeTab === "write" ? (
+                <>
+                  <MarkdownToolbar
+                    textareaRef={textareaRef}
+                    value={description}
+                    onChange={handleDescriptionChange}
+                  />
+                  <textarea
+                    rows={12}
+                    {...descriptionRegister}
+                    ref={handleDescriptionRef}
+                    onChange={(e) => {
+                      descriptionRegister.onChange(e);
+                    }}
+                    className="min-h-64 w-full resize-y border-0 bg-white p-4 font-mono text-sm text-slate-950 focus:outline-none dark:bg-slate-900 dark:text-slate-100"
+                    placeholder="Write your bounty requirements in markdown..."
+                  />
+                </>
+              ) : (
+                <div className="min-h-64 min-w-0 overflow-x-auto bg-white p-4 dark:bg-slate-900">
+                  {description ? (
+                    <MarkdownRenderer content={description} />
+                  ) : (
+                    <p className="text-sm italic text-slate-500 dark:text-slate-500">Nothing to preview yet...</p>
+                  )}
+                </div>
+              )}
+            </div>
             {errors.description && (
               <p className={fieldErrorClass}>{errors.description.message}</p>
             )}
