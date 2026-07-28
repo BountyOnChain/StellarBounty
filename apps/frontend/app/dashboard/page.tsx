@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "../../components/WalletContext";
+import { useAuth } from "../../lib/api";
 import { StatusBadge } from "../../components/StatusBadge";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type SubmissionStatus = "pending" | "approved" | "rejected";
 type BountyStatus = "open" | "in_progress" | "completed" | "cancelled";
@@ -32,6 +31,7 @@ function EmptyState({ message }: { message: string }) {
 
 export default function DashboardPage() {
   const { publicKey, connect } = useWallet();
+  const { getToken, apiUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<"submissions" | "bounties">("submissions");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [bounties, setBounties] = useState<Bounty[]>([]);
@@ -45,8 +45,18 @@ export default function DashboardPage() {
     setError(null);
 
     Promise.all([
-      fetch(`${API_URL}/submissions?contributor=${publicKey}`).then((r) => r.json()),
-      fetch(`${API_URL}/api/v1/bounties?owner=${publicKey}`).then((r) => r.json()),
+      (async () => {
+        const token = await getToken(publicKey);
+        const res = await fetch(`${apiUrl}/api/v1/me/submissions`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return [];
+        const body = await res.json();
+        /* Normalise the API response — the backend may return
+         * { submissions: [...] } or a plain array. */
+        return Array.isArray(body) ? body : body?.submissions ?? [];
+      })(),
+      fetch(`${apiUrl}/api/v1/bounties?owner=${publicKey}`).then((r) => r.json()),
     ])
       .then(([subs, bounts]) => {
         setSubmissions(subs);
@@ -54,7 +64,7 @@ export default function DashboardPage() {
       })
       .catch(() => setError("Failed to load dashboard data."))
       .finally(() => setLoading(false));
-  }, [publicKey]);
+  }, [publicKey, getToken, apiUrl]);
 
   if (!publicKey) {
     return (
