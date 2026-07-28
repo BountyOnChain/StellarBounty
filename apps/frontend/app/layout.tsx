@@ -3,6 +3,8 @@ import { ThemeProvider } from "../components/ThemeProvider";
 import { WalletProvider } from "../components/WalletContext";
 import { ToastProvider } from "../components/toast/ToastProvider";
 import Navbar from "./components/Navbar";
+import SkipToContent from "./components/SkipToContent";
+import NetworkBanner from "./components/NetworkBanner";
 import { absoluteUrl, defaultDescription, siteName, siteUrl } from "./seo";
 import "./globals.css";
 
@@ -37,7 +39,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <WalletProvider>
             <ToastProvider>
-              <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+              <SkipToContent />
+              <NetworkBanner />
+              <div id="main-content" className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
                 <Navbar />
                 {children}
               </div>
