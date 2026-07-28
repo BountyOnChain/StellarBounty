@@ -5,6 +5,7 @@ import { useWallet } from "@/components/WalletContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/components/toast/ToastProvider";
 import { useAuth } from "@/lib/api";
+import { stellarDeepLink } from "@/lib/stellar-links";
 
 type Bounty = {
   id: string;
@@ -101,6 +102,19 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
               <dt className="text-xs uppercase tracking-wide text-slate-500">Owner</dt>
               <dd className="mt-2 break-all font-mono text-sm text-slate-700 dark:text-slate-200">
                 {truncateAddress(bounty.ownerAddress)}
+              </dd>
+              <dd className="mt-1">
+                <a
+                  href={stellarDeepLink(bounty.ownerAddress, process.env.NEXT_PUBLIC_STELLAR_NETWORK)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  View on Stellar Explorer
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
               </dd>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
