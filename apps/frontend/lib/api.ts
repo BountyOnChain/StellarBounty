@@ -14,6 +14,20 @@ type JwtPayload = {
   sub?: unknown;
 };
 
+const AUTH_TOKEN_COOKIE = "auth-token";
+
+function setAuthCookie(token: string): void {
+  if (typeof document === "undefined") return;
+  // Set a non-HttpOnly cookie so the server can read it via `cookies()`.
+  // Path=/ ensures it's sent on every request.
+  document.cookie = `${AUTH_TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+}
+
+export function clearAuthCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${AUTH_TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
 export async function getAccessToken(publicKey: string): Promise<string> {
   const savedToken =
     typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_STORAGE_KEY) : null;
@@ -63,6 +77,7 @@ export async function getAccessToken(publicKey: string): Promise<string> {
   }
 
   window.localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+  setAuthCookie(accessToken);
   return accessToken;
 }
 
@@ -72,6 +87,7 @@ export function clearAuthToken(): void {
   }
 
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  clearAuthCookie();
 }
 
 /**

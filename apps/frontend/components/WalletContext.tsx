@@ -9,6 +9,8 @@ type WalletState = {
   targetNetwork: string;
   isConnecting: boolean;
   error: string | null;
+  /** Whether the server detected an auth-token cookie during SSR. */
+  hasToken: boolean;
   /** Monotonically increasing version. Increments on every connect and
    *  disconnect so dashboard components can key their data-fetches on it
    *  and automatically refetch after a wallet change. */
@@ -39,12 +41,22 @@ async function loadFreighter(): Promise<FreighterApi> {
   return import("@stellar/freighter-api");
 }
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+export function WalletProvider({
+  children,
+  initialHasToken = false,
+}: {
+  children: React.ReactNode;
+  /** Whether the server detected an auth-token cookie during SSR. */
+  initialHasToken?: boolean;
+}) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [freighterNetwork, setFreighterNetwork] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardVersion, setDashboardVersion] = useState(0);
+  // Use the server-hydrated value so the first paint shows the correct
+  // state — no "Connect wallet to view" flash when a token exists.
+  const [hasToken, setHasToken] = useState(initialHasToken);
 
   const targetNetwork = normalizeNetwork(process.env.NEXT_PUBLIC_STELLAR_NETWORK);
 
@@ -120,11 +132,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       targetNetwork,
       isConnecting,
       error,
+      hasToken,
       dashboardVersion,
       connect,
       disconnect,
     }),
-    [connect, disconnect, dashboardVersion, error, freighterNetwork, isConnecting, publicKey, targetNetwork],
+    [connect, disconnect, dashboardVersion, error, freighterNetwork, hasToken, isConnecting, publicKey, targetNetwork],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

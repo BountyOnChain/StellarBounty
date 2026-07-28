@@ -4,6 +4,7 @@ import { WalletProvider } from "../components/WalletContext";
 import { ToastProvider } from "../components/toast/ToastProvider";
 import Navbar from "./components/Navbar";
 import { absoluteUrl, defaultDescription, siteName, siteUrl } from "./seo";
+import { getAuthStatusFromCookie } from "../lib/get-auth-status.server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,11 +32,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const { hasToken } = getAuthStatusFromCookie();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <ThemeProvider>
-          <WalletProvider>
+          <WalletProvider initialHasToken={hasToken}>
             <ToastProvider>
               <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
                 <Navbar />
