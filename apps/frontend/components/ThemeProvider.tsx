@@ -12,11 +12,25 @@ type ThemeContextValue = {
 const STORAGE_KEY = "stellar-bounty-theme";
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-function getInitialTheme(): Theme {
+/**
+ * Read the saved theme from localStorage, falling back to the system
+ * preference, then to `"dark"`.  This function is safe to call during
+ * both SSR and hydration.
+ *
+ * The same logic is also injected as an inline `<script>` in the HTML
+ * `<head>` (see `app/layout.tsx`) so that the correct theme class is
+ * present before React hydrates — eliminating the flash of incorrect
+ * theme (FOUC).
+ */
+export function initializeTheme(): Theme {
   if (typeof window === "undefined") return "dark";
 
-  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-  if (storedTheme === "light" || storedTheme === "dark") return storedTheme;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // localStorage may be blocked in some environments
+  }
 
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
@@ -30,7 +44,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    const initialTheme = getInitialTheme();
+    const initialTheme = initializeTheme();
     setTheme(initialTheme);
     applyTheme(initialTheme);
   }, []);
