@@ -231,7 +231,7 @@ export default function CreateBountyPage() {
                 {description ? (
                   <MarkdownRenderer content={description} />
                 ) : (
-                  <p className="text-sm italic text-slate-500 dark:text-slate-500">Nothing to preview yet...</p>
+                  <p className="text-sm italic text-slate-600 dark:text-slate-400">Nothing to preview yet...</p>
                 )}
               </div>
             )}

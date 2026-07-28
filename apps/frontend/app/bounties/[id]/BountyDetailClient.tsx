@@ -98,17 +98,17 @@ export default function BountyDetailClient({ bounty }: { bounty: Bounty }) {
 
           <dl className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Owner</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-600">Owner</dt>
               <dd className="mt-2 break-all font-mono text-sm text-slate-700 dark:text-slate-200">
                 {truncateAddress(bounty.ownerAddress)}
               </dd>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Reward</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-600">Reward</dt>
               <dd className="mt-2 break-words text-sm font-semibold text-slate-700 dark:text-slate-200">{bounty.reward}</dd>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Status</dt>
+              <dt className="text-xs uppercase tracking-wide text-slate-600">Status</dt>
               <dd className="mt-2 text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
                 {bounty.status}
               </dd>

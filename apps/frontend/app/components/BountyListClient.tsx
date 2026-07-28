@@ -105,7 +105,7 @@ export default function BountyListClient({
       )}
 
       {cursor === null && bounties.length > 0 && (
-        <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-8 text-center text-sm text-slate-600 dark:text-slate-400">
           You&apos;ve reached the end — {bounties.length} of {initialTotal} bounties loaded.
         </p>
       )}

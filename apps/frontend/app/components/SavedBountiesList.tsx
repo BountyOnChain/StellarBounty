@@ -71,15 +71,15 @@ export default function SavedBountiesList() {
   );
 
   if (loading) {
-    return <p className="text-center text-slate-500">Loading saved bounties...</p>;
+    return <p className="text-center text-slate-600">Loading saved bounties...</p>;
   }
 
   if (!publicKey) {
-    return <p className="text-center text-slate-500">Connect your wallet to see saved bounties.</p>;
+    return <p className="text-center text-slate-600">Connect your wallet to see saved bounties.</p>;
   }
 
   if (saved.length === 0) {
-    return <p className="text-center text-slate-500">No saved bounties yet.</p>;
+    return <p className="text-center text-slate-600">No saved bounties yet.</p>;
   }
 
   return (

@@ -26,7 +26,7 @@ type Bounty = {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-500">{message}</div>
+    <div className="py-12 text-center text-sm text-slate-600 dark:text-slate-400">{message}</div>
   );
 }
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-300 text-xs uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <thead className="border-b border-slate-300 text-xs uppercase text-slate-600 dark:border-slate-700 dark:text-slate-400">
                 <tr>
                   <th className="py-3 pr-4">Bounty</th>
                   <th className="py-3 pr-4">Submitted</th>
@@ -133,7 +133,7 @@ export default function DashboardPage() {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-300 text-xs uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <thead className="border-b border-slate-300 text-xs uppercase text-slate-600 dark:border-slate-700 dark:text-slate-400">
               <tr>
                 <th className="py-3 pr-4">Title</th>
                 <th className="py-3 pr-4">Reward</th>

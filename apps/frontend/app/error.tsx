@@ -17,7 +17,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
     <main className="flex min-h-[calc(100vh-73px)] flex-col items-center justify-center bg-slate-50 px-4 text-center text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <h1 className="text-7xl font-black tracking-tight text-red-500/50">500</h1>
       <p className="mt-4 text-lg text-slate-700 dark:text-slate-300">Something went wrong</p>
-      <p className="mt-2 max-w-md text-sm text-slate-500">
+      <p className="mt-2 max-w-md text-sm text-slate-600">
         {error.message || "An unexpected error occurred. Please try again."}
       </p>
       {error.digest && (

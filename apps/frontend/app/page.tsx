@@ -286,7 +286,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
               Showing <span className="font-semibold text-slate-900 dark:text-slate-200">{bounties.length}</span> of{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-200">{total}</span> bounties
             </p>
-            <p className="text-slate-500 dark:text-slate-500">Scroll down to load more bounties automatically.</p>
+            <p className="text-slate-600 dark:text-slate-400">Scroll down to load more bounties automatically.</p>
           </div>
         </section>
 
