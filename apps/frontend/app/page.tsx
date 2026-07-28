@@ -68,12 +68,12 @@ type LoadedBounties = {
   nextCursor: string | null;
 };
 
-function normalizePage(value: string | undefined): number {
+export function normalizePage(value: string | undefined): number {
   const n = Number.parseInt(value ?? "1", 10);
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-function normalizeLimit(value: string | undefined): number {
+export function normalizeLimit(value: string | undefined): number {
   const n = Number.parseInt(value ?? `${DEFAULT_PAGE_SIZE}`, 10);
   if (!Number.isFinite(n) || n < 1) return DEFAULT_PAGE_SIZE;
   // Cap at 100 to match the backend's MAX_PAGE_SIZE.
@@ -120,7 +120,7 @@ async function getBounties(
   }
 }
 
-function getRewardValue(reward: BountyCardData["reward"]) {
+export function getRewardValue(reward: BountyCardData["reward"]) {
   if (typeof reward === "number") {
     return reward;
   }
@@ -133,7 +133,7 @@ function getRewardValue(reward: BountyCardData["reward"]) {
   return -1;
 }
 
-function getDeadlineValue(deadline: BountyCardData["deadline"]) {
+export function getDeadlineValue(deadline: BountyCardData["deadline"]) {
   if (!deadline) {
     return Number.POSITIVE_INFINITY;
   }
@@ -142,7 +142,7 @@ function getDeadlineValue(deadline: BountyCardData["deadline"]) {
   return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
 }
 
-function normalizeSort(sort?: string): SortOption {
+export function normalizeSort(sort?: string): SortOption {
   if (sort === "highest_reward" || sort === "closest_deadline") {
     return sort;
   }
@@ -150,7 +150,7 @@ function normalizeSort(sort?: string): SortOption {
   return "newest";
 }
 
-function normalizeStatus(status?: string): StatusFilter {
+export function normalizeStatus(status?: string): StatusFilter {
   if (status === "open" || status === "in_progress" || status === "completed" || status === "cancelled") {
     return status;
   }
@@ -171,7 +171,7 @@ function getStatusCounts(bounties: BountyCardData[], search: string): BountyStat
   return counts;
 }
 
-function applyListingControls(
+export function applyListingControls(
   bounties: BountyCardData[],
   { sort, status, search }: { sort: SortOption; status: StatusFilter; search: string },
 ) {
