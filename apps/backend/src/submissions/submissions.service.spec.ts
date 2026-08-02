@@ -65,6 +65,7 @@ describe('SubmissionsService', () => {
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
       id: 'bounty1',
+      slug: null,
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration.',
       rewardAmount: 10000000n,

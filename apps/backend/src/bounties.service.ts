@@ -9,6 +9,7 @@ import {
 } from './common/pagination.dto';
 import { Bounty } from './entities/bounty.entity';
 import { SavedBounty } from './entities/saved-bounty.entity';
+import { generateSlug } from './bounties/slug.utils';
 
 @Injectable()
 export class BountiesService {
@@ -26,8 +27,11 @@ export class BountiesService {
       return existing;
     }
 
+    const slug = generateSlug(dto.title);
+
     const bounty = this.bounties.create({
       ...dto,
+      slug,
       description: sanitizeDescription(dto.description),
       rewardAmount: BigInt(dto.rewardAmount),
       deadline: dto.deadline ? new Date(dto.deadline) : null,
@@ -81,8 +85,11 @@ export class BountiesService {
     return PaginatedResponse.of(items, total, page, limit, nextCursor);
   }
 
-  async findOne(id: string) {
-    const bounty = await this.bounties.findOne({ where: { id } });
+  async findOne(idOrSlug: string) {
+    // Try slug first, then fall back to UUID
+    const bounty = await this.bounties.findOne({
+      where: [{ slug: idOrSlug }, { id: idOrSlug }],
+    });
     if (!bounty) {
       throw new NotFoundException('Bounty not found');
     }

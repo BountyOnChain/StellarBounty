@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/api";
 
 type Bounty = {
   id: string;
+  slug?: string;
   title: string;
   description: string;
   reward: string;

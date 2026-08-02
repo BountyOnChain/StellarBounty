@@ -4,6 +4,7 @@ import { absoluteUrl, siteName } from "../../seo";
 
 type Bounty = {
   id: string;
+  slug?: string;
   title: string;
   description: string;
   reward: string;
@@ -31,6 +32,7 @@ function normalizeBounty(bounty: ApiBounty): Bounty | null {
 
   return {
     id: bounty.id,
+    slug: (bounty as any).slug,
     title: bounty.title,
     description: bounty.description,
     reward: String(bounty.reward ?? bounty.rewardAmount ?? bounty.amount ?? "0"),
@@ -73,7 +75,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   }
 
   const description = getBountyDescription(bounty);
-  const url = absoluteUrl(`/bounties/${bounty.id}`);
+  const url = absoluteUrl(`/bounties/${bounty.slug || bounty.id}`);
 
   return {
     title: bounty.title,
@@ -133,7 +135,7 @@ export default async function BountyDetailPage({ params }: { params: { id: strin
     "@type": "CreativeWork",
     name: bounty.title,
     description: getBountyDescription(bounty),
-    url: absoluteUrl(`/bounties/${bounty.id}`),
+    url: absoluteUrl(`/bounties/${bounty.slug || bounty.id}`),
     dateModified: bounty.deadline === "No deadline" ? undefined : bounty.deadline,
     offers: {
       "@type": "Offer",

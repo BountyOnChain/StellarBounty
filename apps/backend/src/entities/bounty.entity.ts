@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -21,6 +22,10 @@ export enum BountyStatus {
 export class Bounty {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @Column({ length: 80, unique: true, nullable: true })
+  @Index()
+  slug!: string | null;
 
   @Column()
   title!: string;

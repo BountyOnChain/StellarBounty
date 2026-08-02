@@ -6,6 +6,7 @@ import { formatRewardXLM } from "@/lib/stellar-amount";
 export type BountyCardData = {
   id: string | number;
   title: string;
+  slug?: string;
   reward?: string | number | null;
   deadline?: string | null;
   status?: string | null;
@@ -75,7 +76,7 @@ export default function BountyCard({ bounty, isSaved, onToggleSave }: BountyCard
   return (
     <div className="relative">
       <Link
-        href={`/bounties/${bounty.id}`}
+        href={`/bounties/${bounty.slug || bounty.id}`}
         className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60 transition hover:-translate-y-1 hover:border-amber-400 hover:bg-amber-50/40 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-black/10 dark:hover:border-yellow-400/60 dark:hover:bg-slate-900 sm:p-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

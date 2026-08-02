@@ -168,7 +168,7 @@ export default function CreateBountyPage() {
 
       const created = (await response.json()) as CreateBountyResponse;
       toast.success("Bounty created successfully.");
-      router.push(`/bounties/${created.id}`);
+      router.push(`/bounties/${(created as any).slug || created.id}`);
     } catch (error) {
       const message = formatErrorMessage(error);
       setSubmitError(message);

@@ -36,6 +36,7 @@ describe('SubmissionsService contract error handling', () => {
   function createBounty(): Bounty {
     return {
       id: 'bounty1',
+      slug: null,
       title: 'Build a Stellar integration',
       description: 'Create a working Stellar integration.',
       rewardAmount: 10000000n,

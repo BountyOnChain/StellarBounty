@@ -19,6 +19,12 @@ describe("BountyCard", () => {
     expect(link).toHaveAttribute("href", "/bounties/7");
   });
 
+  it("uses slug in the link when available", () => {
+    renderCard({ id: "abc-123", slug: "fix-the-readme-x9k2a", title: "Fix the README" });
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "/bounties/fix-the-readme-x9k2a");
+  });
+
   it("formats a numeric reward with thousands separators and the XLM suffix", () => {
     renderCard({ id: "1", title: "x", reward: 12345 });
     expect(screen.getByText("12,345 XLM")).toBeInTheDocument();

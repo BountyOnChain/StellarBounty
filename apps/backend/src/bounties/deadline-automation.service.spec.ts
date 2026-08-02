@@ -35,6 +35,7 @@ describe('DeadlineAutomationService', () => {
   function createBounty(overrides: Partial<Bounty> = {}): Bounty {
     return {
       id: 'bounty-1',
+      slug: null,
       title: 'Build automation',
       description: 'Automate bounty deadlines.',
       rewardAmount: 10000000n,

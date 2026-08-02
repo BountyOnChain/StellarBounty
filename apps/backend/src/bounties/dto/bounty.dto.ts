@@ -216,6 +216,11 @@ export class BountyResponseDto {
   @IsString()
   id!: string;
 
+  @ApiPropertyOptional({ description: 'URL-friendly slug' })
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
   @ApiProperty({ description: 'Bounty title' })
   @IsString()
   title!: string;
