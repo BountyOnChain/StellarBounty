@@ -49,13 +49,51 @@ describe("frontend auth token storage", () => {
     (signMessage as jest.Mock).mockReset();
   });
 
-  it("reuses a saved JWT only when the subject matches the active public key", async () => {
+  it("reuses a saved JWT when the token is fresh and matches the active public key", async () => {
     const token = createJwt("GACTIVE");
     window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ expiresAt: new Date(Date.now() + 120_000).toISOString() }),
+    } as Response);
 
     await expect(getAccessToken("GACTIVE")).resolves.toBe(token);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    // Should call /me endpoint to check freshness but not re-auth
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/me"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+      }),
+    );
+  });
+
+  it("clears a stale JWT and re-authenticates when the token is near expiry", async () => {
+    const staleToken = createJwt("GACTIVE");
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, staleToken);
+    // Mock /me returning a near-expiry token
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ expiresAt: new Date(Date.now() + 30_000).toISOString() }),
+    } as Response);
+    const freshToken = createJwt("GACTIVE");
+    (signMessage as jest.Mock).mockResolvedValue({ signedMessage: "signed-nonce" });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ nonce: "nonce" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ accessToken: freshToken }),
+      } as Response);
+
+    await expect(getAccessToken("GACTIVE")).resolves.toBe(freshToken);
+
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe(freshToken);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(signMessage).toHaveBeenCalledWith("nonce", { address: "GACTIVE" });
   });
 
   it("clears a stale JWT and authenticates again for a different public key", async () => {

@@ -12,6 +12,7 @@ type AuthTokenResponse = {
 
 type JwtPayload = {
   sub?: unknown;
+  exp?: number;
 };
 
 export async function getAccessToken(publicKey: string): Promise<string> {
@@ -20,10 +21,27 @@ export async function getAccessToken(publicKey: string): Promise<string> {
 
   if (savedToken) {
     if (isTokenForPublicKey(savedToken, publicKey)) {
-      return savedToken;
+      // Token matches the public key — check freshness via /me endpoint
+      try {
+        const meResponse = await fetch(`${API_URL}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${savedToken}` },
+        });
+        if (meResponse.ok) {
+          const { expiresAt } = (await meResponse.json()) as { expiresAt: string };
+          const ttlMs = new Date(expiresAt).getTime() - Date.now();
+          if (ttlMs > 60_000) {
+            // More than 60s remaining — token is still fresh
+            return savedToken;
+          }
+        }
+      } catch {
+        // Network error — fall through to re-auth below
+      }
+      // Token is stale or /me call failed — clear and re-authenticate
+      clearAuthToken();
+    } else {
+      clearAuthToken();
     }
-
-    clearAuthToken();
   }
 
   const challengeResponse = await fetch(

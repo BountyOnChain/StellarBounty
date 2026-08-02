@@ -61,17 +61,27 @@ function AuthProbe() {
   );
 }
 
-describe("useAuth — saved-token path (no fetch)", () => {
+describe("useAuth — saved-token path (fetches /me to check freshness)", () => {
+  let fetchMock: jest.MockedFunction<typeof fetch>;
+
   beforeEach(() => {
     window.localStorage.clear();
     window.__lastToken = undefined;
     window.__lastError = undefined;
     jest.clearAllMocks();
+
+    fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
+    global.fetch = fetchMock;
   });
 
-  it("returns a saved token from localStorage without signing or fetching", async () => {
+  it("returns a saved token from localStorage when /me confirms freshness (>60s TTL)", async () => {
     const savedToken = createJwt("GABC");
     window.localStorage.setItem(TOKEN_STORAGE_KEY, savedToken);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ expiresAt: new Date(Date.now() + 120_000).toISOString() }),
+    } as Response);
+
     const { getByText } = render(<AuthProbe />);
 
     await act(async () => {
@@ -81,6 +91,12 @@ describe("useAuth — saved-token path (no fetch)", () => {
     expect(mockedFreighter.signMessage).not.toHaveBeenCalled();
     expect(window.__lastToken).toBe(savedToken);
     expect(window.__lastError).toBeNull();
+    // Should have called /me once
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/auth/me"),
+      expect.anything(),
+    );
   });
 
   it("clearToken removes the stored token", () => {

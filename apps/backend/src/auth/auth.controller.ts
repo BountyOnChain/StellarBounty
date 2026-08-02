@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -7,6 +7,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import {
   getAuthChallengeRateLimit,
@@ -16,6 +17,7 @@ import {
 import { ChallengeQueryDto, ChallengeResponseDto } from './dto/challenge-query.dto';
 import { VerifyDto, VerifyResponseDto } from './dto/verify.dto';
 import { RefreshTokenDto, RevokeTokenDto } from './dto/refresh-token.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('v1: auth')
 @Controller('auth')
@@ -65,5 +67,18 @@ export class AuthController {
   @Post('revoke')
   revoke(@Body() body: RevokeTokenDto) {
     return this.authService.revokeToken(body.token);
+  }
+
+  @ApiOperation({ summary: 'Get current user info from JWT token' })
+  @ApiOkResponse({ description: 'Address and token expiration time.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or expired token.' })
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@Req() req: Request) {
+    const user = req.user as { address: string; exp: number };
+    return {
+      address: user.address,
+      expiresAt: new Date(user.exp * 1000).toISOString(),
+    };
   }
 }
