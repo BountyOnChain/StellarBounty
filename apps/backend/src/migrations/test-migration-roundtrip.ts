@@ -4,7 +4,7 @@ const APP_TABLES = [
   'bounties', 'bounty_contracts', 'contract_outbox_events',
   'dead_letter_events', 'nonces', 'saved_bounties', 'submissions',
 ];
-const MIGRATION_COUNT = 11;
+const MIGRATION_COUNT = 12;
 
 async function getAppTables(): Promise<string[]> {
   const rows: { table_name: string }[] = await AppDataSource.query(

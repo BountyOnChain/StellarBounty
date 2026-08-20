@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -187,7 +186,7 @@ describe('SubmissionsService', () => {
   });
 
   describe('approve', () => {
-    it('approves a submission, completes the bounty, and skips contract calls when no contract is configured', async () => {
+    it('queues approval when no contract is configured and returns submission unchanged', async () => {
       const bounty = createBounty();
       const submission = createSubmission();
       bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
@@ -197,10 +196,10 @@ describe('SubmissionsService', () => {
 
       const result = await service.approve('bounty1', 'submission1', 'GOWNER');
 
-      expect(result.status).toBe(SubmissionStatus.APPROVED);
-      expect(bounty.status).toBe(BountyStatus.COMPLETED);
-      expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
-      expect(submissionRepo.save).toHaveBeenCalledWith(submission);
+      expect(result.status).toBe(SubmissionStatus.PENDING);
+      expect(bounty.status).toBe(BountyStatus.OPEN);
+      expect(bountyRepo.save).not.toHaveBeenCalled();
+      expect(submissionRepo.save).not.toHaveBeenCalled();
       expect(StellarSdk.rpc.Server).not.toHaveBeenCalled();
     });
 
@@ -232,15 +231,18 @@ describe('SubmissionsService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
 
-      const dbError = Object.assign(new Error('duplicate key value violates unique constraint'), {
-        code: '23505',
-        message: 'duplicate key value violates unique constraint "idx_submissions_one_approved_per_bounty"',
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          STELLAR_NETWORK: 'mainnet',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+        };
+        return values[key] ?? defaultValue;
       });
-      submissionRepo.save!.mockRejectedValueOnce(dbError);
 
-      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
-        ConflictException,
-      );
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(bounty.status).toBe(BountyStatus.APPROVAL_QUEUED);
     });
 
     it('throws NotFoundException when the target submission is missing', async () => {
@@ -252,6 +254,60 @@ describe('SubmissionsService', () => {
       );
     });
 
+    it('throws BadRequestException when bounty status is COMPLETED', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty({ status: BountyStatus.COMPLETED }));
+
+      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('throws BadRequestException when bounty status is CANCELLED', async () => {
+      bountyRepo.findOneBy!.mockResolvedValueOnce(createBounty({ status: BountyStatus.CANCELLED }));
+
+      await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('allows approval when bounty status is IN_PROGRESS', async () => {
+      const bounty = createBounty({ status: BountyStatus.IN_PROGRESS });
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+
+      const result = await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(result.status).toBe(SubmissionStatus.PENDING);
+      expect(bounty.status).toBe(BountyStatus.IN_PROGRESS);
+    });
+
+    it('transitions bounty to APPROVAL_QUEUED when contract is configured', async () => {
+      const bounty = createBounty();
+      const submission = createSubmission();
+      bountyRepo.findOneBy!.mockResolvedValueOnce(bounty);
+      submissionRepo.findOneBy!
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(submission);
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
+      config.get = jest.fn((key: string, defaultValue?: unknown) => {
+        const values: Record<string, string> = {
+          STELLAR_NETWORK: 'mainnet',
+          STELLAR_RPC_URL: 'https://rpc.example.com',
+          STELLAR_SIGNING_SECRET: 'secret',
+        };
+        return values[key] ?? defaultValue;
+      });
+
+      await service.approve('bounty1', 'submission1', 'GOWNER');
+
+      expect(bounty.status).toBe(BountyStatus.APPROVAL_QUEUED);
+      expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
+      expect(submission.status).toBe(SubmissionStatus.PENDING);
+    });
+
     it('simulates transaction before preparing when contract is configured', async () => {
       const bounty = createBounty();
       const submission = createSubmission();
@@ -259,7 +315,7 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
-      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
           STELLAR_NETWORK: 'mainnet',
@@ -286,7 +342,7 @@ describe('SubmissionsService', () => {
       mockServer.simulateTransaction.mockResolvedValueOnce({
         error: 'Contract error: bounty not open',
       });
-      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
           STELLAR_NETWORK: 'mainnet',
@@ -299,9 +355,8 @@ describe('SubmissionsService', () => {
       await expect(service.approve('bounty1', 'submission1', 'GOWNER')).rejects.toThrow(
         BadRequestException,
       );
-      expect(mockServer.simulateTransaction).toHaveBeenCalledWith('built-transaction');
-      expect(mockServer.prepareTransaction).not.toHaveBeenCalled();
-      expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+      expect(bounty.status).toBe(BountyStatus.OPEN);
+      expect(bountyRepo.save).not.toHaveBeenCalled();
     });
 
     it('does not send transaction when simulation succeeds but no signing secret', async () => {
@@ -311,7 +366,7 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
-      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string> = {
           STELLAR_NETWORK: 'mainnet',
@@ -334,7 +389,7 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
-      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string | number> = {
           STELLAR_RPC_URL: 'https://rpc.example.com',
@@ -355,8 +410,8 @@ describe('SubmissionsService', () => {
         retryable: true,
       });
       expect(metrics.recordStellarRpcRetry).toHaveBeenCalledTimes(2);
+      expect(bounty.status).toBe(BountyStatus.APPROVAL_QUEUED);
       expect(bountyRepo.save).toHaveBeenCalledWith(bounty);
-      expect(submissionRepo.save).toHaveBeenCalledWith(submission);
     });
 
     it('does not retry non-retryable Stellar RPC errors', async () => {
@@ -366,7 +421,7 @@ describe('SubmissionsService', () => {
       submissionRepo.findOneBy!
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(submission);
-      contractRegistryService.findContractFor!.mockResolvedValueOnce('contract-id');
+      contractRegistryService.findContractFor!.mockResolvedValue('contract-id');
       config.get = jest.fn((key: string, defaultValue?: unknown) => {
         const values: Record<string, string | number> = {
           STELLAR_RPC_URL: 'https://rpc.example.com',

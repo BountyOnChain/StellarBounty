@@ -16,6 +16,7 @@ import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657
 import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-AddSavedBountiesTable';
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { AddUniqueActiveBountyTitle1747700200000 } from './migrations/1747700200000-AddUniqueActiveBountyTitle';
+import { AddApprovalQueuedStatus1747700300000 } from './migrations/1747700300000-AddApprovalQueuedStatus';
 import { AddBountyCreatedAtIdIndex1747700400000 } from './migrations/1747700400000-AddBountyCreatedAtIdIndex';
 import { AddContractOutboxTable1747700500000 } from './migrations/1747700500000-AddContractOutboxTable';
 import { AddDeadLetterEventsTable1747700600000 } from './migrations/1747700600000-AddDeadLetterEventsTable';
@@ -33,6 +34,7 @@ export const AppDataSource = new DataSource({
     AddSavedBountiesTable1747657700000,
     AddBountyContractsTable1747700000000,
     AddUniqueActiveBountyTitle1747700200000,
+    AddApprovalQueuedStatus1747700300000,
     AddBountyCreatedAtIdIndex1747700400000,
     AddContractOutboxTable1747700500000,
     AddDeadLetterEventsTable1747700600000,
