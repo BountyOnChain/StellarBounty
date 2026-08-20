@@ -71,6 +71,25 @@ console.log(`Showing ${data.length} of ${total} bounties (page ${page}/${totalPa
 }
 ```
 
+### Cursor-Based Pagination
+
+For large datasets, use cursor-based pagination instead of offset-based. Pass a `cursor` (the `id` of the last item from the previous page) and `limit`:
+
+```bash
+curl -s "http://localhost:4000/api/v1/bounties?cursor=550e8400-e29b-41d4-a716-446655440000&limit=10" | jq
+```
+
+The cursor uses a composite key `(createdAt, id)` to guarantee stable ordering even when multiple bounties share the same `createdAt` timestamp. The response includes a `nextCursor` field when more pages are available:
+
+```json
+{
+  "data": [ ... ],
+  "nextCursor": "660f9500-f3ac-52e5-b827-557766551111"
+}
+```
+
+When `nextCursor` is absent, you have reached the last page.
+
 ---
 
 ## 2. Get Single Bounty 🔒
