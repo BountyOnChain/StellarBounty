@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -83,15 +83,18 @@ describe('BountiesService', () => {
     service = moduleRef.get(BountiesService);
   });
 
+  const OWNER_ADDRESS = 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX';
+  const NON_OWNER_ADDRESS = 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+
   describe('create', () => {
     it('creates a bounty and normalizes the deadline', async () => {
       const result = await service.create({
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
         rewardAmount: 10000000n,
-        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
+        ownerAddress: OWNER_ADDRESS,
         deadline: '2026-12-31T00:00:00.000Z',
-      });
+      }, OWNER_ADDRESS);
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -108,8 +111,8 @@ describe('BountiesService', () => {
         title: 'Build a Stellar integration',
         description: 'Create a working Stellar integration with tests.',
         rewardAmount: 10000000n,
-        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
-      });
+        ownerAddress: OWNER_ADDRESS,
+      }, OWNER_ADDRESS);
 
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ deadline: null }));
     });
@@ -119,8 +122,8 @@ describe('BountiesService', () => {
         title: 'Build a Stellar integration',
         description: 'Safe text <script>alert("xss")</script> [bad](javascript:alert(1))',
         rewardAmount: '10000000',
-        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
-      });
+        ownerAddress: OWNER_ADDRESS,
+      }, OWNER_ADDRESS);
 
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -136,8 +139,19 @@ describe('BountiesService', () => {
           description: 'Invalid payload',
           rewardAmount: 'not-a-number',
           ownerAddress: 'GABC',
-        } as any),
+        } as any, OWNER_ADDRESS),
       ).rejects.toThrow();
+    });
+
+    it('throws ForbiddenException when ownerAddress does not match JWT subject', async () => {
+      await expect(
+        service.create({
+          title: 'Build a Stellar integration',
+          description: 'Create a working Stellar integration with tests.',
+          rewardAmount: 10000000n,
+          ownerAddress: OWNER_ADDRESS,
+        }, NON_OWNER_ADDRESS),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -224,7 +238,7 @@ describe('BountiesService', () => {
         title: 'Updated title',
         rewardAmount: 25000000n,
         deadline: '2027-01-15T00:00:00.000Z',
-      });
+      }, OWNER_ADDRESS);
 
       expect(result).toMatchObject({
         title: 'Updated title',
@@ -240,7 +254,7 @@ describe('BountiesService', () => {
       repository.findOne!.mockResolvedValueOnce(existing);
       repository.save!.mockImplementationOnce(async (input) => input);
 
-      const result = await service.update('bounty-1', { title: 'Updated title' });
+      const result = await service.update('bounty-1', { title: 'Updated title' }, OWNER_ADDRESS);
 
       expect(result.deadline).toBe(existingDeadline);
     });
@@ -252,9 +266,19 @@ describe('BountiesService', () => {
 
       const result = await service.update('bounty-1', {
         description: '![x](data:image/svg+xml,<svg></svg>) Keep **markdown**',
-      });
+      }, OWNER_ADDRESS);
 
       expect(result.description).toBe('x Keep **markdown**');
+    });
+
+    it('throws ForbiddenException when caller is not the bounty owner', async () => {
+      const existing = createBounty();
+      repository.findOne!.mockResolvedValueOnce(existing);
+
+      await expect(
+        service.update('bounty-1', { title: 'Hacked title' }, NON_OWNER_ADDRESS),
+      ).rejects.toThrow(ForbiddenException);
+      expect(repository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -264,7 +288,7 @@ describe('BountiesService', () => {
       repository.findOne!.mockResolvedValueOnce(bounty);
       repository.softRemove!.mockResolvedValueOnce(bounty);
 
-      await expect(service.remove('bounty-1')).resolves.toEqual({ deleted: true });
+      await expect(service.remove('bounty-1', OWNER_ADDRESS)).resolves.toEqual({ deleted: true });
       expect(repository.softRemove).toHaveBeenCalledWith(bounty);
       expect(repository.remove).not.toHaveBeenCalled();
     });
@@ -272,7 +296,15 @@ describe('BountiesService', () => {
     it('throws NotFoundException when removing a missing bounty', async () => {
       repository.findOne!.mockResolvedValueOnce(null);
 
-      await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('missing', OWNER_ADDRESS)).rejects.toThrow(NotFoundException);
+      expect(repository.softRemove).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when caller is not the bounty owner', async () => {
+      const bounty = createBounty();
+      repository.findOne!.mockResolvedValueOnce(bounty);
+
+      await expect(service.remove('bounty-1', NON_OWNER_ADDRESS)).rejects.toThrow(ForbiddenException);
       expect(repository.softRemove).not.toHaveBeenCalled();
     });
   });
@@ -286,7 +318,7 @@ describe('BountiesService', () => {
         .mockResolvedValueOnce(restored);
       repository.restore!.mockResolvedValueOnce({ affected: 1 } as any);
 
-      await expect(service.restore('bounty-1')).resolves.toBe(restored);
+      await expect(service.restore('bounty-1', OWNER_ADDRESS)).resolves.toBe(restored);
       expect(repository.restore).toHaveBeenCalledWith('bounty-1');
     });
 
@@ -294,14 +326,22 @@ describe('BountiesService', () => {
       const existing = createBounty({ deletedAt: null });
       repository.findOne!.mockResolvedValueOnce(existing);
 
-      await expect(service.restore('bounty-1')).resolves.toBe(existing);
+      await expect(service.restore('bounty-1', OWNER_ADDRESS)).resolves.toBe(existing);
       expect(repository.restore).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when restoring a missing bounty', async () => {
       repository.findOne!.mockResolvedValueOnce(null);
 
-      await expect(service.restore('missing')).rejects.toThrow(NotFoundException);
+      await expect(service.restore('missing', OWNER_ADDRESS)).rejects.toThrow(NotFoundException);
+      expect(repository.restore).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when caller is not the bounty owner', async () => {
+      const deleted = createBounty({ deletedAt: new Date() });
+      repository.findOne!.mockResolvedValueOnce(deleted);
+
+      await expect(service.restore('bounty-1', NON_OWNER_ADDRESS)).rejects.toThrow(ForbiddenException);
       expect(repository.restore).not.toHaveBeenCalled();
     });
   });
@@ -315,8 +355,8 @@ describe('BountiesService', () => {
         title: 'Duplicate bounty',
         description: 'Should not be created',
         rewardAmount: '5000000',
-        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
-      });
+        ownerAddress: OWNER_ADDRESS,
+      }, OWNER_ADDRESS);
 
       expect(repository.create).not.toHaveBeenCalled();
       expect(repository.save).not.toHaveBeenCalled();
@@ -332,8 +372,8 @@ describe('BountiesService', () => {
         title: 'New bounty',
         description: 'Fresh creation',
         rewardAmount: '10000000',
-        ownerAddress: 'GDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDXP4W5M2K2N7KDX',
-      });
+        ownerAddress: OWNER_ADDRESS,
+      }, OWNER_ADDRESS);
 
       expect(repository.create).toHaveBeenCalled();
       expect(repository.save).toHaveBeenCalled();

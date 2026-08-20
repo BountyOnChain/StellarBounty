@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBountyDto, UpdateBountyDto } from './bounties/dto/bounty.dto';
@@ -19,7 +19,11 @@ export class BountiesService {
     private readonly savedBounties: Repository<SavedBounty>,
   ) {}
 
-  async create(dto: CreateBountyDto) {
+  async create(dto: CreateBountyDto, ownerAddress: string) {
+    if (dto.ownerAddress !== ownerAddress) {
+      throw new ForbiddenException('ownerAddress must match the authenticated user');
+    }
+
     // Re-initialization protection: check if bounty with same title already exists
     const existing = await this.bounties.findOne({ where: { title: dto.title } });
     if (existing) {
@@ -89,8 +93,11 @@ export class BountiesService {
     return bounty;
   }
 
-  async update(id: string, dto: UpdateBountyDto) {
+  async update(id: string, dto: UpdateBountyDto, ownerAddress: string) {
     const bounty = await this.findOne(id);
+    if (bounty.ownerAddress !== ownerAddress) {
+      throw new ForbiddenException('Not the bounty owner');
+    }
     Object.assign(bounty, {
       ...dto,
       description: dto.description === undefined ? bounty.description : sanitizeDescription(dto.description),
@@ -100,19 +107,25 @@ export class BountiesService {
     return this.bounties.save(bounty);
   }
 
-  async remove(id: string) {
+  async remove(id: string, ownerAddress: string) {
     const bounty = await this.findOne(id);
+    if (bounty.ownerAddress !== ownerAddress) {
+      throw new ForbiddenException('Not the bounty owner');
+    }
     await this.bounties.softRemove(bounty);
     return { deleted: true };
   }
 
-  async restore(id: string) {
+  async restore(id: string, ownerAddress: string) {
     const bounty = await this.bounties.findOne({
       where: { id },
       withDeleted: true,
     });
     if (!bounty) {
       throw new NotFoundException('Bounty not found');
+    }
+    if (bounty.ownerAddress !== ownerAddress) {
+      throw new ForbiddenException('Not the bounty owner');
     }
     if (bounty.deletedAt === null) {
       return bounty;

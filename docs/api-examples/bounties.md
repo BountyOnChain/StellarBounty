@@ -173,6 +173,7 @@ console.log("Created bounty:", bounty.id);
 |--------|-------|-------------|
 | 400 | Validation failed | Check field constraints (lengths, ranges, formats) |
 | 401 | Unauthorized | Provide a valid JWT in the Authorization header |
+| 403 | Not the bounty owner | The `ownerAddress` in the request body must match your authenticated wallet address |
 
 ---
 
@@ -230,6 +231,7 @@ const updated = await res.json();
 |--------|-------|-------------|
 | 400 | Validation failed | Check field constraints |
 | 401 | Unauthorized | Re-authenticate to get a fresh JWT |
+| 403 | Not the bounty owner | Only the bounty owner can update this bounty |
 | 404 | Bounty not found | Verify the bounty UUID |
 
 ---
@@ -264,6 +266,13 @@ const result = await res.json();
 }
 ```
 
+### Common Errors
+
+| Status | Error | Remediation |
+|--------|-------|-------------|
+| 401 | Unauthorized | Provide a valid JWT in the Authorization header |
+| 404 | Bounty not found | Verify the bounty UUID (non-owners also receive 404 to prevent existence leaks) |
+
 ---
 
 ## 6. Restore Bounty 🔒
@@ -294,5 +303,5 @@ const restored = await res.json();
 
 | Status | Error | Remediation |
 |--------|-------|-------------|
-| 404 | Bounty not found | Verify the bounty UUID |
-| 401 | Unauthorized | Provide a valid JWT |
+| 401 | Unauthorized | Provide a valid JWT in the Authorization header |
+| 404 | Bounty not found | Verify the bounty UUID (non-owners also receive 404 to prevent existence leaks) |
