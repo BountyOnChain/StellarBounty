@@ -14,6 +14,7 @@ import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657
 import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-AddSavedBountiesTable';
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { AddUniqueActiveBountyTitle1747700200000 } from './migrations/1747700200000-AddUniqueActiveBountyTitle';
+import { AddBountyCreatedAtIdIndex1747700400000 } from './migrations/1747700400000-AddBountyCreatedAtIdIndex';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -28,6 +29,7 @@ export const AppDataSource = new DataSource({
     AddSavedBountiesTable1747657700000,
     AddBountyContractsTable1747700000000,
     AddUniqueActiveBountyTitle1747700200000,
+    AddBountyCreatedAtIdIndex1747700400000,
   ],
   extra: createDbPoolExtraFromEnv(),
   synchronize: false,

@@ -74,10 +74,15 @@ export class BountiesService {
     // Fetch page data
     const dataQb = this.bounties.createQueryBuilder('bounty');
     buildWhere(dataQb);
-    dataQb.orderBy('bounty.createdAt', 'DESC');
+    dataQb.orderBy('bounty."createdAt"', 'DESC').addOrderBy('bounty.id', 'DESC');
 
     if (cursor) {
-      dataQb.andWhere('bounty.createdAt < (SELECT "createdAt" FROM bounties WHERE id = :cursor)', { cursor });
+      dataQb.andWhere(
+        `(bounty."createdAt", bounty.id) < (
+          SELECT "createdAt", id FROM bounties WHERE id = :cursor
+        )`,
+        { cursor },
+      );
     }
 
     // Fetch one extra to detect if there is a next page

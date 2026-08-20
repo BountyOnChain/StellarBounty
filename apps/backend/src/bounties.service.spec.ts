@@ -38,6 +38,7 @@ describe('BountiesService', () => {
       andWhere: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue(results),
       getCount: jest.fn().mockResolvedValue(total),
@@ -163,7 +164,8 @@ describe('BountiesService', () => {
 
       const result = await service.findAll();
 
-      expect(qb.orderBy).toHaveBeenCalledWith('bounty.createdAt', 'DESC');
+      expect(qb.orderBy).toHaveBeenCalledWith('bounty."createdAt"', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('bounty.id', 'DESC');
       expect(qb.take).toHaveBeenCalledWith(21);
       expect(result.data).toEqual(bounties);
       expect(result.total).toBe(2);
@@ -173,7 +175,7 @@ describe('BountiesService', () => {
       expect(result.nextCursor).toBeNull();
     });
 
-    it('applies cursor when provided', async () => {
+    it('applies composite cursor when provided', async () => {
       const bounties = [createBounty({ id: 'b' })];
       const qb = createMockQueryBuilder(bounties, 45);
       repository.createQueryBuilder!.mockReturnValue(qb);
@@ -181,7 +183,7 @@ describe('BountiesService', () => {
       const result = await service.findAll({ cursor: 'prev-id', limit: 10 });
 
       expect(qb.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('createdAt <'),
+        expect.stringContaining('(bounty."createdAt", bounty.id) <'),
         { cursor: 'prev-id' },
       );
       expect(qb.take).toHaveBeenCalledWith(11);
@@ -198,6 +200,40 @@ describe('BountiesService', () => {
 
       expect(result.nextCursor).toBe('item-4');
       expect(result.data).toHaveLength(5);
+    });
+
+    it('cursor pagination is stable across tied timestamps', async () => {
+      const sharedTime = new Date('2026-01-01T00:00:00.000Z');
+      const page1Data = [
+        createBounty({ id: 'bounty-a', createdAt: sharedTime }),
+        createBounty({ id: 'bounty-b', createdAt: sharedTime }),
+        createBounty({ id: 'bounty-c', createdAt: sharedTime }),
+      ];
+      const page2Data = [
+        createBounty({ id: 'bounty-d', createdAt: sharedTime }),
+        createBounty({ id: 'bounty-e', createdAt: sharedTime }),
+      ];
+
+      const countQb1 = createMockQueryBuilder([], 4);
+      const dataQb1 = createMockQueryBuilder(page1Data, 4);
+      const countQb2 = createMockQueryBuilder([], 4);
+      const dataQb2 = createMockQueryBuilder(page2Data, 4);
+      repository.createQueryBuilder!
+        .mockReturnValueOnce(countQb1)
+        .mockReturnValueOnce(dataQb1)
+        .mockReturnValueOnce(countQb2)
+        .mockReturnValueOnce(dataQb2);
+
+      const result1 = await service.findAll({ limit: 2 });
+      expect(result1.data).toHaveLength(2);
+      expect(result1.nextCursor).toBe('bounty-b');
+
+      const result2 = await service.findAll({ cursor: 'bounty-b', limit: 2 });
+      expect(result2.data).toHaveLength(2);
+
+      const page1Ids = result1.data.map((b) => b.id);
+      const page2Ids = result2.data.map((b) => b.id);
+      expect(page1Ids.some((id) => page2Ids.includes(id))).toBe(false);
     });
 
     it('returns totalPages = 1 even when total is 0 (defensive)', async () => {
