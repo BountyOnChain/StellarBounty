@@ -1,32 +1,54 @@
-import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { jsonLogger } from '../json-logger.service';
+
+const SENSITIVE_QUERY_KEYS = ['token', 'code', 'apikey', 'api_key', 'secret'];
+
+function sanitizeUrl(originalUrl: string): string {
+  const questionIndex = originalUrl.indexOf('?');
+  if (questionIndex === -1) return originalUrl;
+
+  const base = originalUrl.slice(0, questionIndex);
+  const queryString = originalUrl.slice(questionIndex + 1);
+  const params = new URLSearchParams(queryString);
+
+  for (const key of SENSITIVE_QUERY_KEYS) {
+    if (params.has(key)) {
+      params.set(key, '[REDACTED]');
+    }
+  }
+
+  const sanitized = params.toString();
+  return sanitized ? `${base}?${sanitized}` : base;
+}
 
 @Injectable()
 export class AuditLogMiddleware implements NestMiddleware {
-  private readonly logger = new Logger('AuditLog');
-
   use(req: Request, res: Response, next: NextFunction): void {
     const startTime = Date.now();
-    const { method, originalUrl, ip } = req;
+    const method = req.method;
+    const path = sanitizeUrl(req.originalUrl ?? req.url);
+    const ip = req.ip;
     const userAgent = req.get('user-agent') || 'unknown';
 
     res.on('finish', () => {
-      const duration = Date.now() - startTime;
+      const durationMs = Date.now() - startTime;
       const statusCode = res.statusCode;
-      const logEntry = {
-        timestamp: new Date().toISOString(),
+
+      const entry = {
+        msg: 'http_audit',
         method,
-        url: originalUrl,
+        path,
         statusCode,
-        duration: `${duration}ms`,
+        durationMs,
         ip,
         userAgent,
       };
 
       if (statusCode >= 400) {
-        this.logger.warn(JSON.stringify(logEntry));
+        jsonLogger.warn(entry, 'AUDIT');
       } else {
-        this.logger.log(JSON.stringify(logEntry));
+        jsonLogger.log(entry, 'AUDIT');
       }
     });
 
