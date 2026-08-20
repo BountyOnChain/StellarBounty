@@ -1,6 +1,6 @@
 {
   "name": "@stellar-bounty/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Type-safe SDK for the StellarBounty API — authenticate, list bounties, submit work.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -15,11 +15,15 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests"
   },
   "keywords": ["stellar", "bounty", "sdk", "soroban"],
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0"
   }
