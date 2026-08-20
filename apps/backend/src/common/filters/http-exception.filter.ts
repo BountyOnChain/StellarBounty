@@ -31,7 +31,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     res.status(statusCode).json({
-      error: { code: HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR', message, statusCode },
+      error: {
+        code: (isHttp && typeof exception.getResponse() === 'object'
+          ? (exception.getResponse() as Record<string, unknown>)?.code
+          : undefined) as string | undefined ?? HttpStatus[statusCode] ?? 'INTERNAL_SERVER_ERROR',
+        message,
+        ...((isHttp && typeof exception.getResponse() === 'object')
+          ? Object.fromEntries(
+              Object.entries(exception.getResponse() as Record<string, unknown>)
+                .filter(([key]) => key !== 'message' && key !== 'statusCode' && key !== 'error'),
+            )
+          : {}),
+        statusCode,
+      },
     });
   }
 }
