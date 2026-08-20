@@ -24,10 +24,16 @@ export class BountiesService {
       throw new ForbiddenException('ownerAddress must match the authenticated user');
     }
 
-    // Re-initialization protection: check if bounty with same title already exists
-    const existing = await this.bounties.findOne({ where: { title: dto.title } });
-    if (existing) {
-      return existing;
+    const existing = await this.bounties.findOne({
+      where: { title: dto.title },
+      withDeleted: true,
+    });
+    if (existing && existing.deletedAt === null) {
+      throw new ConflictException({
+        code: 'BOUNTY_TITLE_TAKEN',
+        message: 'A non-deleted bounty with this title already exists',
+        existingBountyId: existing.id,
+      });
     }
 
     const bounty = this.bounties.create({

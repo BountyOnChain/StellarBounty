@@ -174,6 +174,7 @@ console.log("Created bounty:", bounty.id);
 | 400 | Validation failed | Check field constraints (lengths, ranges, formats) |
 | 401 | Unauthorized | Provide a valid JWT in the Authorization header |
 | 403 | Not the bounty owner | The `ownerAddress` in the request body must match your authenticated wallet address |
+| 409 | BOUNTY_TITLE_TAKEN | A bounty with this title already exists. Append a unique suffix or choose a different title. The response includes `existingBountyId`. |
 
 ---
 

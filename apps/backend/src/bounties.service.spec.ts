@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -346,23 +346,65 @@ describe('BountiesService', () => {
     });
   });
 
-  describe('re-initialization protection', () => {
-    it('should not create duplicate bounty with same id', async () => {
-      const existing = createBounty({ id: 'bounty-1' });
+  describe('title uniqueness', () => {
+    it('throws ConflictException when an active bounty with the same title exists', async () => {
+      const existing = createBounty({ id: 'bounty-1', deletedAt: null });
       repository.findOne!.mockResolvedValueOnce(existing);
 
-      await service.create({
-        title: 'Duplicate bounty',
-        description: 'Should not be created',
-        rewardAmount: '5000000',
-        ownerAddress: OWNER_ADDRESS,
-      }, OWNER_ADDRESS);
+      await expect(
+        service.create({
+          title: 'Duplicate bounty',
+          description: 'Should not be created',
+          rewardAmount: '5000000',
+          ownerAddress: OWNER_ADDRESS,
+        }, OWNER_ADDRESS),
+      ).rejects.toThrow(ConflictException);
 
       expect(repository.create).not.toHaveBeenCalled();
       expect(repository.save).not.toHaveBeenCalled();
     });
 
-    it('should allow creation when no bounty exists with same id', async () => {
+    it('includes existingBountyId in the ConflictException response', async () => {
+      const existing = createBounty({ id: 'existing-bounty', deletedAt: null });
+      repository.findOne!.mockResolvedValueOnce(existing);
+
+      try {
+        await service.create({
+          title: 'Build a Stellar integration',
+          description: 'Should not be created',
+          rewardAmount: '5000000',
+          ownerAddress: OWNER_ADDRESS,
+        }, OWNER_ADDRESS);
+        fail('Expected ConflictException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ConflictException);
+        const response = (err as ConflictException).getResponse();
+        expect(response).toMatchObject({
+          code: 'BOUNTY_TITLE_TAKEN',
+          existingBountyId: 'existing-bounty',
+        });
+      }
+    });
+
+    it('allows creation when the same title was soft-deleted', async () => {
+      const deleted = createBounty({ id: 'deleted-bounty', deletedAt: new Date() });
+      repository.findOne!.mockResolvedValueOnce(deleted);
+      const newBounty = createBounty({ id: 'new-bounty' });
+      repository.create!.mockReturnValueOnce(newBounty);
+      repository.save!.mockResolvedValueOnce(newBounty);
+
+      await service.create({
+        title: 'Build a Stellar integration',
+        description: 'Fresh creation after soft-delete',
+        rewardAmount: '10000000',
+        ownerAddress: OWNER_ADDRESS,
+      }, OWNER_ADDRESS);
+
+      expect(repository.create).toHaveBeenCalled();
+      expect(repository.save).toHaveBeenCalled();
+    });
+
+    it('allows creation when no bounty exists with same title', async () => {
       repository.findOne!.mockResolvedValueOnce(null);
       const newBounty = createBounty({ id: 'bounty-2' });
       repository.create!.mockReturnValueOnce(newBounty);
