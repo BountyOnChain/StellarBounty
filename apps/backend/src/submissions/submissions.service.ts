@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -59,6 +58,11 @@ export class SubmissionsService {
     const bounty = await this.bountyRepo.findOneBy({ id: bountyId });
     if (!bounty) throw new NotFoundException('Bounty not found');
     if (bounty.ownerAddress !== ownerAddress) throw new ForbiddenException();
+    if (bounty.status !== BountyStatus.OPEN && bounty.status !== BountyStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        `Bounty is not open for approval (current status: ${bounty.status})`,
+      );
+    }
 
     const alreadyApproved = await this.submissionRepo.findOneBy({
       bountyId,
@@ -69,19 +73,22 @@ export class SubmissionsService {
     const submission = await this.submissionRepo.findOneBy({ id: subId, bountyId });
     if (!submission) throw new NotFoundException('Submission not found');
 
+    const contractId = await this.contractRegistryService.findContractFor(
+      bountyId,
+      this.config.get<string>('STELLAR_NETWORK', 'testnet'),
+    );
+    if (!contractId) {
+      this.logger.warn(
+        `approve called for bounty ${bountyId} with no contract mapped; bounty remains in ${bounty.status}`,
+      );
+      return submission;
+    }
+
     await this.callContractApprove(bountyId, ownerAddress);
 
-    submission.status = SubmissionStatus.APPROVED;
-    bounty.status = BountyStatus.COMPLETED;
+    bounty.status = BountyStatus.APPROVAL_QUEUED;
     await this.bountyRepo.save(bounty);
-    try {
-      return await this.submissionRepo.save(submission);
-    } catch (err: any) {
-      if (err.code === '23505' || err.message?.includes('idx_submissions_one_approved_per_bounty')) {
-        throw new ConflictException('A submission is already approved for this bounty');
-      }
-      throw err;
-    }
+    return submission;
   }
 
   async reject(bountyId: string, subId: string, ownerAddress: string) {

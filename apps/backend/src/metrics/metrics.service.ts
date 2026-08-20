@@ -57,6 +57,9 @@ export class MetricsService {
   private contractEventsReceivedTotal = 0;
   private contractEventsProjectedTotal = 0;
   private readonly contractEventsDeadLettered = new Map<string, number>();
+  private settlementAttempts = 0;
+  private settlementSuccesses = 0;
+  private settlementFailures = 0;
 
   reset(): void {
     this.requestCounts = new Map();
@@ -75,6 +78,9 @@ export class MetricsService {
     this.contractEventsReceivedTotal = 0;
     this.contractEventsProjectedTotal = 0;
     this.contractEventsDeadLettered.clear();
+    this.settlementAttempts = 0;
+    this.settlementSuccesses = 0;
+    this.settlementFailures = 0;
     this.startedAt = Date.now();
   }
 
@@ -163,6 +169,18 @@ export class MetricsService {
     this.contractEventsDeadLettered.set(key, (this.contractEventsDeadLettered.get(key) ?? 0) + 1);
   }
 
+  recordSettlementAttempt(): void {
+    this.settlementAttempts += 1;
+  }
+
+  recordSettlementSuccess(): void {
+    this.settlementSuccesses += 1;
+  }
+
+  recordSettlementFailure(): void {
+    this.settlementFailures += 1;
+  }
+
   renderPrometheus(): string {
     const lines: string[] = [
       '# HELP stellar_bounty_process_uptime_seconds Process uptime in seconds.',
@@ -183,6 +201,7 @@ export class MetricsService {
     this.appendRpcLimiterMetrics(lines);
     this.appendDynamicFeeMetrics(lines);
     this.appendContractEventMetrics(lines);
+    this.appendSettlementMetrics(lines);
 
     return `${lines.join('\n')}\n`;
   }
@@ -323,6 +342,20 @@ export class MetricsService {
       '# HELP stellar_bounty_rpc_limiter_queue_length Number of RPC calls waiting in the concurrency limiter queue.',
       '# TYPE stellar_bounty_rpc_limiter_queue_length gauge',
       `stellar_bounty_rpc_limiter_queue_length ${this.rpcLimiterQueueLength}`,
+    );
+  }
+
+  private appendSettlementMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_settlement_attempts_total Total settlement scheduler attempts.',
+      '# TYPE stellar_bounty_settlement_attempts_total counter',
+      `stellar_bounty_settlement_attempts_total ${this.settlementAttempts}`,
+      '# HELP stellar_bounty_settlement_successes_total Total successful settlement completions.',
+      '# TYPE stellar_bounty_settlement_successes_total counter',
+      `stellar_bounty_settlement_successes_total ${this.settlementSuccesses}`,
+      '# HELP stellar_bounty_settlement_failures_total Total failed settlement attempts.',
+      '# TYPE stellar_bounty_settlement_failures_total counter',
+      `stellar_bounty_settlement_failures_total ${this.settlementFailures}`,
     );
   }
 

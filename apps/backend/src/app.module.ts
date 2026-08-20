@@ -32,6 +32,7 @@ import { AddOneApprovedSubmissionIndex1747657600000 } from './migrations/1747657
 import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-AddSavedBountiesTable';
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { AddUniqueActiveBountyTitle1747700200000 } from './migrations/1747700200000-AddUniqueActiveBountyTitle';
+import { AddApprovalQueuedStatus1747700300000 } from './migrations/1747700300000-AddApprovalQueuedStatus';
 import { AddBountyCreatedAtIdIndex1747700400000 } from './migrations/1747700400000-AddBountyCreatedAtIdIndex';
 import { AddContractOutboxTable1747700500000 } from './migrations/1747700500000-AddContractOutboxTable';
 import { AddDeadLetterEventsTable1747700600000 } from './migrations/1747700600000-AddDeadLetterEventsTable';
@@ -44,6 +45,7 @@ import { MetricsService } from './metrics/metrics.service';
 import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
+import { SettlementSchedulerService } from './submissions/settlement-scheduler.service';
 import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
 import { SorobanEventsPoller } from './events/soroban-events.poller';
 import { EventProjector } from './events/event-projector';
@@ -84,6 +86,8 @@ import { EventProjector } from './events/event-projector';
           STELLAR_RPC_RETRY_BASE_DELAY_MS: Joi.number().integer().min(0).default(1000),
           CONTRACT_EVENT_SYNC_ENABLED: Joi.boolean().default(false),
           CONTRACT_EVENT_SYNC_INTERVAL_MS: Joi.number().integer().positive().default(30000),
+          SETTLEMENT_SCHEDULER_ENABLED: Joi.boolean().default(true),
+          SETTLEMENT_SCHEDULER_INTERVAL_MS: Joi.number().integer().positive().default(900000),
           PORT: Joi.number().default(4000),
          LOG_LEVEL: Joi.string()
            .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
@@ -121,6 +125,7 @@ import { EventProjector } from './events/event-projector';
             AddSavedBountiesTable1747657700000,
             AddBountyContractsTable1747700000000,
             AddUniqueActiveBountyTitle1747700200000,
+            AddApprovalQueuedStatus1747700300000,
             AddBountyCreatedAtIdIndex1747700400000,
             AddContractOutboxTable1747700500000,
             AddDeadLetterEventsTable1747700600000,
@@ -135,7 +140,7 @@ import { EventProjector } from './events/event-projector';
       }),
     ],
   controllers: [AppController, BountiesController, CspReportController],
-  providers: [AppService, BountiesService, DeadlineAutomationService, EventProjector, SorobanEventsPoller],
+  providers: [AppService, BountiesService, DeadlineAutomationService, EventProjector, SorobanEventsPoller, SettlementSchedulerService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
