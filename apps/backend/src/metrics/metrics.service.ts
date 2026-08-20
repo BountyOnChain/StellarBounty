@@ -54,6 +54,9 @@ export class MetricsService {
   private readonly dynamicFeeBuckets = new Map<string, number[]>();
   private readonly dynamicFeeSums = new Map<string, number>();
   private readonly dynamicFeeCounts = new Map<string, number>();
+  private contractEventsReceivedTotal = 0;
+  private contractEventsProjectedTotal = 0;
+  private readonly contractEventsDeadLettered = new Map<string, number>();
 
   reset(): void {
     this.requestCounts = new Map();
@@ -69,6 +72,9 @@ export class MetricsService {
     this.dynamicFeeBuckets.clear();
     this.dynamicFeeSums.clear();
     this.dynamicFeeCounts.clear();
+    this.contractEventsReceivedTotal = 0;
+    this.contractEventsProjectedTotal = 0;
+    this.contractEventsDeadLettered.clear();
     this.startedAt = Date.now();
   }
 
@@ -143,6 +149,20 @@ export class MetricsService {
     this.rpcLimiterQueueLength = queueLength;
   }
 
+  recordContractEventsReceived(count: number): void {
+    this.contractEventsReceivedTotal += count;
+  }
+
+  recordContractEventProcessed(eventType: string): void {
+    this.contractEventsProjectedTotal += 1;
+    void eventType;
+  }
+
+  recordContractEventDeadLettered(eventType: string): void {
+    const key = this.escapeLabel(eventType);
+    this.contractEventsDeadLettered.set(key, (this.contractEventsDeadLettered.get(key) ?? 0) + 1);
+  }
+
   renderPrometheus(): string {
     const lines: string[] = [
       '# HELP stellar_bounty_process_uptime_seconds Process uptime in seconds.',
@@ -162,6 +182,7 @@ export class MetricsService {
     this.appendCircuitMetrics(lines);
     this.appendRpcLimiterMetrics(lines);
     this.appendDynamicFeeMetrics(lines);
+    this.appendContractEventMetrics(lines);
 
     return `${lines.join('\n')}\n`;
   }
@@ -319,6 +340,24 @@ export class MetricsService {
         lines.push(`stellar_bounty_dynamic_fee_stroops_bucket{${key},le="+Inf"} ${this.dynamicFeeCounts.get(key) ?? 0}`);
         lines.push(`stellar_bounty_dynamic_fee_stroops_sum{${key}} ${this.formatNumber(this.dynamicFeeSums.get(key) ?? 0)}`);
         lines.push(`stellar_bounty_dynamic_fee_stroops_count{${key}} ${this.dynamicFeeCounts.get(key) ?? 0}`);
+      });
+  }
+
+  private appendContractEventMetrics(lines: string[]): void {
+    lines.push(
+      '# HELP stellar_bounty_contract_events_received_total Total Soroban contract events received from RPC.',
+      '# TYPE stellar_bounty_contract_events_received_total counter',
+      `stellar_bounty_contract_events_received_total ${this.contractEventsReceivedTotal}`,
+      '# HELP stellar_bounty_contract_events_projected_total Total contract events projected to database.',
+      '# TYPE stellar_bounty_contract_events_projected_total counter',
+      `stellar_bounty_contract_events_projected_total ${this.contractEventsProjectedTotal}`,
+      '# HELP stellar_bounty_contract_events_dead_lettered_total Contract events moved to dead-letter table.',
+      '# TYPE stellar_bounty_contract_events_dead_lettered_total counter',
+    );
+    [...this.contractEventsDeadLettered.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([eventType, count]) => {
+        lines.push(`stellar_bounty_contract_events_dead_lettered_total{event_type="${eventType}"} ${count}`);
       });
   }
 

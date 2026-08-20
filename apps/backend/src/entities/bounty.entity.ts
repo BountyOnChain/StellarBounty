@@ -13,6 +13,7 @@ import { stroopTransformer } from '../bounties/stroop.utils';
 export enum BountyStatus {
   OPEN = 'open',
   IN_PROGRESS = 'in_progress',
+  APPROVAL_QUEUED = 'approval_queued',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
