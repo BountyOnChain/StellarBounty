@@ -22,6 +22,8 @@ import { SavedBounty } from './entities/saved-bounty.entity';
 import { BountyContract } from './entities/bounty-contract.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
+import { OutboxEvent } from './entities/outbox-event.entity';
+import { DeadLetterEvent } from './entities/dead-letter-event.entity';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
 import { AddTagsColumn1747657400000 } from './migrations/1747657400000-AddTagsColumn';
@@ -31,6 +33,8 @@ import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-A
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { AddUniqueActiveBountyTitle1747700200000 } from './migrations/1747700200000-AddUniqueActiveBountyTitle';
 import { AddBountyCreatedAtIdIndex1747700400000 } from './migrations/1747700400000-AddBountyCreatedAtIdIndex';
+import { AddContractOutboxTable1747700500000 } from './migrations/1747700500000-AddContractOutboxTable';
+import { AddDeadLetterEventsTable1747700600000 } from './migrations/1747700600000-AddDeadLetterEventsTable';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { CspReportController } from './csp-report.controller';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
@@ -41,6 +45,8 @@ import { TypeOrmMetricsLogger } from './metrics/typeorm-metrics.logger';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { DeadlineAutomationService } from './bounties/deadline-automation.service';
 import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
+import { SorobanEventsPoller } from './events/soroban-events.poller';
+import { EventProjector } from './events/event-projector';
 
 @Module({
    imports: [
@@ -73,10 +79,12 @@ import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
          BOUNTY_DEADLINE_AUTOMATION_ENABLED: Joi.boolean().default(true),
          BOUNTY_DEADLINE_AUTOMATION_INTERVAL_MS: Joi.number().integer().positive().default(900000),
          BOUNTY_DEADLINE_GRACE_PERIOD_MS: Joi.number().integer().min(0).default(86400000),
-         BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
-         STELLAR_RPC_RETRY_MAX_RETRIES: Joi.number().integer().min(0).default(3),
-         STELLAR_RPC_RETRY_BASE_DELAY_MS: Joi.number().integer().min(0).default(1000),
-         PORT: Joi.number().default(4000),
+          BOUNTY_DEADLINE_REMINDER_WINDOW_MS: Joi.number().integer().min(0).default(172800000),
+          STELLAR_RPC_RETRY_MAX_RETRIES: Joi.number().integer().min(0).default(3),
+          STELLAR_RPC_RETRY_BASE_DELAY_MS: Joi.number().integer().min(0).default(1000),
+          CONTRACT_EVENT_SYNC_ENABLED: Joi.boolean().default(false),
+          CONTRACT_EVENT_SYNC_INTERVAL_MS: Joi.number().integer().positive().default(30000),
+          PORT: Joi.number().default(4000),
          LOG_LEVEL: Joi.string()
            .valid('debug', 'verbose', 'log', 'info', 'warn', 'warning', 'error')
            .default('log'),
@@ -96,14 +104,14 @@ import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
      HealthModule,
      MetricsModule,
       SavedBountiesModule,
-      TypeOrmModule.forFeature([Bounty, SavedBounty, BountyContract, Nonce]),
+      TypeOrmModule.forFeature([Bounty, SavedBounty, BountyContract, Nonce, OutboxEvent, DeadLetterEvent]),
       TypeOrmModule.forRootAsync({
         imports: [ConfigModule, MetricsModule],
         inject: [ConfigService, MetricsService],
         useFactory: (config: ConfigService, metrics: MetricsService) => ({
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce],
+          entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce, OutboxEvent, DeadLetterEvent],
           migrations: [
             InitSchema1747657200000,
             AddNoncesTable1747657300000,
@@ -114,6 +122,8 @@ import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
             AddBountyContractsTable1747700000000,
             AddUniqueActiveBountyTitle1747700200000,
             AddBountyCreatedAtIdIndex1747700400000,
+            AddContractOutboxTable1747700500000,
+            AddDeadLetterEventsTable1747700600000,
           ],
           logger: new TypeOrmMetricsLogger(metrics),
           extra: createDbPoolExtra(config),
@@ -125,7 +135,7 @@ import { SavedBountiesModule } from './saved-bounties/saved-bounties.module';
       }),
     ],
   controllers: [AppController, BountiesController, CspReportController],
-  providers: [AppService, BountiesService, DeadlineAutomationService],
+  providers: [AppService, BountiesService, DeadlineAutomationService, EventProjector, SorobanEventsPoller],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

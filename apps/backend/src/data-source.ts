@@ -5,6 +5,8 @@ import { SavedBounty } from './entities/saved-bounty.entity';
 import { BountyContract } from './entities/bounty-contract.entity';
 import { Submission } from './entities/submission.entity';
 import { Nonce } from './entities/nonce.entity';
+import { OutboxEvent } from './entities/outbox-event.entity';
+import { DeadLetterEvent } from './entities/dead-letter-event.entity';
 import { createDbPoolExtraFromEnv } from './db-pool.config';
 import { InitSchema1747657200000 } from './migrations/1747657200000-InitSchema';
 import { AddNoncesTable1747657300000 } from './migrations/1747657300000-AddNoncesTable';
@@ -15,11 +17,13 @@ import { AddSavedBountiesTable1747657700000 } from './migrations/1747657700000-A
 import { AddBountyContractsTable1747700000000 } from './migrations/1747700000000-AddBountyContractsTable';
 import { AddUniqueActiveBountyTitle1747700200000 } from './migrations/1747700200000-AddUniqueActiveBountyTitle';
 import { AddBountyCreatedAtIdIndex1747700400000 } from './migrations/1747700400000-AddBountyCreatedAtIdIndex';
+import { AddContractOutboxTable1747700500000 } from './migrations/1747700500000-AddContractOutboxTable';
+import { AddDeadLetterEventsTable1747700600000 } from './migrations/1747700600000-AddDeadLetterEventsTable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce],
+  entities: [Bounty, SavedBounty, BountyContract, Submission, Nonce, OutboxEvent, DeadLetterEvent],
   migrations: [
     InitSchema1747657200000,
     AddNoncesTable1747657300000,
@@ -30,6 +34,8 @@ export const AppDataSource = new DataSource({
     AddBountyContractsTable1747700000000,
     AddUniqueActiveBountyTitle1747700200000,
     AddBountyCreatedAtIdIndex1747700400000,
+    AddContractOutboxTable1747700500000,
+    AddDeadLetterEventsTable1747700600000,
   ],
   extra: createDbPoolExtraFromEnv(),
   synchronize: false,
