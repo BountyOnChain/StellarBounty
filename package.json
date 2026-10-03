@@ -7,10 +7,10 @@
     "apps/backend"
   ],
   "scripts": {
-    "dev:frontend": "npm run dev --workspace=apps/frontend",
-    "dev:backend": "npm run dev --workspace=apps/backend",
-    "dev:up": "docker compose up --build",
-    "build": "npm run build --workspaces --if-present",
+    "dev:frontend": "node init && npm run dev --workspace=apps/frontend",
+    "dev:backend": "node init && npm run dev --workspace=apps/backend",
+    "dev:up": "node init && docker compose up --build",
+    "build": "node init && npm run build --workspaces --if-present",
     "install:all": "npm install",
     "release:check": "npm run build --workspaces --if-present && git diff --check",
     "version": "npm run release:check",
