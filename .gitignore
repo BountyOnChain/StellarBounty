@@ -13,8 +13,6 @@ target/
 **/*.rs.bk
 
 # Env
-.env
-.env.local
 .env.*.local
 
 # Backups
@@ -26,3 +24,4 @@ backups/
 coverage/
 test-results/
 apps/contracts/test_snapshots/
+config.bat

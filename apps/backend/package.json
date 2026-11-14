@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
-    "start": "node dist/main",
+    "dev": "node init && nest start --watch",
+    "build": "node init && nest build",
+    "start": "node init && node dist/main",
     "test": "jest",
     "lint": "eslint \"src/**/*.ts\"",
     "migration:run": "typeorm migration:run -d dist/data-source.js",
