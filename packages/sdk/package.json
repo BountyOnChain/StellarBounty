@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "node init && tsup src/index.ts --format cjs,esm --dts --clean",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests"
   },
